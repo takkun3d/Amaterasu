@@ -30,7 +30,6 @@ except ImportError:
 
 from maya import cmds
 from ..lib import parser, widgets
-from . import create_controller
 from ..modify import history_visibility
 
 # ==============================================================================
@@ -45,7 +44,6 @@ __copyright__ = 'Copyright(c) 2025 @takkun3d. All Rights Reserved.'
 _logger: logging.Logger = logging.getLogger(__product__)
 
 PLUGIN_NAME: str = 'quatNodes.mll'
-WORLD_DAG_PATH: str = '|'
 
 
 # ==============================================================================
