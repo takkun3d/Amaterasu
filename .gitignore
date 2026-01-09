@@ -1,0 +1,14 @@
+.env/
+psd/
+publish/
+
+__pycache__/
+*.pyc
+.mypy_cache/
+
+Thumbs.db
+.DS_Store
+
+tools/
+template/
+.vscode/

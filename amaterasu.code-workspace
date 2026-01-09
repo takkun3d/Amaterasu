@@ -1,0 +1,55 @@
+{
+    "folders": [
+        {
+            "path": "."
+        }
+    ],
+    "settings": {
+        "files.trimTrailingWhitespace": true,
+        "editor.mouseWheelZoom": true,
+        "editor.fontFamily": "'Moralerspace Neon JPDOC', Consolas, 'Courier New', monospace",
+        "editor.fontSize": 14,
+
+        "[python]": {
+            "editor.autoIndent": "full",
+            "editor.detectIndentation": true,
+            "editor.insertSpaces": true,
+            "editor.tabSize": 4,
+            "editor.rulers": [
+                80,
+                100
+            ],
+            "editor.formatOnSave": true,
+            "editor.defaultFormatter": "ms-python.black-formatter"
+        },
+        "python.autoComplete.extraPaths": [
+            "${workspaceFolder}\\.vscode\\stubs"
+        ],
+        "python.analysis.extraPaths": [
+            "${workspaceFolder}\\.vscode\\stubs"
+        ],
+        "python.analysis.autoImportCompletions": true,
+        "python.analysis.typeCheckingMode": "off",
+        "python.analysis.inlayHints.functionReturnTypes": true,
+        "python.analysis.inlayHints.variableTypes": true,
+        "python.analysis.inlayHints.pytestParameters": true,
+
+        "pylint.args": [
+            "--extension-pkg-whitelist=PySide2,PySide6,maya,pymel",
+            "--max-line-length=80",
+            "--disable=W0613"
+        ],
+
+        "files.exclude": {
+            "**/.git": true,
+            "**/.svn": true,
+            "**/.hg": true,
+            "**/.env": true,
+            "**/.mypy_cache": true,
+            "**/.DS_Store": true,
+            "**/Thumbs.db": true,
+            "**/__pycache__": true,
+            "**/*.pyc": true
+        }
+    }
+}

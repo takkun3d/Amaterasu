@@ -1,0 +1,19 @@
+global proc AEmotionTrailCurveTemplate(string $nodeName) 
+{
+	editorTemplate -beginScrollLayout;
+	
+	editorTemplate -beginLayout "motionTrailCurve" -collapse false;
+	{
+		editorTemplate -l "Back Time" -addControl "backTime";
+		editorTemplate -l "Step" -addControl "step";
+		editorTemplate -l "Matrix In" -addControl "matrixIn";
+		editorTemplate -l "Noise Map" -addControl "noiseMap";
+	}
+	editorTemplate -endLayout;
+
+	editorTemplate -s "outputCurve";
+	
+	AEabstractBaseCreateTemplate $nodeName;
+	editorTemplate -addExtraControls;
+	editorTemplate -endScrollLayout;
+}
