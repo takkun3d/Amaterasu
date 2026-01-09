@@ -88,6 +88,9 @@ class MainWindow(widgets.ToolWidget):
         self.__form_layout.addRow(widgets.HorizontalLine(self))
 
         self.__sources: widgets.NodePicker = widgets.NodePicker(-1, self)
+        self.__sources.set_placeholder_text(
+            '*Select in order: Parent -> Child.'
+        )
         self.__form_layout.addRow(widgets.FormLabel('Sources'), self.__sources)
 
         self.__target: widgets.NodePicker = widgets.NodePicker(1, self)
@@ -212,21 +215,20 @@ def apply(
     mult_matrix: str = cmds.createNode(
         'multMatrix', name=f'{base_name}{target_base_name}_multMtx'
     )
+    cmds.connectAttr(f'{target_space}.matrix', f'{mult_matrix}.matrixIn[0]')
 
     if space == 0:
         # Calc Matrix
-        cmds.connectAttr(
-            f'{target_space}.worldMatrix[0]', f'{mult_matrix}.matrixIn[0]'
-        )
         cmds.connectAttr(
             f'{target}.parentInverseMatrix[0]',
             f'{mult_matrix}.matrixIn[1]',
         )
 
     else:
-        # Calc Matrix
-        cmds.connectAttr(f'{target_space}.matrix', f'{mult_matrix}.matrixIn[0]')
+        # Reverse sources.
+        sources = list(reversed(sources))
 
+        # Calc Matrix
         i: int = 0
         for i, node in enumerate(sources, 1):
             cmds.connectAttr(f'{node}.matrix', f'{mult_matrix}.matrixIn[{i}]')
