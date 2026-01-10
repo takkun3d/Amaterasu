@@ -346,13 +346,7 @@ def apply(
         cmds.outlinerEditor(panel, edit=True, refresh=True)
 
     # Clean up
-    history_visibility.main(
-        [
-            target,
-            *sources,
-        ],
-        0,
-    )
+    history_visibility.main([target, *sources], 0)
 
 
 def main() -> None:
