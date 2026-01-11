@@ -338,6 +338,14 @@ class NodePicker(QWidget):
         '''Set text to QLineEdit'''
         self.set_text_from_list(text.split(','))
 
+    def placeholder_text(self) -> str:
+        '''Return placeholder text from QLineEdit.'''
+        return self.__line_edit.placeholderText()
+
+    def set_placeholder_text(self, text: str) -> None:
+        '''Set placeholder text to QLineEdit.'''
+        self.__line_edit.setPlaceholderText(text)
+
     def set_text_from_list(self, selection: list[str]) -> None:
         '''Set text to QLineEdit from list of strings.'''
         if not selection:
