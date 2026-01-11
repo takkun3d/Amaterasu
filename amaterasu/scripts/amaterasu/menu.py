@@ -539,6 +539,11 @@ def create_main_menu() -> None:
 
             m.add_divider('Constraint')
             m.add_item(
+                'Matrix Constraint',
+                'amaterasu.rigging.matrix_constraint',
+                is_window_only=True,
+            )
+            m.add_item(
                 'Geometry Constraint', 'amaterasu.rigging.geometry_constraint'
             )
             m.add_item(
