@@ -609,11 +609,12 @@ def normalize_shading_engine_name_from_selection() -> None:
 
 def remove_pasted() -> None:
     '''Removes the 'pasted__' prefix from all scene nodes.'''
-    nodes: list[str] = cmds.ls('pasted__*')
+    cmds.select('pasted__*')
+    cmds.select('pasted__*', add=True, allDependencyNodes=True)
+    nodes: list[str] = cmds.ls(selection=True)
     if not nodes:
         _logger.info('No \'pasted__\' nodes found.')
 
-    cmds.select(*nodes, allDagObjects=True, allDependencyNodes=True)
     rename('pasted__', '')
     _logger.info('Done.')
 
