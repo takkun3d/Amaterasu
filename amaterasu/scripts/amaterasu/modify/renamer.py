@@ -315,6 +315,10 @@ class NameRefiner(QWidget):
         button.clicked.connect(self.normalize_shading_engine_name)
         main_layout.addWidget(button)
 
+        button = QPushButton('Remove \'pasted__\'', self)
+        button.clicked.connect(self.remove_pasted)
+        main_layout.addWidget(button)
+
         main_layout.addStretch(True)
 
     @widgets.undo
@@ -326,6 +330,11 @@ class NameRefiner(QWidget):
     def normalize_shading_engine_name(self) -> None:
         '''Do it'''
         normalize_shading_engine_name_from_selection()
+
+    @widgets.undo
+    def remove_pasted(self) -> None:
+        '''Do it'''
+        remove_pasted()
 
 
 class SameNameFinder(QWidget):
@@ -595,6 +604,17 @@ def normalize_shading_engine_name_from_selection() -> None:
     for node in selection:
         normalize_shading_engine_name(node)
 
+    _logger.info('Done.')
+
+
+def remove_pasted() -> None:
+    '''Removes the 'pasted__' prefix from all scene nodes.'''
+    nodes: list[str] = cmds.ls('pasted__*')
+    if not nodes:
+        _logger.info('No \'pasted__\' nodes found.')
+
+    cmds.select(*nodes, allDagObjects=True, allDependencyNodes=True)
+    rename('pasted__', '')
     _logger.info('Done.')
 
 
