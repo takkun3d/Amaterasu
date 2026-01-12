@@ -295,8 +295,8 @@ class FindAndReplace(QWidget):
         rename(find_str.replace('*', '.*'), replace_str)
 
 
-class NormalizeShapeName(QWidget):
-    '''Normalize shape name option'''
+class NameRefiner(QWidget):
+    '''A toolset for refining and standardizing node names in the scene.'''
 
     def __init__(
         self,
@@ -307,19 +307,34 @@ class NormalizeShapeName(QWidget):
 
         main_layout: QVBoxLayout = QVBoxLayout(self)
 
-        label: QLabel = QLabel('No option', self)
-        main_layout.addWidget(label)
+        button = QPushButton('Normalize Shape Name', self)
+        button.clicked.connect(self.normalize_shape_name)
+        main_layout.addWidget(button)
+
+        button = QPushButton('Normalize Shading Engine Name', self)
+        button.clicked.connect(self.normalize_shading_engine_name)
+        main_layout.addWidget(button)
+
+        button = QPushButton('Remove \'pasted__\'', self)
+        button.clicked.connect(self.remove_pasted)
+        main_layout.addWidget(button)
 
         main_layout.addStretch(True)
 
-        button = QPushButton('Normalize Shape Name', self)
-        button.clicked.connect(self.apply)
-        main_layout.addWidget(button)
-
     @widgets.undo
-    def apply(self) -> None:
+    def normalize_shape_name(self) -> None:
         '''Do it'''
         normalize_shape_name_from_selection()
+
+    @widgets.undo
+    def normalize_shading_engine_name(self) -> None:
+        '''Do it'''
+        normalize_shading_engine_name_from_selection()
+
+    @widgets.undo
+    def remove_pasted(self) -> None:
+        '''Do it'''
+        remove_pasted()
 
 
 class SameNameFinder(QWidget):
@@ -446,7 +461,7 @@ class MainWindow(widgets.ToolWidget):
         self.__tab.addTab(self.__string_and_number, 'String && Number')
         self.__tab.addTab(self.__insert_string_to, 'Insert String To')
         self.__tab.addTab(self.__find_and_replace, 'Find && Replace')
-        self.__tab.addTab(NormalizeShapeName(self), 'Shape')
+        self.__tab.addTab(NameRefiner(self), 'Refine')
         self.__tab.addTab(SameNameFinder(self), 'Same Name')
         main_layout.addWidget(self.__tab, 0, 0)
 
@@ -550,6 +565,57 @@ def normalize_shape_name_from_selection() -> None:
     for node in selection:
         normalize_shape_name(node)
 
+    _logger.info('Done.')
+
+
+def normalize_shading_engine_name(node: str) -> None:
+    '''Normalize shading engine name from material.'''
+    # Ignore default matrials.
+    if node in [
+        'lambert1',
+        'particleCloud1',
+        'shaderGlow1',
+        'standardSurface1',
+    ]:
+        return
+
+    shading_engine: list[str] = (
+        cmds.listConnections(
+            node, source=False, destination=True, type='shadingEngine'
+        )
+        or []
+    )
+    if not shading_engine:
+        return
+
+    try:
+        cmds.rename(shading_engine[0], f'{node}SG')
+    except RuntimeError as error:
+        _logger.error('Failed to rename : %s', error)
+
+
+def normalize_shading_engine_name_from_selection() -> None:
+    '''Normalize shading engine name from transform.'''
+    selection: list[str] = cmds.ls(selection=True, materials=True)
+    if not selection:
+        _logger.error('Select nodes to normalize shading engine name.')
+        return
+
+    for node in selection:
+        normalize_shading_engine_name(node)
+
+    _logger.info('Done.')
+
+
+def remove_pasted() -> None:
+    '''Removes the 'pasted__' prefix from all scene nodes.'''
+    cmds.select('pasted__*')
+    cmds.select('pasted__*', add=True, allDependencyNodes=True)
+    nodes: list[str] = cmds.ls(selection=True)
+    if not nodes:
+        _logger.info('No \'pasted__\' nodes found.')
+
+    rename('pasted__', '')
     _logger.info('Done.')
 
 
