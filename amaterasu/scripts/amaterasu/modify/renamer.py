@@ -461,7 +461,7 @@ class MainWindow(widgets.ToolWidget):
         self.__tab.addTab(self.__string_and_number, 'String && Number')
         self.__tab.addTab(self.__insert_string_to, 'Insert String To')
         self.__tab.addTab(self.__find_and_replace, 'Find && Replace')
-        self.__tab.addTab(NameRefiner(self), 'Shape')
+        self.__tab.addTab(NameRefiner(self), 'Refine')
         self.__tab.addTab(SameNameFinder(self), 'Same Name')
         main_layout.addWidget(self.__tab, 0, 0)
 
