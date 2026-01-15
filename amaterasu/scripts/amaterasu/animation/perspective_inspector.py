@@ -6,10 +6,21 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 import logging
+import math
 
 try:
-    from PySide2.QtCore import Qt, QRectF, QPoint
-    from PySide2.QtGui import QPainter, QPixmap, QMouseEvent, QWheelEvent
+    from PySide2.QtCore import Qt, Signal, QRectF, QLineF, QPointF, QPoint
+    from PySide2.QtGui import (
+        QPainter,
+        QPainterPath,
+        QColor,
+        QBrush,
+        QPen,
+        QPixmap,
+        QMouseEvent,
+        QWheelEvent,
+        QKeyEvent,
+    )
     from PySide2.QtWidgets import (
         QWidget,
         QVBoxLayout,
@@ -17,6 +28,8 @@ try:
         QGraphicsScene,
         QGraphicsView,
         QGraphicsItem,
+        QGraphicsEllipseItem,
+        QGraphicsLineItem,
         QGraphicsPixmapItem,
         QPushButton,
         QLineEdit,
@@ -27,8 +40,18 @@ try:
 
 except ImportError:
     if not TYPE_CHECKING:
-        from PySide6.QtCore import Qt, QRectF, QPoint
-        from PySide6.QtGui import QPainter, QPixmap, QMouseEvent, QWheelEvent
+        from PySide6.QtCore import Qt, Signal, QRectF, QLineF, QPointF, QPoint
+        from PySide6.QtGui import (
+            QPainter,
+            QPainterPath,
+            QColor,
+            QBrush,
+            QPen,
+            QPixmap,
+            QMouseEvent,
+            QWheelEvent,
+            QKeyEvent,
+        )
         from PySide6.QtWidgets import (
             QWidget,
             QVBoxLayout,
@@ -36,6 +59,8 @@ except ImportError:
             QGraphicsScene,
             QGraphicsView,
             QGraphicsItem,
+            QGraphicsEllipseItem,
+            QGraphicsLineItem,
             QGraphicsPixmapItem,
             QPushButton,
             QLineEdit,
@@ -69,8 +94,151 @@ class Settings(parser.ToolSettings):
     window_geo: parser.Variant[str] = parser.Variant('')
 
 
+class HandleItem(QGraphicsEllipseItem):
+    '''Handle Item.'''
+
+    def __init__(self, x: float, y: float, parent_line: GuideLineItem) -> None:
+        '''Initialize'''
+        super().__init__(-3, -3, 6, 6, parent_line)
+        self.setPos(x, y)
+        self.setFlag(QGraphicsItem.ItemIsMovable, True)
+        self.setFlag(QGraphicsItem.ItemIsSelectable, True)
+        self.setFlag(QGraphicsItem.ItemIgnoresTransformations)
+        self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
+        self.setBrush(QBrush(QColor(255, 170, 0)))
+        self.setZValue(30)
+        self.setAcceptHoverEvents(True)
+        self.setCursor(Qt.PointingHandCursor)
+        self.__parent_line: GuideLineItem = parent_line
+
+    def itemChange(
+        self, change: QGraphicsItem.GraphicsItemChange, value: str
+    ) -> object:
+        '''Override'''
+        if (
+            change == QGraphicsItem.ItemPositionHasChanged
+            and self.__parent_line
+        ):
+            self.__parent_line.update_position_from_handles()
+
+        return super().itemChange(change, value)
+
+
+class GuideLineItem(QGraphicsItem):
+    '''Smart Line Item.'''
+
+    def __init__(
+        self,
+        line: QLineF,
+        axis: str = 'X',
+        view_ref: DrawingView | None = None,
+    ) -> None:
+        super().__init__()
+        self.setFlag(QGraphicsItem.ItemIsSelectable, True)
+
+        self.color_type: str = axis
+        self.__view_ref: DrawingView | None = view_ref
+        self.__color: QColor = self.__get_axis_color(axis)
+        self.__guide_item: QGraphicsItem = self.__create_guide_line()
+        self.__line_item: QGraphicsLineItem = self.__create_main_line()
+        self.__handle1: HandleItem = self.__create_handle(line.p1())
+        self.__handle2: HandleItem = self.__create_handle(line.p2())
+        self.setHandlesChildEvents(False)
+        self.update_position_from_handles()
+
+    def boundingRect(self) -> QRectF:
+        '''Override bounding rect.'''
+        return self.__line_item.boundingRect()
+
+    def shape(self) -> QPainterPath:
+        '''Override shape to match the main line.'''
+        return self.__line_item.shape()
+
+    def paint(
+        self,
+        painter: QPainter,
+        option: object,
+        widget: QWidget | None = None,
+    ) -> None:
+        '''Paint event.'''
+
+    def __get_axis_color(self, axis: str) -> QColor:
+        '''Get color based on axis.'''
+        colors: dict[str, QColor] = {
+            'X': QColor(255, 50, 50),
+            'Y': QColor(50, 255, 50),
+            'Z': QColor(80, 120, 255),
+        }
+        return colors.get(axis, QColor(255, 255, 255))
+
+    def __create_guide_line(self) -> QGraphicsLineItem:
+        '''Create infinite guide line item.'''
+        pen = QPen(self.__color)
+        pen.setWidth(1)
+        pen.setCosmetic(True)
+
+        item = QGraphicsLineItem(self)
+        item.setPen(pen)
+        return item
+
+    def __create_main_line(self) -> QGraphicsLineItem:
+        '''Create main line item.'''
+        pen = QPen(self.__color)
+        pen.setWidth(2)
+        pen.setCosmetic(True)
+
+        item = QGraphicsLineItem(self)
+        item.setPen(pen)
+        item.setFlag(QGraphicsItem.ItemIsSelectable, True)
+        return item
+
+    def __create_handle(self, pos: QPointF) -> HandleItem:
+        '''Create handle item.'''
+        handle = HandleItem(pos.x(), pos.y(), self)
+        return handle
+
+    def update_position_from_handles(self) -> None:
+        '''Update position from handles.'''
+        self.prepareGeometryChange()
+        p1: QPointF = self.__handle1.scenePos()
+        p2: QPointF = self.__handle2.scenePos()
+        local_p1: QPointF = self.mapFromScene(p1)
+        local_p2: QPointF = self.mapFromScene(p2)
+        self.__line_item.setLine(QLineF(local_p1, local_p2))
+
+        line_vec: QPointF = local_p2 - local_p1
+        length: float = math.hypot(line_vec.x(), line_vec.y())
+        if length > 0:
+            scale = 100000
+            dx: float = (line_vec.x() / length) * scale
+            dy: float = (line_vec.y() / length) * scale
+            self.__guide_item.setLine(
+                QLineF(
+                    local_p1.x() - dx,
+                    local_p1.y() - dy,
+                    local_p2.x() + dx,
+                    local_p2.y() + dy,
+                )
+            )
+
+        if self.__view_ref:
+            self.__view_ref.update_global_visuals()
+
+    def remove_from_scene(self) -> None:
+        '''Remove self from scene.'''
+        scene: QGraphicsScene = self.scene()
+        if scene:
+            scene.removeItem(self)
+
+    def get_line_f(self) -> QLineF:
+        '''Get QLineF in scene coordinates.'''
+        return QLineF(self.__handle1.scenePos(), self.__handle2.scenePos())
+
+
 class DrawingView(QGraphicsView):
     '''Drawing View'''
+
+    lines_updated = Signal()
 
     def __init__(
         self,
@@ -79,16 +247,44 @@ class DrawingView(QGraphicsView):
     ) -> None:
         '''Initialize widget.'''
         super().__init__(scene, parent)
-        self._is_zooming: bool = False
-        self._is_panning: bool = False
-        self._last_pan_pos: QPoint = QPoint()
-
-        self.setRenderHint(QPainter.SmoothPixmapTransform)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setDragMode(QGraphicsView.NoDrag)
         self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
         self.setResizeAnchor(QGraphicsView.AnchorUnderMouse)
+
+        self.__is_zooming: bool = False
+        self.__is_panning: bool = False
+        self.__last_pos: QPoint = QPoint()
+
+        self.__temp_line: QGraphicsLineItem | None = None
+        self.__start_pos: QPointF = QPointF()
+        self.__current_axis_mode: str = 'X'
+        self.__lines: list[GuideLineItem] = []
+
+        self.__vp_marker_x: QGraphicsEllipseItem = self.__create_vp_marker(
+            QColor(255, 50, 50)
+        )
+        self.__vp_marker_y: QGraphicsEllipseItem = self.__create_vp_marker(
+            QColor(50, 255, 50)
+        )
+        self.__vp_marker_z: QGraphicsEllipseItem = self.__create_vp_marker(
+            QColor(80, 120, 255)
+        )
+
+        h_pen = QPen(QColor(0, 255, 255))
+        h_pen.setWidth(2)
+        h_pen.setCosmetic(True)
+
+        self.__horizon_line = QGraphicsLineItem()
+        self.__horizon_line.setPen(h_pen)
+        self.__horizon_line.setZValue(15)
+        self.scene().addItem(self.__horizon_line)
+
+        self.setRenderHints(
+            QPainter.Antialiasing | QPainter.SmoothPixmapTransform
+        )
+        self.update_global_visuals()
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         '''Override'''
@@ -97,34 +293,62 @@ class DrawingView(QGraphicsView):
                 event.button() == Qt.MiddleButton
                 or event.button() == Qt.LeftButton
             ):
-                self._is_panning = True
-                self._last_pan_pos = event.pos()
+                self.__is_panning = True
+                self.__last_pos = event.pos()
                 self.setCursor(Qt.ClosedHandCursor)
                 event.accept()
                 return
 
             if event.button() == Qt.RightButton:
-                self._is_zooming = True
-                self._last_pan_pos = event.pos()
+                self.__is_zooming = True
+                self.__last_pos = event.pos()
                 self.setTransformationAnchor(QGraphicsView.AnchorViewCenter)
                 self.setCursor(Qt.SizeVerCursor)
                 event.accept()
                 return
 
+        item: QGraphicsItem = self.itemAt(event.pos())
+        if isinstance(item, HandleItem):
+            super().mousePressEvent(event)
+            return
+
+        if isinstance(item, QGraphicsLineItem):
+            super().mousePressEvent(event)
+            return
+
+        if isinstance(item, GuideLineItem):
+            super().mousePressEvent(event)
+            return
+
+        if event.button() == Qt.LeftButton:
+            self.__start_pos = self.mapToScene(event.pos())
+
+            pen: QPen = QPen(Qt.black)
+            pen.setWidth(2)
+            pen.setStyle(Qt.DashLine)
+            pen.setCosmetic(True)
+
+            self.__temp_line = QGraphicsLineItem(
+                QLineF(self.__start_pos, self.__start_pos)
+            )
+            self.__temp_line.setPen(pen)
+            self.scene().addItem(self.__temp_line)
+
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         '''Override'''
-        delta: QPoint = event.pos() - self._last_pan_pos
-        if self._is_zooming:
+        delta: QPoint = event.pos() - self.__last_pos
+        if self.__is_zooming:
             zoom_input: int = delta.x() - delta.y()
-            zoom_factor: float = 1.0 + (zoom_input * 0.001)
+            zoom_factor: float = 1.0 + (zoom_input * 0.003)
             if zoom_factor > 0:
                 self.scale(zoom_factor, zoom_factor)
+                self.__last_pos = event.pos()
             return
 
-        if self._is_panning:
-            self._last_pan_pos = event.pos()
+        if self.__is_panning:
+            self.__last_pos = event.pos()
             self.horizontalScrollBar().setValue(
                 self.horizontalScrollBar().value() - delta.x()
             )
@@ -134,16 +358,36 @@ class DrawingView(QGraphicsView):
             event.accept()
             return
 
+        if self.__temp_line:
+            current_pos: QPointF = self.mapToScene(event.pos())
+            line: QLineF = self.__temp_line.line()
+            line.setP2(current_pos)
+            self.__temp_line.setLine(line)
+
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         '''Override'''
-        if self._is_panning or self._is_zooming:
-            self._is_zooming = False
-            self._is_panning = False
+        if self.__is_panning or self.__is_zooming:
+            self.__is_zooming = False
+            self.__is_panning = False
             self.setCursor(Qt.ArrowCursor)
             event.accept()
             return
+
+        if self.__temp_line:
+            end_pos: QPointF = self.mapToScene(event.pos())
+            self.scene().removeItem(self.__temp_line)
+            self.__temp_line = None
+            if (end_pos - self.__start_pos).manhattanLength() > 10:
+                new_smart_line = GuideLineItem(
+                    QLineF(self.__start_pos, end_pos),
+                    self.__current_axis_mode,
+                    self,
+                )
+                self.scene().addItem(new_smart_line)
+                self.__lines.append(new_smart_line)
+                self.update_global_visuals()
 
         super().mouseReleaseEvent(event)
 
@@ -154,6 +398,109 @@ class DrawingView(QGraphicsView):
             self.scale(factor, factor)
         else:
             self.scale(1.0 / factor, 1.0 / factor)
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        '''Handle key press events.'''
+        if event.key() == Qt.Key_Delete or event.key() == Qt.Key_Backspace:
+            selected_items: list[QGraphicsItem] = self.scene().selectedItems()
+            changed: bool = False
+            for item in selected_items:
+                parent_item: QGraphicsItem = item.parentItem()
+                if isinstance(item, GuideLineItem):
+                    if item in self.__lines:
+                        self.__lines.remove(item)
+
+                    item.remove_from_scene()
+                    changed = True
+
+                elif isinstance(parent_item, GuideLineItem):
+                    if parent_item in self.__lines:
+                        self.__lines.remove(parent_item)
+
+                    parent_item.remove_from_scene()
+                    changed = True
+
+            if changed:
+                self.update_global_visuals()
+
+        else:
+            super().keyPressEvent(event)
+
+    def __create_vp_marker(self, color: QColor) -> QGraphicsEllipseItem:
+        '''Create vanishing point maker.'''
+        marker = QGraphicsEllipseItem(-6, -6, 12, 12)
+        marker.setBrush(QBrush(color))
+        marker.setFlags(QGraphicsItem.ItemIgnoresTransformations)
+        marker.setZValue(25)
+        marker.setVisible(False)
+        self.scene().addItem(marker)
+        return marker
+
+    def __update_single_vp(
+        self, marker_item: QGraphicsEllipseItem, lines: list[QLineF]
+    ) -> QPointF | None:
+        '''Update vanishing point.'''
+        if len(lines) < 2:
+            marker_item.setVisible(False)
+            return None
+
+        pt: QPointF | None = calculate_intersection(lines[0], lines[1])
+        if not pt:
+            marker_item.setVisible(False)
+            return None
+
+        marker_item.setPos(pt)
+        marker_item.setVisible(True)
+        return pt
+
+    def axis_mode(self) -> str:
+        '''Return axis mode'''
+        return self.__current_axis_mode
+
+    def set_axis_mode(self, axis: str) -> None:
+        '''Set axis mode'''
+        self.__current_axis_mode = axis
+
+    def update_global_visuals(self) -> None:
+        '''Update View.'''
+        lines_x: list[QLineF] = [
+            line.get_line_f() for line in self.__lines if line.color_type == 'X'
+        ]
+        lines_y: list[QLineF] = [
+            line.get_line_f() for line in self.__lines if line.color_type == 'Y'
+        ]
+        lines_z: list[QLineF] = [
+            line.get_line_f() for line in self.__lines if line.color_type == 'Z'
+        ]
+        vp_x: QPointF | None = self.__update_single_vp(
+            self.__vp_marker_x, lines_x
+        )
+        vp_y: QPointF | None = self.__update_single_vp(
+            self.__vp_marker_y, lines_y
+        )
+        vp_z: QPointF | None = self.__update_single_vp(
+            self.__vp_marker_z, lines_z
+        )
+        if vp_x and vp_z:
+            self.__horizon_line.setVisible(True)
+            diff: QPointF = vp_z - vp_x
+            scale = 100000
+            length: float = math.sqrt(diff.x() ** 2 + diff.y() ** 2)
+            if length > 0:
+                dx: float = (diff.x() / length) * scale
+                dy: float = (diff.y() / length) * scale
+                self.__horizon_line.setLine(
+                    QLineF(
+                        vp_x.x() - dx,
+                        vp_x.y() - dy,
+                        vp_z.x() + dx,
+                        vp_z.y() + dy,
+                    )
+                )
+        else:
+            self.__horizon_line.setVisible(False)
+
+        self.lines_updated.emit()
 
 
 class MainWindow(widgets.ToolWidget):
@@ -194,14 +541,17 @@ class MainWindow(widgets.ToolWidget):
         tool_layout.addWidget(widgets.VerticalLine(self))
 
         button: QPushButton = QPushButton('X', self)
+        button.clicked.connect(lambda: self.set_mode('X'))
         button.setFixedWidth(50)
         tool_layout.addWidget(button)
 
         button: QPushButton = QPushButton('Y', self)
+        button.clicked.connect(lambda: self.set_mode('Y'))
         button.setFixedWidth(50)
         tool_layout.addWidget(button)
 
         button: QPushButton = QPushButton('Z', self)
+        button.clicked.connect(lambda: self.set_mode('Z'))
         button.setFixedWidth(50)
         tool_layout.addWidget(button)
 
@@ -250,6 +600,7 @@ class MainWindow(widgets.ToolWidget):
 
         button: QPushButton = QPushButton('Apply', self)
         button.setFixedWidth(50)
+        button.clicked.connect(self.apply)
         tool_layout.addWidget(button)
 
         # View
@@ -339,6 +690,10 @@ class MainWindow(widgets.ToolWidget):
         if self.__bg_item:
             self.__bg_item.setOpacity(value / 100.0)
 
+    def set_mode(self, mode: str) -> None:
+        '''Set line mode.'''
+        self.__view.set_axis_mode(mode)
+
     def calc_preview(self) -> None:
         '''Calc focal length and rotate as preview.'''
 
@@ -346,7 +701,6 @@ class MainWindow(widgets.ToolWidget):
     def apply(self) -> None:
         '''Apply'''
         self.save_settings()
-        main()
 
 
 # ==============================================================================
@@ -354,6 +708,31 @@ class MainWindow(widgets.ToolWidget):
 # Functions
 #
 # ==============================================================================
+def calculate_intersection(line1: QPointF, line2: QPointF) -> QPointF | None:
+    '''Calculate intersection.'''
+    x1: float = line1.p1().x()
+    y1: float = line1.p1().y()
+    x2: float = line1.p2().x()
+    y2: float = line1.p2().y()
+
+    x3: float = line2.p1().x()
+    y3: float = line2.p1().y()
+    x4: float = line2.p2().x()
+    y4: float = line2.p2().y()
+
+    denom: float = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+    if abs(denom) < 1e-9:
+        return None
+
+    px: float = (
+        (x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)
+    ) / denom
+    py: float = (
+        (x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)
+    ) / denom
+    return QPointF(px, py)
+
+
 def apply() -> bool:
     '''Docstring'''
     return True
