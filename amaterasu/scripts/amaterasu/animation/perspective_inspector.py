@@ -74,6 +74,7 @@ except ImportError:
             QButtonGroup,
         )
 from maya import cmds
+from maya.api import OpenMaya as om
 from ..lib import parser, widgets
 
 
@@ -113,41 +114,36 @@ class PerspectiveSolver:
         self.__cy: float = self.__height / 2.0
         self.__film_width: float = film_width
 
-    def matrix_to_euler(self, matrix: list[list[float]]) -> list[float]:
-        '''Returns Euler angle of matrix.'''
-        sy: float = math.sqrt(
-            matrix[0][0] * matrix[0][0] + matrix[1][0] * matrix[1][0]
-        )
-        if not sy < 1e-6:
-            x: float = math.atan2(matrix[2][1], matrix[2][2])
-            y: float = math.atan2(-matrix[2][0], sy)
-            z: float = math.atan2(matrix[1][0], matrix[0][0])
-
-        else:
-            x = math.atan2(-matrix[1][2], matrix[1][1])
-            y = math.atan2(-matrix[2][0], sy)
-            z = 0
-
-        return [math.degrees(x), math.degrees(y), math.degrees(z)]
-
     def solve(
         self,
         x_lines: list[list[float]],
         y_lines: list[list[float]],
         z_lines: list[list[float]],
     ) -> dict[str, float]:
-        '''Solve camera parameters.'''
+        '''Main solver method.'''
+        # Calculate vanishing points for each axis
         vp_x: list[float] = self.intersection(x_lines)
         vp_y: list[float] = self.intersection(y_lines)
         vp_z: list[float] = self.intersection(z_lines)
 
+        # Invalidate vanishing points that are too far away.
+        vp_x = vp_x if self.is_vp_valid(vp_x) else []
+        vp_y = vp_y if self.is_vp_valid(vp_y) else []
+        vp_z = vp_z if self.is_vp_valid(vp_z) else []
+
         # VP2
+        vp2_result: dict[str, float] = {}
         if vp_x and vp_z:
-            return self.solve_vp2(vp_x, vp_z, 'XZ')
+            vp2_result = self.solve_vp2(vp_x, vp_z, 'XZ')
+
         elif vp_x and vp_y:
-            return self.solve_vp2(vp_x, vp_y, 'XY')
+            vp2_result = self.solve_vp2(vp_x, vp_y, 'XY')
+
         elif vp_y and vp_z:
-            return self.solve_vp2(vp_y, vp_z, 'YZ')
+            vp2_result = self.solve_vp2(vp_y, vp_z, 'YZ')
+
+        if vp2_result:
+            return vp2_result
 
         # VP1
         if vp_x and len(z_lines) >= 2:
@@ -170,20 +166,45 @@ class PerspectiveSolver:
 
         return {}
 
+    def is_vp_valid(
+        self, vp: list[float] | None, threshold_ratio: float = 100.0
+    ) -> bool:
+        '''Check if the VP is within a valid distance.'''
+        if not vp:
+            return False
+
+        dx: float = vp[0] - self.__cx
+        dy: float = vp[1] - self.__cy
+        dist: float = math.sqrt(dx * dx + dy * dy)
+        if dist > self.__width * threshold_ratio:
+            return False
+
+        return True
+
     def solve_vp2(
         self, vp1: list[float], vp2: list[float], pair_mode: str
     ) -> dict[str, float]:
-        '''Solve for 2-point perspective.'''
+        '''Calculates true focal length using the orthogonality of axes.'''
+
+        # Convert VP coordinates to vectors from the image center
         v1_x: float = vp1[0] - self.__cx
         v1_y: float = -(vp1[1] - self.__cy)
         v2_x: float = vp2[0] - self.__cx
         v2_y: float = -(vp2[1] - self.__cy)
+
+        # Calculate the dot product of the image plane vectors.
+        # Ideally: V1 . V2 = -f^2 (derived from V1_3d . V2_3d = 0)
         dot_part: float = v1_x * v2_x + v1_y * v2_y
         if dot_part >= 0:
             return {}
 
+        # Calculate Focal Length (in pixels)
         f_pixel: float = math.sqrt(-dot_part)
+
+        # Convert to mm (35mm equivalent)
         focal_length: float = (f_pixel * self.__film_width) / self.__width
+
+        # Reconstruct 3D vectors from camera to VPs
         vec_1: list[float] = self.normalize([v1_x, v1_y, -f_pixel])
         vec_2: list[float] = self.normalize([v2_x, v2_y, -f_pixel])
 
@@ -197,9 +218,12 @@ class PerspectiveSolver:
         pair_mode: str,
         is_vp_primary: bool,
     ) -> dict[str, float]:
-        '''Solve for 1-point perspective.'''
+        '''Focal length cannot be mathematically determined from 1 VP alone.'''
         focal_length: float = 35.0
         f_pixel: float = (focal_length * self.__width) / self.__film_width
+
+        # Vector towards the vanishing point.
+        # (Optical Axis direction usually)
         vec_converge: list[float] = self.normalize(
             [
                 vp[0] - self.__cx,
@@ -208,6 +232,8 @@ class PerspectiveSolver:
             ]
         )
 
+        # Vector for lines that are parallel on screen.
+        # (Perpendicular to Optical Axis)
         line_vec: list[float] = self.angle(parallel_lines)
         vec_parallel: list[float] = self.normalize(
             [line_vec[0], -line_vec[1], 0]
@@ -226,57 +252,103 @@ class PerspectiveSolver:
     def rotation_matrix(
         self, vec_1: list[float], vec_2: list[float], mode: str
     ) -> list[float]:
-        '''Calculate rotation matrix from two vectors.'''
+        '''Calculate rotation matrix from two vectors with orthogonalization.'''
         cam_x: list[float] = [1, 0, 0]
         cam_y: list[float] = [0, 1, 0]
         cam_z: list[float] = [0, 0, 1]
 
         if mode == 'XZ':
+            # X(v1), Z(v2)
+            # Fix Z (Depth), generate Y, then recalculate X.
             raw_x: list[float] = vec_1
             raw_z: list[float] = vec_2
+
+            # Z x X = Y (Create temporary Y-axis)
             temp_y: list[float] = self.normalize(
                 self.cross_product(raw_z, raw_x)
             )
+
+            # Correct Y orientation (Y-up: Flip if pointing down)
             if temp_y[1] < 0:
                 temp_y = [-temp_y[0], -temp_y[1], -temp_y[2]]
 
+            # Fix Y and Z
             cam_y = temp_y
             cam_z = raw_z
+
+            # Y x Z = X (X is now perfectly orthogonal)
             cam_x = self.normalize(self.cross_product(cam_y, cam_z))
 
         elif mode == 'XY':
+            # X(v1), Y(v2)
+            # Fix Y (Height), generate Z, then recalculate X.
             raw_x = vec_1
             raw_y: list[float] = vec_2
+
+            # Correct Y orientation
             if raw_y[1] < 0:
                 raw_y = [-raw_y[0], -raw_y[1], -raw_y[2]]
 
+            # Fix Y
             cam_y = raw_y
+
+            # X x Y = Z (Create Z-axis)
             cam_z = self.normalize(self.cross_product(raw_x, cam_y))
+
+            # Y x Z = X (X is now perfectly orthogonal)
             cam_x = self.normalize(self.cross_product(cam_y, cam_z))
 
         elif mode == 'YZ':
+            # Y(v1), Z(v2)
+            # Fix Y (Height), generate X, then recalculate Z.
             raw_y = vec_1
             raw_z = vec_2
+
+            # Correct Y orientation
             if raw_y[1] < 0:
                 raw_y = [-raw_y[0], -raw_y[1], -raw_y[2]]
 
+            # Fix Y
             cam_y = raw_y
-            cam_z = raw_z
-            cam_x = self.normalize(self.cross_product(cam_y, cam_z))
+
+            # Y x Z = X (Create X-axis)
+            cam_x = self.normalize(self.cross_product(cam_y, raw_z))
+
+            # X x Y = Z (Z is now perfectly orthogonal)
             cam_z = self.normalize(self.cross_product(cam_x, cam_y))
 
-        matrix: list[list[float | int]] = [
-            [cam_x[0], cam_y[0], cam_z[0]],
-            [cam_x[1], cam_y[1], cam_z[1]],
-            [cam_x[2], cam_y[2], cam_z[2]],
-        ]
-        transpose_matrix: list[list[float | int]] = [
-            [matrix[0][0], matrix[1][0], matrix[2][0]],
-            [matrix[0][1], matrix[1][1], matrix[2][1]],
-            [matrix[0][2], matrix[1][2], matrix[2][2]],
+        # Transpose matrix (Inverse rotation)
+        matrix_list: list[float] = [
+            cam_x[0],
+            cam_y[0],
+            cam_z[0],
+            0.0,
+            cam_x[1],
+            cam_y[1],
+            cam_z[1],
+            0.0,
+            cam_x[2],
+            cam_y[2],
+            cam_z[2],
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
         ]
 
-        return self.matrix_to_euler(transpose_matrix)
+        matrix: om.MMatrix = om.MMatrix(matrix_list)
+        transform_matrix: om.MTransformationMatrix = om.MTransformationMatrix(
+            matrix
+        )
+        transform_matrix.reorderRotation(om.MTransformationMatrix.kXYZ)
+        rotate: om.MEulerRotation = transform_matrix.rotation(False)
+        rotate.setToClosestSolution(om.MEulerRotation(0, 0, 0))
+        return [
+            math.degrees(rotate.x),
+            math.degrees(rotate.y),
+            math.degrees(rotate.z),
+        ]
 
     def __format_result(
         self, focal_length: float, rotate: list[float]
@@ -327,7 +399,7 @@ class PerspectiveSolver:
 
     @staticmethod
     def cross_point(line_a: list[float], line_b: list[float]) -> list[float]:
-        '''Calculate cross point of tow lines.'''
+        '''Calculate intersection point of two lines.'''
         x1: float = line_a[0]
         y1: float = line_a[1]
         x2: float = line_a[2]
@@ -727,8 +799,8 @@ class DrawingView(QGraphicsView):
         line_list: list[list[float]] = [
             [ln.p1().x(), ln.p1().y(), ln.p2().x(), ln.p2().y()] for ln in lines
         ]
-        potision: list[float] = PerspectiveSolver.intersection(line_list)
-        point: QPointF = QPointF(*potision)
+        position: list[float] = PerspectiveSolver.intersection(line_list)
+        point: QPointF = QPointF(*position)
         if not point:
             marker_item.setVisible(False)
             return None
@@ -746,7 +818,7 @@ class DrawingView(QGraphicsView):
         self.__current_axis_mode = axis
 
     def lines(self) -> list[GuideLineItem]:
-        '''Return list of guide line item.'''
+        '''Returns a list of guide line items.'''
         return self.__lines
 
     def add_line(self, line: GuideLineItem) -> None:
@@ -968,7 +1040,7 @@ class MainWindow(widgets.ToolWidget):
             self.__view.fitInView(self.__bg_item, Qt.KeepAspectRatio)
 
     def set_background_image(self, pixmap: QPixmap) -> None:
-        '''Set ground image'''
+        '''Set background image.'''
         if self.__bg_item:
             self.__scene.removeItem(self.__bg_item)
 
@@ -1111,7 +1183,7 @@ class MainWindow(widgets.ToolWidget):
 
         image_path: str = data.get('image_path', '')
         if not pathlib.Path(image_path).exists():
-            _logger.error('Does not exists image : %s', image_path)
+            _logger.error('Image path does not exist : %s', image_path)
             return
 
         self.load_image(image_path)
@@ -1136,7 +1208,7 @@ class MainWindow(widgets.ToolWidget):
 # Functions
 #
 # ==============================================================================
-def apply_to_maya_scene(flocal_length: float, rotate: list[float]) -> bool:
+def apply_to_maya_scene(focal_length: float, rotate: list[float]) -> bool:
     '''Apply to maya scene.'''
     selection: list[str] = cmds.ls(selection=True)
     target_camera: str = ''
@@ -1152,12 +1224,13 @@ def apply_to_maya_scene(flocal_length: float, rotate: list[float]) -> bool:
 
     if not target_camera:
         target_camera = cmds.camera(name='render_cam')[0]  # type:ignore
+        target_camera = cmds.rename(target_camera, 'render_cam')
 
     # cmds.setAttr(f'{target_camera}.horizontalFilmAperture', 1.417)
     # cmds.setAttr(f'{target_camera}.verticalFilmAperture', 0.945)
     # cmds.setAttr(f'{target_camera}.lensSqueezeRatio', 1.0)
     cmds.setAttr(f'{target_camera}.rotateOrder', 0)
-    cmds.setAttr(f'{target_camera}.focalLength', flocal_length)
+    cmds.setAttr(f'{target_camera}.focalLength', focal_length)
     cmds.setAttr(f'{target_camera}.rotate', *rotate, type='double3')
     return True
 
