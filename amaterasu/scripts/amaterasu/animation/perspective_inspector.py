@@ -71,6 +71,7 @@ except ImportError:
             QFileDialog,
             QButtonGroup,
         )
+from maya import cmds
 from ..lib import parser, widgets
 
 
@@ -1032,14 +1033,46 @@ class MainWindow(widgets.ToolWidget):
         '''Apply'''
         self.save_settings()
 
+        result: dict[str, float] = self.perform_solver()
+        if not result:
+            _logger.error('Need at least 2 axes with 2 lines each.')
+            return
+
+        apply_to_maya_scene(
+            result['focal_length'],
+            [result['rotate_x'], result['rotate_y'], result['rotate_z']],
+        )
+        _logger.info('Done.')
+
 
 # ==============================================================================
 #
 # Functions
 #
 # ==============================================================================
-def apply() -> bool:
-    '''Docstring'''
+def apply_to_maya_scene(flocal_length: float, rotate: list[float]) -> bool:
+    '''Apply to maya scene.'''
+    selection: list[str] = cmds.ls(selection=True)
+    target_camera: str = ''
+    if selection:
+        shapes: list[str] = (
+            cmds.listRelatives(selection[0], shapes=True, fullPath=True) or []
+        )
+        if cmds.nodeType(selection[0]) == 'camera':
+            target_camera = selection[0]
+
+        elif shapes and cmds.nodeType(shapes[0]) == 'camera':
+            target_camera = selection[0]
+
+    if not target_camera:
+        target_camera = cmds.camera(name='render_cam')[0]  # type:ignore
+
+    # cmds.setAttr(f'{target_camera}.horizontalFilmAperture', 1.417)
+    # cmds.setAttr(f'{target_camera}.verticalFilmAperture', 0.945)
+    # cmds.setAttr(f'{target_camera}.lensSqueezeRatio', 1.0)
+    cmds.setAttr(f'{target_camera}.rotateOrder', 0)
+    cmds.setAttr(f'{target_camera}.focalLength', flocal_length)
+    cmds.setAttr(f'{target_camera}.rotate', *rotate, type='double3')
     return True
 
 
