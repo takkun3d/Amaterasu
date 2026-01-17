@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 import logging
 import math
+import itertools
 
 try:
     from PySide2.QtCore import Qt, Signal, QRectF, QLineF, QPointF, QPoint
@@ -36,6 +37,7 @@ try:
         QLabel,
         QSlider,
         QFileDialog,
+        QButtonGroup,
     )
 
 except ImportError:
@@ -67,6 +69,7 @@ except ImportError:
             QLabel,
             QSlider,
             QFileDialog,
+            QButtonGroup,
         )
 from ..lib import parser, widgets
 
@@ -94,6 +97,273 @@ class Settings(parser.ToolSettings):
     window_geo: parser.Variant[str] = parser.Variant('')
 
 
+class PerspectiveSolver:
+    '''Perspective Solver'''
+
+    def __init__(
+        self, width: int, height: int, film_width: float = 36.0
+    ) -> None:
+        '''Initialize'''
+        self.__width: float = float(width)
+        self.__height: float = float(height)
+        self.__cx: float = self.__width / 2.0
+        self.__cy: float = self.__height / 2.0
+        self.__film_width: float = film_width
+
+    def matrix_to_euler(self, matrix: list[list[float]]) -> list[float]:
+        '''Returns Euler angle of matrix.'''
+        sy: float = math.sqrt(
+            matrix[0][0] * matrix[0][0] + matrix[1][0] * matrix[1][0]
+        )
+        if not sy < 1e-6:
+            x: float = math.atan2(matrix[2][1], matrix[2][2])
+            y: float = math.atan2(-matrix[2][0], sy)
+            z: float = math.atan2(matrix[1][0], matrix[0][0])
+
+        else:
+            x = math.atan2(-matrix[1][2], matrix[1][1])
+            y = math.atan2(-matrix[2][0], sy)
+            z = 0
+
+        return [math.degrees(x), math.degrees(y), math.degrees(z)]
+
+    def solve(
+        self,
+        x_lines: list[list[float]],
+        y_lines: list[list[float]],
+        z_lines: list[list[float]],
+    ) -> dict[str, float]:
+        '''Solve camera parameters.'''
+        vp_x: list[float] = self.intersection(x_lines)
+        vp_y: list[float] = self.intersection(y_lines)
+        vp_z: list[float] = self.intersection(z_lines)
+
+        # VP2
+        if vp_x and vp_z:
+            return self.solve_vp2(vp_x, vp_z, 'XZ')
+        elif vp_x and vp_y:
+            return self.solve_vp2(vp_x, vp_y, 'XY')
+        elif vp_y and vp_z:
+            return self.solve_vp2(vp_y, vp_z, 'YZ')
+
+        # VP1
+        if vp_x and len(z_lines) >= 2:
+            return self.solve_vp1(vp_x, z_lines, 'XZ', is_vp_primary=True)
+
+        elif vp_z and len(x_lines) >= 2:
+            return self.solve_vp1(vp_z, x_lines, 'XZ', is_vp_primary=False)
+
+        elif vp_y and len(x_lines) >= 2:
+            return self.solve_vp1(vp_y, x_lines, 'XY', is_vp_primary=False)
+
+        elif vp_x and len(y_lines) >= 2:
+            return self.solve_vp1(vp_x, y_lines, 'XY', is_vp_primary=True)
+
+        elif vp_y and len(z_lines) >= 2:
+            return self.solve_vp1(vp_y, z_lines, 'YZ', is_vp_primary=True)
+
+        elif vp_z and len(y_lines) >= 2:
+            return self.solve_vp1(vp_z, y_lines, 'YZ', is_vp_primary=False)
+
+        return {}
+
+    def solve_vp2(
+        self, vp1: list[float], vp2: list[float], pair_mode: str
+    ) -> dict[str, float]:
+        '''Solve for 2-point perspective.'''
+        v1_x: float = vp1[0] - self.__cx
+        v1_y: float = -(vp1[1] - self.__cy)
+        v2_x: float = vp2[0] - self.__cx
+        v2_y: float = -(vp2[1] - self.__cy)
+        dot_part: float = v1_x * v2_x + v1_y * v2_y
+        if dot_part >= 0:
+            return {}
+
+        f_pixel: float = math.sqrt(-dot_part)
+        focal_length: float = (f_pixel * self.__film_width) / self.__width
+        vec_1: list[float] = self.normalize([v1_x, v1_y, -f_pixel])
+        vec_2: list[float] = self.normalize([v2_x, v2_y, -f_pixel])
+
+        rotate: list[float] = self.rotation_matrix(vec_1, vec_2, pair_mode)
+        return self.__format_result(focal_length, rotate)
+
+    def solve_vp1(
+        self,
+        vp: list[float],
+        parallel_lines: list[list[float]],
+        pair_mode: str,
+        is_vp_primary: bool,
+    ) -> dict[str, float]:
+        '''Solve for 1-point perspective.'''
+        focal_length: float = 35.0
+        f_pixel: float = (focal_length * self.__width) / self.__film_width
+        vec_converge: list[float] = self.normalize(
+            [
+                vp[0] - self.__cx,
+                -(vp[1] - self.__cy),
+                -f_pixel,
+            ]
+        )
+
+        line_vec: list[float] = self.angle(parallel_lines)
+        vec_parallel: list[float] = self.normalize(
+            [line_vec[0], -line_vec[1], 0]
+        )
+
+        if is_vp_primary:
+            vec_1: list[float] = vec_converge
+            vec_2: list[float] = vec_parallel
+        else:
+            vec_1 = vec_parallel
+            vec_2 = vec_converge
+
+        rotate: list[float] = self.rotation_matrix(vec_1, vec_2, pair_mode)
+        return self.__format_result(focal_length, rotate)
+
+    def rotation_matrix(
+        self, vec_1: list[float], vec_2: list[float], mode: str
+    ) -> list[float]:
+        '''Calculate rotation matrix from two vectors.'''
+        cam_x: list[float] = [1, 0, 0]
+        cam_y: list[float] = [0, 1, 0]
+        cam_z: list[float] = [0, 0, 1]
+
+        if mode == 'XZ':
+            raw_x: list[float] = vec_1
+            raw_z: list[float] = vec_2
+            temp_y: list[float] = self.normalize(
+                self.cross_product(raw_z, raw_x)
+            )
+            if temp_y[1] < 0:
+                temp_y = [-temp_y[0], -temp_y[1], -temp_y[2]]
+
+            cam_y = temp_y
+            cam_z = raw_z
+            cam_x = self.normalize(self.cross_product(cam_y, cam_z))
+
+        elif mode == 'XY':
+            raw_x = vec_1
+            raw_y: list[float] = vec_2
+            if raw_y[1] < 0:
+                raw_y = [-raw_y[0], -raw_y[1], -raw_y[2]]
+
+            cam_y = raw_y
+            cam_z = self.normalize(self.cross_product(raw_x, cam_y))
+            cam_x = self.normalize(self.cross_product(cam_y, cam_z))
+
+        elif mode == 'YZ':
+            raw_y = vec_1
+            raw_z = vec_2
+            if raw_y[1] < 0:
+                raw_y = [-raw_y[0], -raw_y[1], -raw_y[2]]
+
+            cam_y = raw_y
+            cam_z = raw_z
+            cam_x = self.normalize(self.cross_product(cam_y, cam_z))
+            cam_z = self.normalize(self.cross_product(cam_x, cam_y))
+
+        matrix: list[list[float | int]] = [
+            [cam_x[0], cam_y[0], cam_z[0]],
+            [cam_x[1], cam_y[1], cam_z[1]],
+            [cam_x[2], cam_y[2], cam_z[2]],
+        ]
+        transpose_matrix: list[list[float | int]] = [
+            [matrix[0][0], matrix[1][0], matrix[2][0]],
+            [matrix[0][1], matrix[1][1], matrix[2][1]],
+            [matrix[0][2], matrix[1][2], matrix[2][2]],
+        ]
+
+        return self.matrix_to_euler(transpose_matrix)
+
+    def __format_result(
+        self, focal_length: float, rotate: list[float]
+    ) -> dict[str, float]:
+        '''Format the output dictionary.'''
+        return {
+            'focal_length': round(focal_length, 1),
+            'rotate_x': round(rotate[0], 3),
+            'rotate_y': round(rotate[1], 3),
+            'rotate_z': round(rotate[2], 3),
+        }
+
+    @staticmethod
+    def normalize(v: list[float]) -> list[float]:
+        '''Returns normalized vector.'''
+        norm: float = math.sqrt(v[0] ** 2 + v[1] ** 2 + v[2] ** 2)
+        if norm == 0:
+            return [0, 0, 0]
+        return [v[0] / norm, v[1] / norm, v[2] / norm]
+
+    @staticmethod
+    def cross_product(a: list[float], b: list[float]) -> list[float]:
+        '''Returns cross product of two vectors.'''
+        return [
+            a[1] * b[2] - a[2] * b[1],
+            a[2] * b[0] - a[0] * b[2],
+            a[0] * b[1] - a[1] * b[0],
+        ]
+
+    @staticmethod
+    def intersection(lines: list[list[float]]) -> list[float]:
+        '''Calculate average intersection point of multiple lines.'''
+        if len(lines) < 2:
+            return []
+
+        intersections: list[list[float]] = []
+        for line_a, line_b in itertools.combinations(lines, 2):
+            point: list[float] = PerspectiveSolver.cross_point(line_a, line_b)
+            if point:
+                intersections.append(point)
+
+        if not intersections:
+            return []
+
+        avg_x: float = sum(p[0] for p in intersections) / len(intersections)
+        avg_y: float = sum(p[1] for p in intersections) / len(intersections)
+        return [avg_x, avg_y]
+
+    @staticmethod
+    def cross_point(line_a: list[float], line_b: list[float]) -> list[float]:
+        '''Calculate cross point of tow lines.'''
+        x1: float = line_a[0]
+        y1: float = line_a[1]
+        x2: float = line_a[2]
+        y2: float = line_a[3]
+
+        x3: float = line_b[0]
+        y3: float = line_b[1]
+        x4: float = line_b[2]
+        y4: float = line_b[3]
+
+        denom: float = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+        if abs(denom) < 1e-10:
+            return []
+
+        px: float = (
+            (x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)
+        ) / denom
+
+        py: float = (
+            (x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)
+        ) / denom
+        return [px, py]
+
+    @staticmethod
+    def angle(lines: list[list[float]]) -> list[float]:
+        '''Return angle between two vectors.'''
+        dx_sum: float = 0.0
+        dy_sum: float = 0.0
+        for line in lines:
+            dx: float = line[2] - line[0]
+            dy: float = line[3] - line[1]
+            length: float = math.sqrt(dx * dx + dy * dy)
+            if length > 0:
+                dx_sum += dx / length
+                dy_sum += dy / length
+
+        return [dx_sum, dy_sum]
+
+
 class HandleItem(QGraphicsEllipseItem):
     '''Handle Item.'''
 
@@ -119,7 +389,7 @@ class HandleItem(QGraphicsEllipseItem):
             change == QGraphicsItem.ItemPositionHasChanged
             and self.__parent_line
         ):
-            self.__parent_line.update_position_from_handles()
+            self.__parent_line.update_ui()
 
         return super().itemChange(change, value)
 
@@ -144,7 +414,7 @@ class GuideLineItem(QGraphicsItem):
         self.__handle1: HandleItem = self.__create_handle(line.p1())
         self.__handle2: HandleItem = self.__create_handle(line.p2())
         self.setHandlesChildEvents(False)
-        self.update_position_from_handles()
+        self.update_ui()
 
     def boundingRect(self) -> QRectF:
         '''Override bounding rect.'''
@@ -197,7 +467,7 @@ class GuideLineItem(QGraphicsItem):
         handle = HandleItem(pos.x(), pos.y(), self)
         return handle
 
-    def update_position_from_handles(self) -> None:
+    def update_ui(self) -> None:
         '''Update position from handles.'''
         self.prepareGeometryChange()
         p1: QPointF = self.__handle1.scenePos()
@@ -222,7 +492,7 @@ class GuideLineItem(QGraphicsItem):
             )
 
         if self.__view_ref:
-            self.__view_ref.update_global_visuals()
+            self.__view_ref.update_ui()
 
     def remove_from_scene(self) -> None:
         '''Remove self from scene.'''
@@ -230,9 +500,14 @@ class GuideLineItem(QGraphicsItem):
         if scene:
             scene.removeItem(self)
 
-    def get_line_f(self) -> QLineF:
+    def line(self) -> QLineF:
         '''Get QLineF in scene coordinates.'''
         return QLineF(self.__handle1.scenePos(), self.__handle2.scenePos())
+
+    def coordinates(self) -> list[float]:
+        '''Returns position of point1 and point2.'''
+        line: QLineF = self.line()
+        return [line.p1().x(), line.p1().y(), line.p2().x(), line.p2().y()]
 
 
 class DrawingView(QGraphicsView):
@@ -284,7 +559,7 @@ class DrawingView(QGraphicsView):
         self.setRenderHints(
             QPainter.Antialiasing | QPainter.SmoothPixmapTransform
         )
-        self.update_global_visuals()
+        self.update_ui()
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         '''Override'''
@@ -387,7 +662,7 @@ class DrawingView(QGraphicsView):
                 )
                 self.scene().addItem(new_smart_line)
                 self.__lines.append(new_smart_line)
-                self.update_global_visuals()
+                self.update_ui()
 
         super().mouseReleaseEvent(event)
 
@@ -421,7 +696,7 @@ class DrawingView(QGraphicsView):
                     changed = True
 
             if changed:
-                self.update_global_visuals()
+                self.update_ui()
 
         else:
             super().keyPressEvent(event)
@@ -436,7 +711,7 @@ class DrawingView(QGraphicsView):
         self.scene().addItem(marker)
         return marker
 
-    def __update_single_vp(
+    def __update_vp_marker(
         self, marker_item: QGraphicsEllipseItem, lines: list[QLineF]
     ) -> QPointF | None:
         '''Update vanishing point.'''
@@ -444,14 +719,18 @@ class DrawingView(QGraphicsView):
             marker_item.setVisible(False)
             return None
 
-        pt: QPointF | None = calculate_intersection(lines[0], lines[1])
-        if not pt:
+        line_list: list[list[float]] = [
+            [ln.p1().x(), ln.p1().y(), ln.p2().x(), ln.p2().y()] for ln in lines
+        ]
+        potision: list[float] = PerspectiveSolver.intersection(line_list)
+        point: QPointF = QPointF(*potision)
+        if not point:
             marker_item.setVisible(False)
             return None
 
-        marker_item.setPos(pt)
+        marker_item.setPos(point)
         marker_item.setVisible(True)
-        return pt
+        return point
 
     def axis_mode(self) -> str:
         '''Return axis mode'''
@@ -461,24 +740,28 @@ class DrawingView(QGraphicsView):
         '''Set axis mode'''
         self.__current_axis_mode = axis
 
-    def update_global_visuals(self) -> None:
+    def lines(self) -> list[GuideLineItem]:
+        '''Return list of guide line item.'''
+        return self.__lines
+
+    def update_ui(self) -> None:
         '''Update View.'''
         lines_x: list[QLineF] = [
-            line.get_line_f() for line in self.__lines if line.color_type == 'X'
+            line.line() for line in self.__lines if line.color_type == 'X'
         ]
         lines_y: list[QLineF] = [
-            line.get_line_f() for line in self.__lines if line.color_type == 'Y'
+            line.line() for line in self.__lines if line.color_type == 'Y'
         ]
         lines_z: list[QLineF] = [
-            line.get_line_f() for line in self.__lines if line.color_type == 'Z'
+            line.line() for line in self.__lines if line.color_type == 'Z'
         ]
-        vp_x: QPointF | None = self.__update_single_vp(
+        vp_x: QPointF | None = self.__update_vp_marker(
             self.__vp_marker_x, lines_x
         )
-        vp_y: QPointF | None = self.__update_single_vp(
+        vp_y: QPointF | None = self.__update_vp_marker(
             self.__vp_marker_y, lines_y
         )
-        vp_z: QPointF | None = self.__update_single_vp(
+        vp_z: QPointF | None = self.__update_vp_marker(
             self.__vp_marker_z, lines_z
         )
         if vp_x and vp_z:
@@ -540,19 +823,28 @@ class MainWindow(widgets.ToolWidget):
 
         tool_layout.addWidget(widgets.VerticalLine(self))
 
+        axis_group: QButtonGroup = QButtonGroup(self)
+
         button: QPushButton = QPushButton('X', self)
+        button.setCheckable(True)
+        button.setChecked(True)
         button.clicked.connect(lambda: self.set_mode('X'))
         button.setFixedWidth(50)
+        axis_group.addButton(button)
         tool_layout.addWidget(button)
 
         button: QPushButton = QPushButton('Y', self)
+        button.setCheckable(True)
         button.clicked.connect(lambda: self.set_mode('Y'))
         button.setFixedWidth(50)
+        axis_group.addButton(button)
         tool_layout.addWidget(button)
 
         button: QPushButton = QPushButton('Z', self)
+        button.setCheckable(True)
         button.clicked.connect(lambda: self.set_mode('Z'))
         button.setFixedWidth(50)
+        axis_group.addButton(button)
         tool_layout.addWidget(button)
 
         tool_layout.addWidget(widgets.VerticalLine(self))
@@ -607,6 +899,8 @@ class MainWindow(widgets.ToolWidget):
         self.__scene: QGraphicsScene = QGraphicsScene(self)
         self.__view: DrawingView = DrawingView(self.__scene)
         main_layout.addWidget(self.__view)
+
+        self.__view.lines_updated.connect(self.perform_solver_for_preview)
 
     # override
     def load_settings(self) -> None:
@@ -676,7 +970,7 @@ class MainWindow(widgets.ToolWidget):
             self.__height + margin * 2,
         )
         self.__scene.setSceneRect(rect)
-        self.calc_preview()
+        self.perform_solver_for_preview()
 
     def fit_view(self) -> None:
         '''Fit view.'''
@@ -694,8 +988,44 @@ class MainWindow(widgets.ToolWidget):
         '''Set line mode.'''
         self.__view.set_axis_mode(mode)
 
-    def calc_preview(self) -> None:
-        '''Calc focal length and rotate as preview.'''
+    def perform_solver_for_preview(self) -> None:
+        '''Perform solver for preview.'''
+        result: dict[str, float] = self.perform_solver()
+        if not result:
+            self.__focal_length.setText('')
+            self.__rotate_x.setText('')
+            self.__rotate_y.setText('')
+            self.__rotate_z.setText('')
+
+        else:
+            self.__focal_length.setText(f"{result['focal_length']}")
+            self.__rotate_x.setText(f"{result['rotate_x']}")
+            self.__rotate_y.setText(f"{result['rotate_y']}")
+            self.__rotate_z.setText(f"{result['rotate_z']}")
+
+    def perform_solver(self) -> dict[str, float]:
+        '''Perform solver.'''
+        x_lines: list[list[float]] = []
+        y_lines: list[list[float]] = []
+        z_lines: list[list[float]] = []
+        for line in self.__view.lines():
+            coords: list[float] = line.coordinates()
+            if line.color_type == 'X':
+                x_lines.append(coords)
+
+            elif line.color_type == 'Y':
+                y_lines.append(coords)
+
+            else:
+                z_lines.append(coords)
+
+        if (len(x_lines) >= 2) + (len(y_lines) >= 2) + (len(z_lines) >= 2) < 2:
+            return {}
+
+        solver: PerspectiveSolver = PerspectiveSolver(
+            self.__width, self.__height
+        )
+        return solver.solve(x_lines, y_lines, z_lines)
 
     @widgets.undo
     def apply(self) -> None:
@@ -708,31 +1038,6 @@ class MainWindow(widgets.ToolWidget):
 # Functions
 #
 # ==============================================================================
-def calculate_intersection(line1: QPointF, line2: QPointF) -> QPointF | None:
-    '''Calculate intersection.'''
-    x1: float = line1.p1().x()
-    y1: float = line1.p1().y()
-    x2: float = line1.p2().x()
-    y2: float = line1.p2().y()
-
-    x3: float = line2.p1().x()
-    y3: float = line2.p1().y()
-    x4: float = line2.p2().x()
-    y4: float = line2.p2().y()
-
-    denom: float = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
-    if abs(denom) < 1e-9:
-        return None
-
-    px: float = (
-        (x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)
-    ) / denom
-    py: float = (
-        (x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)
-    ) / denom
-    return QPointF(px, py)
-
-
 def apply() -> bool:
     '''Docstring'''
     return True
