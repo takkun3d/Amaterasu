@@ -4,10 +4,12 @@
 #
 # ==============================================================================
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 import logging
 import math
 import itertools
+import pathlib
+import json
 
 try:
     from PySide2.QtCore import Qt, Signal, QRectF, QLineF, QPointF, QPoint
@@ -407,7 +409,7 @@ class GuideLineItem(QGraphicsItem):
         super().__init__()
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
 
-        self.color_type: str = axis
+        self.__axis: str = axis
         self.__view_ref: DrawingView | None = view_ref
         self.__color: QColor = self.__get_axis_color(axis)
         self.__guide_item: QGraphicsItem = self.__create_guide_line()
@@ -504,6 +506,10 @@ class GuideLineItem(QGraphicsItem):
     def line(self) -> QLineF:
         '''Get QLineF in scene coordinates.'''
         return QLineF(self.__handle1.scenePos(), self.__handle2.scenePos())
+
+    def axis(self) -> str:
+        '''Returns axis.'''
+        return self.__axis
 
     def coordinates(self) -> list[float]:
         '''Returns position of point1 and point2.'''
@@ -656,14 +662,12 @@ class DrawingView(QGraphicsView):
             self.scene().removeItem(self.__temp_line)
             self.__temp_line = None
             if (end_pos - self.__start_pos).manhattanLength() > 10:
-                new_smart_line = GuideLineItem(
+                line = GuideLineItem(
                     QLineF(self.__start_pos, end_pos),
                     self.__current_axis_mode,
                     self,
                 )
-                self.scene().addItem(new_smart_line)
-                self.__lines.append(new_smart_line)
-                self.update_ui()
+                self.add_line(line)
 
         super().mouseReleaseEvent(event)
 
@@ -745,16 +749,22 @@ class DrawingView(QGraphicsView):
         '''Return list of guide line item.'''
         return self.__lines
 
+    def add_line(self, line: GuideLineItem) -> None:
+        '''Add line.'''
+        self.scene().addItem(line)
+        self.__lines.append(line)
+        self.update_ui()
+
     def update_ui(self) -> None:
         '''Update View.'''
         lines_x: list[QLineF] = [
-            line.line() for line in self.__lines if line.color_type == 'X'
+            line.line() for line in self.__lines if line.axis() == 'X'
         ]
         lines_y: list[QLineF] = [
-            line.line() for line in self.__lines if line.color_type == 'Y'
+            line.line() for line in self.__lines if line.axis() == 'Y'
         ]
         lines_z: list[QLineF] = [
-            line.line() for line in self.__lines if line.color_type == 'Z'
+            line.line() for line in self.__lines if line.axis() == 'Z'
         ]
         vp_x: QPointF | None = self.__update_vp_marker(
             self.__vp_marker_x, lines_x
@@ -790,6 +800,9 @@ class DrawingView(QGraphicsView):
 class MainWindow(widgets.ToolWidget):
     '''Tool main window'''
 
+    SAVE_NODE_NAME: str = 'amaterasuPerspectiveInspector'
+    SAVE_ATTR_NAME: str = 'saveData'
+
     def __init__(
         self,
         parent: QWidget | None = None,
@@ -819,6 +832,7 @@ class MainWindow(widgets.ToolWidget):
         tool_layout.addWidget(button)
 
         button: QPushButton = QPushButton('Save', self)
+        button.clicked.connect(self.save_data_to_scene)
         button.setFixedWidth(50)
         tool_layout.addWidget(button)
 
@@ -902,6 +916,7 @@ class MainWindow(widgets.ToolWidget):
         main_layout.addWidget(self.__view)
 
         self.__view.lines_updated.connect(self.perform_solver_for_preview)
+        self.load_data_from_scene()
 
     # override
     def load_settings(self) -> None:
@@ -1011,10 +1026,10 @@ class MainWindow(widgets.ToolWidget):
         z_lines: list[list[float]] = []
         for line in self.__view.lines():
             coords: list[float] = line.coordinates()
-            if line.color_type == 'X':
+            if line.axis() == 'X':
                 x_lines.append(coords)
 
-            elif line.color_type == 'Y':
+            elif line.axis() == 'Y':
                 y_lines.append(coords)
 
             else:
@@ -1043,6 +1058,77 @@ class MainWindow(widgets.ToolWidget):
             [result['rotate_x'], result['rotate_y'], result['rotate_z']],
         )
         _logger.info('Done.')
+
+    @widgets.undo
+    def save_data_to_scene(self) -> None:
+        '''Save data to scene.'''
+        lines_data: list[dict[str, Any]] = []
+        for line in self.__view.lines():
+            lines_data.append(
+                {'coords': line.coordinates(), 'axis': line.axis()}
+            )
+
+        save_data: dict[str, Any] = {
+            'image_path': self.__current_image_path,
+            'opacity': self.__opacity.value(),
+            'lines': lines_data,
+        }
+        json_str: str = json.dumps(save_data)
+        if not cmds.objExists(self.SAVE_NODE_NAME):
+            cmds.createNode('network', name=self.SAVE_NODE_NAME)
+
+        if not cmds.attributeQuery(
+            self.SAVE_ATTR_NAME, node=self.SAVE_NODE_NAME, exists=True
+        ):
+            cmds.addAttr(
+                self.SAVE_NODE_NAME,
+                longName=self.SAVE_ATTR_NAME,
+                dataType='string',
+            )
+
+        cmds.setAttr(
+            f'{self.SAVE_NODE_NAME}.{self.SAVE_ATTR_NAME}',
+            json_str,
+            type='string',
+        )
+        _logger.info('Saved.')
+
+    def load_data_from_scene(self) -> None:
+        '''Load data from scene.'''
+        if not cmds.objExists(self.SAVE_NODE_NAME) or not cmds.attributeQuery(
+            self.SAVE_ATTR_NAME, node=self.SAVE_NODE_NAME, exists=True
+        ):
+            return
+
+        try:
+            data: dict[str, Any] = json.loads(
+                cmds.getAttr(f'{self.SAVE_NODE_NAME}.{self.SAVE_ATTR_NAME}')
+            )
+
+        except json.JSONDecodeError:
+            _logger.error('Failed to load data.')
+            return
+
+        image_path: str = data.get('image_path', '')
+        if not pathlib.Path(image_path).exists():
+            _logger.error('Does not exists image : %s', image_path)
+            return
+
+        self.load_image(image_path)
+        self.__opacity.setValue(data.get('opacity', 100))
+        lines_data: list[dict[str, Any]] = data.get('lines', [])
+        for l_data in lines_data:
+            c: list[float] = l_data['coords']
+            line: GuideLineItem = GuideLineItem(
+                QLineF(QPointF(c[0], c[1]), QPointF(c[2], c[3])),
+                l_data['axis'],
+                self.__view,
+            )
+            self.__view.add_line(line)
+
+        self.__view.update_ui()
+        self.fit_view()
+        _logger.info('Loaded save data.')
 
 
 # ==============================================================================
