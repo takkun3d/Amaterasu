@@ -425,6 +425,11 @@ def create_main_menu() -> None:
                 is_window_only=True,
             )
             m.add_item(
+                'Perspective Inspector',
+                'amaterasu.animation.perspective_inspector',
+                is_window_only=True,
+            )
+            m.add_item(
                 'Rotoscope',
                 'amaterasu.animation.rotoscope',
                 is_window_only=True,
