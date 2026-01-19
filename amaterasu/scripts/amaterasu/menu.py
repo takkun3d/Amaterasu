@@ -278,6 +278,7 @@ def create_main_menu() -> None:
             )
 
         with SubMenu(label='Display') as m:
+            m.add_divider('Colors')
             m.add_item(
                 'Outliner Color',
                 'amaterasu.display.outliner_color',
@@ -288,6 +289,8 @@ def create_main_menu() -> None:
                 'amaterasu.display.drawing_color',
                 is_window_only=True,
             )
+
+            m.add_divider('Viewport')
             m.add_item(
                 'Perspective Guide',
                 'amaterasu.display.perspective_guide',
@@ -296,6 +299,11 @@ def create_main_menu() -> None:
             m.add_item(
                 'XRay Geometry',
                 'amaterasu.display.xray_geometry',
+                is_window_only=True,
+            )
+            m.add_item(
+                'Local Axis',
+                'amaterasu.display.local_axis',
                 is_window_only=True,
             )
 
@@ -425,6 +433,11 @@ def create_main_menu() -> None:
                 is_window_only=True,
             )
             m.add_item(
+                'Perspective Inspector',
+                'amaterasu.animation.perspective_inspector',
+                is_window_only=True,
+            )
+            m.add_item(
                 'Rotoscope',
                 'amaterasu.animation.rotoscope',
                 is_window_only=True,
@@ -538,6 +551,11 @@ def create_main_menu() -> None:
             )
 
             m.add_divider('Constraint')
+            m.add_item(
+                'Matrix Constraint',
+                'amaterasu.rigging.matrix_constraint',
+                is_window_only=True,
+            )
             m.add_item(
                 'Geometry Constraint', 'amaterasu.rigging.geometry_constraint'
             )
