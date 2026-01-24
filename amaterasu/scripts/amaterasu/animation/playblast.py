@@ -47,9 +47,9 @@ from ..lib import parser, widgets
 #
 # ==============================================================================
 __product__: str = 'Playblast'
-__version__: str = '1.10'
+__version__: str = '1.20'
 __doc__ = 'Quick playblast from the rendering setup.'
-__copyright__ = 'Copyright(c) 2018-2024 @takkun3d. All Rights Reserved.'
+__copyright__ = 'Copyright(c) 2018-2026 @takkun3d. All Rights Reserved.'
 _logger: logging.Logger = logging.getLogger(__product__)
 
 
@@ -366,6 +366,18 @@ class MainWindow(widgets.StandardToolWidget):
         )
         self.__frame_padding_index = self.__file_format_layout.row_id()
 
+        # Frame Range
+        range_frame = widgets.FrameWidget('Frame Range', False, True, self)
+        main_layout.addWidget(range_frame)
+
+        range_layout = widgets.FormLayout(self)
+        range_frame.setLayout(range_layout)
+
+        range_layout.addRow(
+            widgets.FormLabel('Frame Range'),
+            QLabel('From Render Settings.'),
+        )
+
         # Camera Settings
         camera_frame = widgets.FrameWidget('Camera Settings', False, True, self)
         main_layout.addWidget(camera_frame)
@@ -664,6 +676,8 @@ def playblast(layer_name: str, option: PlayblastOption) -> None:
     ssao: bool = cmds.getAttr('hardwareRenderingGlobals.ssaoEnable')
     mb: bool = cmds.getAttr('hardwareRenderingGlobals.motionBlurEnable')
     msaa: bool = cmds.getAttr('hardwareRenderingGlobals.multiSampleEnable')
+    start_frame: float = cmds.getAttr('defaultRenderGlobals.startFrame')
+    end_frame: float = cmds.getAttr('defaultRenderGlobals.endFrame')
 
     cmds.setAttr('hardwareRenderingGlobals.ssaoEnable', option.ssao())
     cmds.setAttr('hardwareRenderingGlobals.motionBlurEnable', option.mb())
@@ -684,6 +698,8 @@ def playblast(layer_name: str, option: PlayblastOption) -> None:
         compression=option.encoding(),
         quality=option.quality(),
         widthHeight=(option.width(), option.height()),
+        startTime=start_frame,
+        endTime=end_frame,
     )
 
     cmds.setAttr('hardwareRenderingGlobals.ssaoEnable', ssao)
