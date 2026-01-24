@@ -45,7 +45,7 @@ from ..lib import parser, widgets
 #
 # ==============================================================================
 __product__: str = 'Register Geometry'
-__version__: str = '1.01'
+__version__: str = '1.10'
 __doc__ = 'Register geometry to the selected layers.'
 __copyright__ = 'Copyright(c) 2025 @takkun3d. All Rights Reserved.'
 _logger: logging.Logger = logging.getLogger(__product__)
@@ -55,6 +55,7 @@ HIDE_GEOMETRY_TAG: str = 'AMATERASU_HIDE_GEOMETRY'
 MATTE_OUT_GEOMETRY_SW_TAG: str = 'AMATERASU_MATTE_OUT_GEOMETRY_SW'
 MATTE_OUT_GEOMETRY_AIMATTE_TAG: str = 'AMATERASU_MATTE_OUT_GEOMETRY_AIMATTE'
 DISABLE_PRIMARY_VISIBILITY_TAG: str = 'DISABLE_PRIMARY_VISIBILITY'
+DISABLE_CASTS_SHADOWS_TAG: str = 'DISABLE_CASTS_SHADOWS'
 
 
 # ==============================================================================
@@ -226,6 +227,19 @@ class MainWindow(widgets.ToolWidget):
         )
         main_layout.addWidget(widget)
 
+        widget = ContainerWidget('Disable Casts Shadows', self)
+        widget.apply_clicked.connect(
+            self.register_disable_casts_shadows_callback
+        )
+        widget.add_clicked.connect(self.add_disable_casts_shadows_callback)
+        widget.remove_clicked.connect(
+            self.remove_disable_casts_shadows_callback
+        )
+        widget.delete_clicked.connect(
+            self.delete_disable_casts_shadows_callback
+        )
+        main_layout.addWidget(widget)
+
         main_layout.addStretch(True)
 
     # override
@@ -337,23 +351,43 @@ class MainWindow(widgets.ToolWidget):
 
     @widgets.undo
     def register_disable_primary_visibility_callback(self) -> None:
-        '''Register matte out geometry (aiMatte) callback.'''
+        '''Register disable primary visibility callback.'''
         register_disable_primary_visibility()
 
     @widgets.undo
     def add_disable_primary_visibility_callback(self) -> None:
-        '''Add matte out geometry (aiMatte) callback.'''
+        '''Add disable primary visibility callback.'''
         add_disable_primary_visibility()
 
     @widgets.undo
     def remove_disable_primary_visibility_callback(self) -> None:
-        '''Remove matte out geometry (aiMatte) callback.'''
+        '''Remove disable primary visibility callback.'''
         remove_disable_primary_visibility()
 
     @widgets.undo
     def delete_disable_primary_visibility_callback(self) -> None:
-        '''Delete matte out geometry (aiMatte) callback.'''
+        '''Delete disable primary visibility callback.'''
         delete_disable_primary_visibility()
+
+    @widgets.undo
+    def register_disable_casts_shadows_callback(self) -> None:
+        '''Register disable casts shadows callback.'''
+        register_disable_casts_shadows()
+
+    @widgets.undo
+    def add_disable_casts_shadows_callback(self) -> None:
+        '''Add disable casts shadows callback.'''
+        add_disable_casts_shadows()
+
+    @widgets.undo
+    def remove_disable_casts_shadows_callback(self) -> None:
+        '''Remove disable casts shadows callback.'''
+        remove_disable_casts_shadows()
+
+    @widgets.undo
+    def delete_disable_casts_shadows_callback(self) -> None:
+        '''Delete disable casts shadows callback.'''
+        delete_disable_casts_shadows()
 
 
 # ==============================================================================
@@ -403,7 +437,7 @@ def register_renderable_geometry() -> bool:
             if c.getNotes() == RENDERABLE_GEOMETRY_TAG:
                 collection.delete(c)
 
-        collect = layer.createCollection('Renderable_Geometry')
+        collect: Collection = layer.createCollection('Renderable_Geometry')
         collect.setNotes(RENDERABLE_GEOMETRY_TAG)
         setExpandedStateValue(collect, False)
 
@@ -513,7 +547,7 @@ def register_hide_geometry() -> bool:
             if c.getNotes() == HIDE_GEOMETRY_TAG:
                 collection.delete(c)
 
-        collect = layer.createCollection('Hide_Geometry')
+        collect: Collection = layer.createCollection('Hide_Geometry')
         collect.setNotes(HIDE_GEOMETRY_TAG)
         setExpandedStateValue(collect, False)
 
@@ -639,7 +673,7 @@ def register_matte_out_geometry_sw() -> bool:
             if c.getNotes() == MATTE_OUT_GEOMETRY_SW_TAG:
                 collection.delete(c)
 
-        collect = layer.createCollection('Matte_Out_Geometry_SW')
+        collect: Collection = layer.createCollection('Matte_Out_Geometry_SW')
         collect.setNotes(MATTE_OUT_GEOMETRY_SW_TAG)
         setExpandedStateValue(collect, False)
 
@@ -758,7 +792,9 @@ def register_matte_out_geometry_aimatte() -> bool:
             if c.getNotes() == MATTE_OUT_GEOMETRY_AIMATTE_TAG:
                 collection.delete(c)
 
-        collect = layer.createCollection('Matte_Out_Geometry_aiMatte')
+        collect: Collection = layer.createCollection(
+            'Matte_Out_Geometry_aiMatte'
+        )
         collect.setNotes(MATTE_OUT_GEOMETRY_AIMATTE_TAG)
         setExpandedStateValue(collect, False)
 
@@ -880,7 +916,9 @@ def register_disable_primary_visibility() -> bool:
             if c.getNotes() == DISABLE_PRIMARY_VISIBILITY_TAG:
                 collection.delete(c)
 
-        collect = layer.createCollection('Disable_Primary_Visibility_Geometry')
+        collect: Collection = layer.createCollection(
+            'Disable_Primary_Visibility_Geometry'
+        )
         collect.setNotes(DISABLE_PRIMARY_VISIBILITY_TAG)
         setExpandedStateValue(collect, False)
 
@@ -972,6 +1010,136 @@ def delete_disable_primary_visibility() -> bool:
         collect: Collection | None = None
         for c in layer.getCollections():
             if c.getNotes() == DISABLE_PRIMARY_VISIBILITY_TAG:
+                collect = c
+
+        if collect is None:
+            continue
+
+        collection.delete(collect)
+
+    return True
+
+
+# ------------------------------------------------------------------------------
+# Disable Casts Shadows
+def register_disable_casts_shadows() -> bool:
+    '''Register disable casts shadows geometry.'''
+    nodes: list[str] = cmds.ls(selection=True, type='transform')
+    if not nodes:
+        _logger.error('Select nodes for layer registration.')
+        return False
+
+    layers: list[RenderLayer] = selected_render_layer()
+    if not layers:
+        _logger.error('Select layer for node registration.')
+        return False
+
+    dummy_mesh: str = ''
+    meshes: list[str] = cmds.ls(type='mesh')
+    if not meshes:
+        mesh: str = cmds.createNode('mesh')
+        dummy_mesh = cmds.listRelatives(mesh, parent=True, path=True)[0]
+        meshes.append(mesh)
+
+    for layer in layers:
+        for c in layer.getCollections():
+            if c.getNotes() == DISABLE_CASTS_SHADOWS_TAG:
+                collection.delete(c)
+
+        collect: Collection = layer.createCollection(
+            'Disable_Casts_Shadows_Geometry'
+        )
+        collect.setNotes(DISABLE_CASTS_SHADOWS_TAG)
+        setExpandedStateValue(collect, False)
+
+        selector_: SimpleSelector = collect.getSelector()
+        selector_.setFilterType(selector.Filters.kTransforms)
+        selector_.staticSelection.set(nodes)
+
+        shape_collect: Collection = collect.createCollection(
+            'Disable_Casts_Shadow_Shape'
+        )
+        setExpandedStateValue(shape_collect, False)
+        shape_selector: SimpleSelector = shape_collect.getSelector()
+        shape_selector.setFilterType(selector.Filters.kShapes)
+        shape_selector.setPattern('*')
+        aiMatte_override: AbsUniqueOverride = (
+            shape_collect.createAbsoluteOverride(meshes[0], 'castsShadows')
+        )
+        aiMatte_override.setAttrValue(False)
+
+    if dummy_mesh:
+        cmds.delete(dummy_mesh)
+
+    return True
+
+
+def add_disable_casts_shadows() -> bool:
+    '''Add disable casts shadows geometry.'''
+    nodes: list[str] = cmds.ls(selection=True, type='transform')
+    if not nodes:
+        _logger.error('Select nodes for layer addition.')
+        return False
+
+    layers: list[RenderLayer] = selected_render_layer()
+    if not layers:
+        _logger.error('Select layer for node addition.')
+        return False
+
+    for layer in layers:
+        collect: Collection | None = None
+        for c in layer.getCollections():
+            if c.getNotes() == DISABLE_CASTS_SHADOWS_TAG:
+                collect = c
+
+        if collect is None:
+            register_disable_casts_shadows()
+            continue
+
+        selector_: SimpleSelector = collect.getSelector()
+        selector_.staticSelection.add(nodes)
+
+    return True
+
+
+def remove_disable_casts_shadows() -> bool:
+    '''Remove disable casts shadows geometry.'''
+    nodes: list[str] = cmds.ls(selection=True, type='transform')
+    if not nodes:
+        _logger.error('Select nodes for layer removal.')
+        return False
+
+    layers: list[RenderLayer] = selected_render_layer()
+    if not layers:
+        _logger.error('Select layer for node removal.')
+        return False
+
+    for layer in layers:
+        collect: Collection | None = None
+        for c in layer.getCollections():
+            if c.getNotes() == DISABLE_CASTS_SHADOWS_TAG:
+                collect = c
+
+        if collect is None:
+            continue
+
+        selector_: SimpleSelector = collect.getSelector()
+        selector_.staticSelection.remove(nodes)
+
+    return True
+
+
+def delete_disable_casts_shadows() -> bool:
+    '''delete disable casts shadows geometry.'''
+    layers: list[RenderLayer] = selected_render_layer()
+    if not layers:
+        _logger.error('Select layer for node deletion.')
+        return False
+
+    for layer in layers:
+        collect: Collection | None = None
+        for c in layer.getCollections():
+            if c.getNotes() == DISABLE_CASTS_SHADOWS_TAG:
                 collect = c
 
         if collect is None:
