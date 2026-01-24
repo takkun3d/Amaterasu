@@ -47,10 +47,12 @@ from ..lib import parser, widgets
 #
 # ==============================================================================
 __product__: str = 'Playblast'
-__version__: str = '1.20'
+__version__: str = '1.21'
 __doc__ = 'Quick playblast from the rendering setup.'
 __copyright__ = 'Copyright(c) 2018-2026 @takkun3d. All Rights Reserved.'
 _logger: logging.Logger = logging.getLogger(__product__)
+
+DEFAULT_FILE_NAME_PREFIX: str = '<Scene>/<RenderLayer>/<RenderLayer>'
 
 
 # ==============================================================================
@@ -236,7 +238,8 @@ class PlayblastOption:
             cmds.workspace(query=True, rootDirectory=True),
             cmds.workspace(fileRuleEntry='images'),
             self.sub_folder(),
-            cmds.getAttr('defaultRenderGlobals.imageFilePrefix'),
+            cmds.getAttr('defaultRenderGlobals.imageFilePrefix')
+            or DEFAULT_FILE_NAME_PREFIX,
         )
 
         scene_name: str = cmds.file(query=True, sceneName=True, shortName=True)
@@ -314,7 +317,8 @@ class MainWindow(widgets.StandardToolWidget):
         output_layout.addRow(
             widgets.FormLabel('Output'),
             QLabel(
-                'From Render Settings.\nIf empty, the output will be <Scene>/<RenderLayer>/<RenderLayer>.',
+                'From Render Settings.\n'
+                f'If empty, the output will be {DEFAULT_FILE_NAME_PREFIX}.',
                 self,
             ),
         )
