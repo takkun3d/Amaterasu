@@ -537,6 +537,7 @@ def create_main_menu() -> None:
                 'amaterasu.rigging.curve_rivet',
                 option_func='option()',
             )
+            m.add_item('Curve Linker', 'amaterasu.rigging.curve_linker')
 
             m.add_divider('Deformation')
             m.add_item(
