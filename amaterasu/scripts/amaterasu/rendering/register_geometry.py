@@ -514,6 +514,16 @@ class MainWindow(widgets.ToolWidget):
         widget.set_manager(manager)
         main_layout.addWidget(widget)
 
+        manager = ShapeAttrOverrideManager(
+            tag='AMATERASU_DISABLE_RECEIVE_SHADOWS',
+            name='Disable_Receive_Shadows_Geometry',
+            attr='receiveShadows',
+            value=False,
+        )
+        widget = ContainerWidget('Disable Receive Shadows', self)
+        widget.set_manager(manager)
+        main_layout.addWidget(widget)
+
         main_layout.addStretch(True)
 
     # override
