@@ -38,6 +38,7 @@ except ImportError:
         )
 from maya import cmds, mel
 from maya.app.renderSetup.model import renderSetup
+from maya.app.renderSetup.model import renderLayer
 from ..lib import parser, widgets
 
 
@@ -125,7 +126,9 @@ class PlayblastOption:
             if not cmds.getAttr(f'{camera}.renderable'):
                 continue
 
-            parent = cmds.listRelatives(camera, parent=True, path=True)
+            parent: list[str] = (
+                cmds.listRelatives(camera, parent=True, path=True) or []
+            )
             if not parent:
                 continue
 
@@ -244,8 +247,8 @@ class PlayblastOption:
 
         scene_name: str = cmds.file(query=True, sceneName=True, shortName=True)
         scene_name = scene_name if scene_name else 'untitled'
-        scene_base_name, ext = os.path.splitext(scene_name)
-        version = (
+        scene_base_name, _ = os.path.splitext(scene_name)
+        version: str = (
             cmds.getAttr('defaultRenderGlobals.renderVersion')
             if cmds.getAttr('defaultRenderGlobals.renderVersion')
             else 'v01'
@@ -368,7 +371,7 @@ class MainWindow(widgets.StandardToolWidget):
         self.__file_format_layout.addRow(
             widgets.FormLabel('Frame Padding'), self.__frame_padding
         )
-        self.__frame_padding_index = self.__file_format_layout.row_id()
+        self.__frame_padding_index: int = self.__file_format_layout.row_id()
 
         # Frame Range
         range_frame = widgets.FrameWidget('Frame Range', False, True, self)
@@ -580,19 +583,19 @@ class MainWindow(widgets.StandardToolWidget):
     def set_valid_options(self) -> None:
         '''Synchronize with valid options.'''
         self.__encoding.clear()
-        format: str = self.__format.currentText()
+        output_format: str = self.__format.currentText()
         state: bool = cmds.commandEcho(query=True, state=True)
 
         cmds.commandEcho(state=False)
         encodings: list[str] = mel.eval(
-            f'$am_playblastFormat = `playblast -format {format} -query -compression`;'
+            f'$am_playblastFormat = `playblast -format {output_format} -query -compression`;'
         )
         for encoding in encodings:
             self.__encoding.addItem(encoding)
 
         cmds.commandEcho(state=state)
         self.__file_format_layout.set_row_enabled(
-            self.__frame_padding_index, bool(format == 'image')
+            self.__frame_padding_index, bool(output_format == 'image')
         )
 
     @widgets.undo
@@ -676,7 +679,7 @@ def create_playblast_window(option: PlayblastOption) -> tuple[str, str, str]:
 
 def playblast(layer_name: str, option: PlayblastOption) -> None:
     '''Playblast from specific layer.'''
-    window, panel, editor = create_playblast_window(option)
+    window, panel, _ = create_playblast_window(option)
     ssao: bool = cmds.getAttr('hardwareRenderingGlobals.ssaoEnable')
     mb: bool = cmds.getAttr('hardwareRenderingGlobals.motionBlurEnable')
     msaa: bool = cmds.getAttr('hardwareRenderingGlobals.multiSampleEnable')
@@ -698,12 +701,12 @@ def playblast(layer_name: str, option: PlayblastOption) -> None:
         showOrnaments=option.show_ornaments(),
         offScreen=True,
         framePadding=option.frame_padding(),
-        percent=option.scale() * 100,
+        percent=int(option.scale() * 100),
         compression=option.encoding(),
         quality=option.quality(),
         widthHeight=(option.width(), option.height()),
-        startTime=start_frame,
-        endTime=end_frame,
+        startTime=int(start_frame),
+        endTime=int(end_frame),
     )
 
     cmds.setAttr('hardwareRenderingGlobals.ssaoEnable', ssao)
@@ -714,9 +717,11 @@ def playblast(layer_name: str, option: PlayblastOption) -> None:
 
 def apply() -> bool:
     '''Playblast from Render Setup Layers.'''
-    render_setup = renderSetup.instance()
-    default_layer = render_setup.getDefaultRenderLayer()
-    layers = render_setup.getRenderLayers()
+    render_setup: renderSetup.RenderSetup = renderSetup.instance()
+    default_layer: renderLayer.RenderLayer = (
+        render_setup.getDefaultRenderLayer()
+    )
+    layers: list[renderLayer.RenderLayer] = render_setup.getRenderLayers()
     if default_layer.isRenderable():
         layers.insert(0, default_layer)
 
