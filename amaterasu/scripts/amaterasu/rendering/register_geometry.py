@@ -4,7 +4,8 @@
 #
 # ==============================================================================
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
 import logging
 
 try:
@@ -24,18 +25,17 @@ except ImportError:
             QVBoxLayout,
         )
 from maya import cmds
-from maya.app.renderSetup.model import utils
-from maya.app.renderSetup.views import viewCmds
-from maya.app.renderSetup.model.expandedState import setExpandedStateValue
-from maya.app.renderSetup.model.childNode import ChildNode
-from maya.app.renderSetup.model.renderLayer import RenderLayer
-from maya.app.renderSetup.model import collection
-from maya.app.renderSetup.model.collection import Collection
-from maya.app.renderSetup.model import selector
-from maya.app.renderSetup.model.selector import SimpleSelector
-from maya.app.renderSetup.model.override import AbsUniqueOverride
-from maya.app.renderSetup.model.connectionOverride import MaterialOverride
-from maya.app.renderSetup.model import typeIDs
+from maya.app.renderSetup.model import (
+    utils,
+    expandedState,
+    renderLayer,
+    collection,
+    selector,
+    override,
+    connectionOverride,
+    typeIDs,
+)  # type: ignore
+from maya.app.renderSetup.views import viewCmds  # type: ignore
 from ..lib import parser, widgets
 
 
@@ -45,16 +45,10 @@ from ..lib import parser, widgets
 #
 # ==============================================================================
 __product__: str = 'Register Geometry'
-__version__: str = '1.01'
+__version__: str = '1.10'
 __doc__ = 'Register geometry to the selected layers.'
 __copyright__ = 'Copyright(c) 2025 @takkun3d. All Rights Reserved.'
 _logger: logging.Logger = logging.getLogger(__product__)
-
-RENDERABLE_GEOMETRY_TAG: str = 'AMATERASU_RENDERABLE_GEOMETRY'
-HIDE_GEOMETRY_TAG: str = 'AMATERASU_HIDE_GEOMETRY'
-MATTE_OUT_GEOMETRY_SW_TAG: str = 'AMATERASU_MATTE_OUT_GEOMETRY_SW'
-MATTE_OUT_GEOMETRY_AIMATTE_TAG: str = 'AMATERASU_MATTE_OUT_GEOMETRY_AIMATTE'
-DISABLE_PRIMARY_VISIBILITY_TAG: str = 'DISABLE_PRIMARY_VISIBILITY'
 
 
 # ==============================================================================
@@ -66,6 +60,286 @@ class Settings(parser.ToolSettings):
     '''Settings for tool.'''
 
     window_geo: parser.Variant[str] = parser.Variant('')
+
+
+class RenderSetupGeometryManager:
+    '''Render Setup Geometry Manager'''
+
+    def __init__(self, tag: str, name: str) -> None:
+        '''Initialize'''
+        self.__tag: str = tag
+        self.__name: str = name
+
+    def tag(self) -> str:
+        '''Returns tag'''
+        return self.__tag
+
+    def set_tag(self, tag: str) -> None:
+        '''Set tag'''
+        self.__tag = tag
+
+    def name(self) -> str:
+        '''Return name'''
+        return self.__name
+
+    def set_name(self, name: str) -> None:
+        '''Set name'''
+        self.__name = name
+
+    def selected_layers(self) -> list[renderLayer.RenderLayer]:
+        '''Return list of layers selected on window.'''
+        selected_layers: list[str] = viewCmds.getSelection(renderLayers=True)
+        if not selected_layers:
+            return []
+
+        return [utils.nameToUserNode(x) for x in selected_layers]
+
+    def find_collection(
+        self, layer: renderLayer.RenderLayer
+    ) -> collection.Collection | None:
+        '''Search for objects with a specific note.'''
+        collect: collection.Collection | None = None
+        for c in layer.getCollections():
+            if c.getNotes() == self.tag():
+                collect = c
+
+        return collect
+
+    @widgets.undo
+    def register(self) -> bool:
+        '''Register collection to Render Layer.'''
+        return True
+
+    @widgets.undo
+    def add(self) -> bool:
+        '''Add geometry to my collection.'''
+        nodes: list[str] = cmds.ls(selection=True, type='transform')
+        if not nodes:
+            _logger.error('Select nodes for layer addition.')
+            return False
+
+        layers: list[renderLayer.RenderLayer] = self.selected_layers()
+        if not layers:
+            _logger.error('Select layer for node addition.')
+            return False
+
+        for layer in layers:
+            collect: collection.Collection | None = self.find_collection(layer)
+            if collect is None:
+                self.register()
+                continue
+
+            selector_: selector.SimpleSelector = collect.getSelector()
+            selector_.staticSelection.add(nodes)
+
+        return True
+
+    @widgets.undo
+    def remove(self) -> bool:
+        '''Remove geometry from my collection.'''
+        nodes: list[str] = cmds.ls(selection=True, type='transform')
+        if not nodes:
+            _logger.error('Select nodes for layer removal.')
+            return False
+
+        layers: list[renderLayer.RenderLayer] = self.selected_layers()
+        if not layers:
+            _logger.error('Select layer for node removal.')
+            return False
+
+        for layer in layers:
+            collect: collection.Collection | None = self.find_collection(layer)
+            if collect:
+                selector_: selector.SimpleSelector = collect.getSelector()
+                selector_.staticSelection.remove(nodes)
+
+        return True
+
+    @widgets.undo
+    def delete(self) -> bool:
+        '''Delete my collection.'''
+        layers: list[renderLayer.RenderLayer] = self.selected_layers()
+        if not layers:
+            _logger.error('Select layer for node deletion.')
+            return False
+
+        for layer in layers:
+            collect: collection.Collection | None = self.find_collection(layer)
+            if collect:
+                collection.delete(collect)
+
+        return True
+
+
+class AttrOverrideManager(RenderSetupGeometryManager):
+    '''Attribute Override Manager'''
+
+    def __init__(self, tag: str, name: str, attr: str, value: Any) -> None:
+        '''Initialize'''
+        super().__init__(tag, name)
+        self.__attr_name: str = attr
+        self.__value: Any = value
+
+    def attr_name(self) -> str:
+        '''Return attribute name.'''
+        return self.__attr_name
+
+    def set_attr_name(self, val: str) -> None:
+        '''Set attribute name.'''
+        self.__attr_name = val
+
+    def value(self) -> Any:
+        '''Returns value.'''
+        return self.__value
+
+    def set_value(self, value: Any) -> None:
+        '''Set value.'''
+        self.__value = value
+
+    @widgets.undo
+    def register(self) -> bool:
+        '''Override'''
+        nodes: list[str] = cmds.ls(selection=True, type='transform')
+        if not nodes:
+            _logger.error('Select nodes for layer registration.')
+            return False
+
+        layers: list[renderLayer.RenderLayer] = self.selected_layers()
+        if not layers:
+            _logger.error('Select layer for node registration.')
+            return False
+
+        for layer in layers:
+            collect: collection.Collection | None = self.find_collection(layer)
+            if collect:
+                collection.delete(collect)
+
+            collect = layer.createCollection(self.name())
+            collect.setNotes(self.tag())
+            expandedState.setExpandedStateValue(collect, False)
+
+            selector_: selector.SimpleSelector = collect.getSelector()
+            selector_.setFilterType(selector.Filters.kTransforms)
+            selector_.staticSelection.set(nodes)
+
+            override_: override.AbsUniqueOverride = (
+                collect.createAbsoluteOverride(nodes[0], self.attr_name())
+            )
+            override_.setAttrValue(self.value())
+        return True
+
+
+class ShapeAttrOverrideManager(AttrOverrideManager):
+    '''Shape Attribute Override Manager'''
+
+    @widgets.undo
+    def register(self) -> bool:
+        '''Override'''
+        nodes: list[str] = cmds.ls(selection=True, type='transform')
+        if not nodes:
+            _logger.error('Select nodes for layer registration.')
+            return False
+
+        layers: list[renderLayer.RenderLayer] = self.selected_layers()
+        if not layers:
+            _logger.error('Select layer for node registration.')
+            return False
+
+        dummy_mesh: str = ''
+        meshes: list[str] = cmds.ls(type='mesh')
+        if not meshes:
+            mesh: str = cmds.createNode('mesh')
+            dummy_mesh = cmds.listRelatives(mesh, parent=True, path=True)[0]
+            meshes.append(mesh)
+
+        for layer in layers:
+            collect: collection.Collection | None = self.find_collection(layer)
+            if collect:
+                collection.delete(collect)
+
+            collect = layer.createCollection(self.name())
+            collect.setNotes(self.tag())
+            expandedState.setExpandedStateValue(collect, False)
+
+            selector_: selector.SimpleSelector = collect.getSelector()
+            selector_.setFilterType(selector.Filters.kTransforms)
+            selector_.staticSelection.set(nodes)
+
+            shape_collect: collection.Collection = collect.createCollection(
+                f'{self.name()}_Shape'
+            )
+            expandedState.setExpandedStateValue(shape_collect, False)
+            shape_selector: selector.SimpleSelector = (
+                shape_collect.getSelector()
+            )
+            shape_selector.setFilterType(selector.Filters.kShapes)
+            shape_selector.setPattern('*')
+            unique_override: override.AbsUniqueOverride = (
+                shape_collect.createAbsoluteOverride(
+                    meshes[0], self.attr_name()
+                )
+            )
+            unique_override.setAttrValue(self.value())
+
+        if dummy_mesh:
+            cmds.delete(dummy_mesh)
+
+        return True
+
+
+class MaterialOverrideManager(RenderSetupGeometryManager):
+    '''Material Override Manager'''
+
+    @widgets.undo
+    def register(self) -> bool:
+        '''Override'''
+        nodes: list[str] = cmds.ls(selection=True, type='transform')
+        if not nodes:
+            _logger.error('Select nodes for layer registration.')
+            return False
+
+        layers: list[renderLayer.RenderLayer] = self.selected_layers()
+        if not layers:
+            _logger.error('Select layer for node registration.')
+            return False
+
+        material: str = 'matteout_MT'
+        if not cmds.objExists(material):
+            material = cmds.shadingNode(
+                'useBackground', name=material, asShader=True
+            )
+
+        sg: str = 'matteout_MTSG'
+        if not cmds.objExists(sg):
+            cmds.sets(
+                renderable=True, noSurfaceShader=True, empty=True, name=sg
+            )
+
+        src_plug: str = f'{material}.outColor'
+        dst_plug: str = f'{sg}.surfaceShader'
+        if not cmds.isConnected(src_plug, dst_plug):
+            cmds.connectAttr(src_plug, dst_plug, force=True)
+
+        cmds.select(*nodes)
+        for layer in layers:
+            collect: collection.Collection | None = self.find_collection(layer)
+            if collect:
+                collection.delete(collect)
+
+            collect = layer.createCollection(self.name())
+            collect.setNotes(self.tag())
+            expandedState.setExpandedStateValue(collect, False)
+
+            selector_: selector.SimpleSelector = collect.getSelector()
+            selector_.setFilterType(selector.Filters.kTransforms)
+            selector_.staticSelection.set(nodes)
+
+            override_: connectionOverride.MaterialOverride = (
+                collect.createOverride(sg, typeIDs.materialOverride)
+            )
+            override_.setMaterial(sg)
+
+        return True
 
 
 class ContainerWidget(QWidget):
@@ -84,6 +358,7 @@ class ContainerWidget(QWidget):
     ) -> None:
         '''Initialize widget.'''
         super().__init__(parent, flag)
+        self.__manager: RenderSetupGeometryManager | None = None
 
         main_layout: QHBoxLayout = QHBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -153,6 +428,14 @@ class ContainerWidget(QWidget):
         '''Emit signal of delete.'''
         self.delete_clicked.emit()
 
+    def set_manager(self, manager: RenderSetupGeometryManager) -> None:
+        '''Set manager'''
+        self.__manager: RenderSetupGeometryManager = manager
+        self.apply_clicked.connect(self.__manager.register)
+        self.add_clicked.connect(self.__manager.add)
+        self.remove_clicked.connect(self.__manager.remove)
+        self.delete_clicked.connect(self.__manager.delete)
+
 
 class MainWindow(widgets.ToolWidget):
     '''Tool main window'''
@@ -169,61 +452,76 @@ class MainWindow(widgets.ToolWidget):
 
         main_layout: QVBoxLayout = QVBoxLayout(self.option_widget())
 
+        manager: RenderSetupGeometryManager = AttrOverrideManager(
+            tag='AMATERASU_RENDERABLE_GEOMETRY',
+            name='Renderable_Geometry',
+            attr='visibility',
+            value=True,
+        )
         widget: ContainerWidget = ContainerWidget('Renderable Geometry', self)
-        widget.apply_clicked.connect(self.register_renderable_geometry_callback)
-        widget.add_clicked.connect(self.add_renderable_geometry_callback)
-        widget.remove_clicked.connect(self.remove_renderable_geometry_callback)
-        widget.delete_clicked.connect(self.delete_renderable_geometry_callback)
+        widget.set_manager(manager)
         main_layout.addWidget(widget)
 
+        manager = AttrOverrideManager(
+            tag='AMATERASU_HIDE_GEOMETRY',
+            name='Hide_Geometry',
+            attr='visibility',
+            value=False,
+        )
         widget = ContainerWidget('Hide Geometry', self)
-        widget.apply_clicked.connect(self.register_hide_geometry_callback)
-        widget.add_clicked.connect(self.add_hide_geometry_callback)
-        widget.remove_clicked.connect(self.remove_hide_geometry_callback)
-        widget.delete_clicked.connect(self.delete_hide_geometry_callback)
+        widget.set_manager(manager)
         main_layout.addWidget(widget)
 
         main_layout.addWidget(widgets.HorizontalLine(self))
 
+        manager = MaterialOverrideManager(
+            tag='AMATERASU_MATTE_OUT_GEOMETRY_SW',
+            name='Matte_Out_Geometry_SW',
+        )
         widget = ContainerWidget('Matte out Geometry(SW)', self)
-        widget.apply_clicked.connect(
-            self.register_matte_out_geometry_sw_callback
-        )
-        widget.add_clicked.connect(self.add_matte_out_geometry_sw_callback)
-        widget.remove_clicked.connect(
-            self.remove_matte_out_geometry_sw_callback
-        )
-        widget.delete_clicked.connect(
-            self.delete_matte_out_geometry_sw_callback
-        )
+        widget.set_manager(manager)
         main_layout.addWidget(widget)
 
+        manager = ShapeAttrOverrideManager(
+            tag='AMATERASU_MATTE_OUT_GEOMETRY_AIMATTE',
+            name='Matte_Out_Geometry_aiMatte',
+            attr='aiMatte',
+            value=True,
+        )
         widget = ContainerWidget('Matte out Geometry(Arnold)', self)
-        widget.apply_clicked.connect(
-            self.register_matte_out_geometry_aimatte_callback
-        )
-        widget.add_clicked.connect(self.add_matte_out_geometry_aimatte_callback)
-        widget.remove_clicked.connect(
-            self.remove_matte_out_geometry_aimatte_callback
-        )
-        widget.delete_clicked.connect(
-            self.delete_matte_out_geometry_aimatte_callback
-        )
+        widget.set_manager(manager)
         main_layout.addWidget(widget)
 
         main_layout.addWidget(widgets.HorizontalLine(self))
 
+        manager = ShapeAttrOverrideManager(
+            tag='DISABLE_PRIMARY_VISIBILITY',
+            name='Disable_Primary_Visibility_Geometry',
+            attr='primaryVisibility',
+            value=False,
+        )
         widget = ContainerWidget('Disable Primary Visibility', self)
-        widget.apply_clicked.connect(
-            self.register_disable_primary_visibility_callback
+        widget.set_manager(manager)
+        main_layout.addWidget(widget)
+
+        manager = ShapeAttrOverrideManager(
+            tag='AMATERASU_DISABLE_CASTS_SHADOWS',
+            name='Disable_Casts_Shadows_Geometry',
+            attr='castsShadows',
+            value=False,
         )
-        widget.add_clicked.connect(self.add_disable_primary_visibility_callback)
-        widget.remove_clicked.connect(
-            self.remove_disable_primary_visibility_callback
+        widget = ContainerWidget('Disable Casts Shadows', self)
+        widget.set_manager(manager)
+        main_layout.addWidget(widget)
+
+        manager = ShapeAttrOverrideManager(
+            tag='AMATERASU_DISABLE_RECEIVE_SHADOWS',
+            name='Disable_Receive_Shadows_Geometry',
+            attr='receiveShadows',
+            value=False,
         )
-        widget.delete_clicked.connect(
-            self.delete_disable_primary_visibility_callback
-        )
+        widget = ContainerWidget('Disable Receive Shadows', self)
+        widget.set_manager(manager)
         main_layout.addWidget(widget)
 
         main_layout.addStretch(True)
@@ -255,734 +553,12 @@ class MainWindow(widgets.ToolWidget):
             self, __product__, __version__, __copyright__, __doc__
         )
 
-    @widgets.undo
-    def register_renderable_geometry_callback(self) -> None:
-        '''Register renderable geometry callback.'''
-        register_renderable_geometry()
-
-    @widgets.undo
-    def add_renderable_geometry_callback(self) -> None:
-        '''Add renderable geometry callback.'''
-        add_renderable_geometry()
-
-    @widgets.undo
-    def remove_renderable_geometry_callback(self) -> None:
-        '''Remove renderable geometry callback.'''
-        remove_renderable_geometry()
-
-    @widgets.undo
-    def delete_renderable_geometry_callback(self) -> None:
-        '''Delete renderable geometry callback.'''
-        delete_renderable_geometry()
-
-    @widgets.undo
-    def register_hide_geometry_callback(self) -> None:
-        '''Register hide geometry callback.'''
-        register_hide_geometry()
-
-    @widgets.undo
-    def add_hide_geometry_callback(self) -> None:
-        '''Add hide geometry callback.'''
-        add_hide_geometry()
-
-    @widgets.undo
-    def remove_hide_geometry_callback(self) -> None:
-        '''Remove hide geometry callback.'''
-        remove_hide_geometry()
-
-    @widgets.undo
-    def delete_hide_geometry_callback(self) -> None:
-        '''Delete hide geometry callback.'''
-        delete_hide_geometry()
-
-    @widgets.undo
-    def register_matte_out_geometry_sw_callback(self) -> None:
-        '''Register matte out geometry (SW) callback.'''
-        register_matte_out_geometry_sw()
-
-    @widgets.undo
-    def add_matte_out_geometry_sw_callback(self) -> None:
-        '''Add matte out geometry (SW) callback.'''
-        add_matte_out_geometry_sw()
-
-    @widgets.undo
-    def remove_matte_out_geometry_sw_callback(self) -> None:
-        '''Remove matte out geometry (SW) callback.'''
-        remove_matte_out_geometry_sw()
-
-    @widgets.undo
-    def delete_matte_out_geometry_sw_callback(self) -> None:
-        '''Delete matte out geometry (SW) callback.'''
-        delete_matte_out_geometry_sw()
-
-    @widgets.undo
-    def register_matte_out_geometry_aimatte_callback(self) -> None:
-        '''Register matte out geometry (aiMatte) callback.'''
-        register_matte_out_geometry_aimatte()
-
-    @widgets.undo
-    def add_matte_out_geometry_aimatte_callback(self) -> None:
-        '''Add matte out geometry (aiMatte) callback.'''
-        add_matte_out_geometry_aimatte()
-
-    @widgets.undo
-    def remove_matte_out_geometry_aimatte_callback(self) -> None:
-        '''Remove matte out geometry (aiMatte) callback.'''
-        remove_matte_out_geometry_aimatte()
-
-    @widgets.undo
-    def delete_matte_out_geometry_aimatte_callback(self) -> None:
-        '''Delete matte out geometry (aiMatte) callback.'''
-        delete_matte_out_geometry_aimatte()
-
-    @widgets.undo
-    def register_disable_primary_visibility_callback(self) -> None:
-        '''Register matte out geometry (aiMatte) callback.'''
-        register_disable_primary_visibility()
-
-    @widgets.undo
-    def add_disable_primary_visibility_callback(self) -> None:
-        '''Add matte out geometry (aiMatte) callback.'''
-        add_disable_primary_visibility()
-
-    @widgets.undo
-    def remove_disable_primary_visibility_callback(self) -> None:
-        '''Remove matte out geometry (aiMatte) callback.'''
-        remove_disable_primary_visibility()
-
-    @widgets.undo
-    def delete_disable_primary_visibility_callback(self) -> None:
-        '''Delete matte out geometry (aiMatte) callback.'''
-        delete_disable_primary_visibility()
-
 
 # ==============================================================================
 #
 # Functions
 #
 # ==============================================================================
-# Utility
-def selected_render_layer() -> list[RenderLayer]:
-    '''Return list of layers selected on window.'''
-    selected_layers: list[str] = viewCmds.getSelection(
-        True, False, False, False
-    )
-    if not selected_layers:
-        return []
-
-    return [utils.nameToUserNode(x) for x in selected_layers]
-
-
-def find_objects_with_note(
-    objects: list[ChildNode], note: str
-) -> list[ChildNode]:
-    '''Search for objects with a specific note.'''
-    result: list[ChildNode] = []
-    for object_ in objects:
-        if object_.getNotes() == note:
-            result.append(object_)
-    return result
-
-
-# ------------------------------------------------------------------------------
-# Register Geometry
-def register_renderable_geometry() -> bool:
-    '''Register renderable geometry.'''
-    nodes: list[str] = cmds.ls(selection=True, type='transform')
-    if not nodes:
-        _logger.error('Select nodes for layer registration.')
-        return False
-
-    layers: list[RenderLayer] = selected_render_layer()
-    if not layers:
-        _logger.error('Select layer for node registration.')
-        return False
-
-    for layer in layers:
-        for c in layer.getCollections():
-            if c.getNotes() == RENDERABLE_GEOMETRY_TAG:
-                collection.delete(c)
-
-        collect = layer.createCollection('Renderable_Geometry')
-        collect.setNotes(RENDERABLE_GEOMETRY_TAG)
-        setExpandedStateValue(collect, False)
-
-        selector_: SimpleSelector = collect.getSelector()
-        selector_.setFilterType(selector.Filters.kTransforms)
-        selector_.staticSelection.set(nodes)
-
-        override_: AbsUniqueOverride = collect.createAbsoluteOverride(
-            nodes[0], 'visibility'
-        )
-        override_.setAttrValue(True)
-    return True
-
-
-def add_renderable_geometry() -> bool:
-    '''Add renderable geometry.'''
-    nodes: list[str] = cmds.ls(selection=True, type='transform')
-    if not nodes:
-        _logger.error('Select nodes for layer addition.')
-        return False
-
-    layers: list[RenderLayer] = selected_render_layer()
-    if not layers:
-        _logger.error('Select layer for node addition.')
-        return False
-
-    for layer in layers:
-        collect: Collection | None = None
-        for c in layer.getCollections():
-            if c.getNotes() == RENDERABLE_GEOMETRY_TAG:
-                collect = c
-
-        if collect is None:
-            register_renderable_geometry()
-            continue
-
-        selector_: SimpleSelector = collect.getSelector()
-        selector_.staticSelection.add(nodes)
-
-    return True
-
-
-def remove_renderable_geometry() -> bool:
-    '''Remove renderable geometry.'''
-    nodes: list[str] = cmds.ls(selection=True, type='transform')
-    if not nodes:
-        _logger.error('Select nodes for layer removal.')
-        return False
-
-    layers: list[RenderLayer] = selected_render_layer()
-    if not layers:
-        _logger.error('Select layer for node removal.')
-        return False
-
-    for layer in layers:
-        collect: Collection | None = None
-        for c in layer.getCollections():
-            if c.getNotes() == RENDERABLE_GEOMETRY_TAG:
-                collect = c
-
-        if collect is None:
-            continue
-
-        selector_: SimpleSelector = collect.getSelector()
-        selector_.staticSelection.remove(nodes)
-
-    return True
-
-
-def delete_renderable_geometry() -> bool:
-    '''delete renderable geometry.'''
-    layers: list[RenderLayer] = selected_render_layer()
-    if not layers:
-        _logger.error('Select layer for node deletion.')
-        return False
-
-    for layer in layers:
-        collect: Collection | None = None
-        for c in layer.getCollections():
-            if c.getNotes() == RENDERABLE_GEOMETRY_TAG:
-                collect = c
-
-        if collect is None:
-            continue
-
-        collection.delete(collect)
-
-    return True
-
-
-# ------------------------------------------------------------------------------
-# Hide Geometry
-def register_hide_geometry() -> bool:
-    '''Register hide geometry.'''
-    nodes: list[str] = cmds.ls(selection=True, type='transform')
-    if not nodes:
-        _logger.error('Select nodes for layer registration.')
-        return False
-
-    layers: list[RenderLayer] = selected_render_layer()
-    if not layers:
-        _logger.error('Select layer for node registration.')
-        return False
-
-    for layer in layers:
-        for c in layer.getCollections():
-            if c.getNotes() == HIDE_GEOMETRY_TAG:
-                collection.delete(c)
-
-        collect = layer.createCollection('Hide_Geometry')
-        collect.setNotes(HIDE_GEOMETRY_TAG)
-        setExpandedStateValue(collect, False)
-
-        selector_: SimpleSelector = collect.getSelector()
-        selector_.setFilterType(selector.Filters.kTransforms)
-        selector_.staticSelection.set(nodes)
-
-        override_: AbsUniqueOverride = collect.createAbsoluteOverride(
-            nodes[0], 'visibility'
-        )
-        override_.setAttrValue(False)
-    return True
-
-
-def add_hide_geometry() -> bool:
-    '''Add hide geometry.'''
-    nodes: list[str] = cmds.ls(selection=True, type='transform')
-    if not nodes:
-        _logger.error('Select nodes for layer addition.')
-        return False
-
-    layers: list[RenderLayer] = selected_render_layer()
-    if not layers:
-        _logger.error('Select layer for node addition.')
-        return False
-
-    for layer in layers:
-        collect: Collection | None = None
-        for c in layer.getCollections():
-            if c.getNotes() == HIDE_GEOMETRY_TAG:
-                collect = c
-
-        if collect is None:
-            register_hide_geometry()
-            continue
-
-        selector_: SimpleSelector = collect.getSelector()
-        selector_.staticSelection.add(nodes)
-
-    return True
-
-
-def remove_hide_geometry() -> bool:
-    '''Remove hide geometry.'''
-    nodes: list[str] = cmds.ls(selection=True, type='transform')
-    if not nodes:
-        _logger.error('Select nodes for layer removal.')
-        return False
-
-    layers: list[RenderLayer] = selected_render_layer()
-    if not layers:
-        _logger.error('Select layer for node removal.')
-        return False
-
-    for layer in layers:
-        collect: Collection | None = None
-        for c in layer.getCollections():
-            if c.getNotes() == HIDE_GEOMETRY_TAG:
-                collect = c
-
-        if collect is None:
-            continue
-
-        selector_: SimpleSelector = collect.getSelector()
-        selector_.staticSelection.remove(nodes)
-
-    return True
-
-
-def delete_hide_geometry() -> bool:
-    '''delete hide geometry.'''
-    layers: list[RenderLayer] = selected_render_layer()
-    if not layers:
-        _logger.error('Select layer for node deletion.')
-        return False
-
-    for layer in layers:
-        collect: Collection | None = None
-        for c in layer.getCollections():
-            if c.getNotes() == HIDE_GEOMETRY_TAG:
-                collect = c
-
-        if collect is None:
-            continue
-
-        collection.delete(collect)
-
-    return True
-
-
-# ------------------------------------------------------------------------------
-# Matte out Geometry(SW)
-def register_matte_out_geometry_sw() -> bool:
-    '''Register matte out geometry.'''
-    nodes: list[str] = cmds.ls(selection=True, type='transform')
-    if not nodes:
-        _logger.error('Select nodes for layer registration.')
-        return False
-
-    layers: list[RenderLayer] = selected_render_layer()
-    if not layers:
-        _logger.error('Select layer for node registration.')
-        return False
-
-    material: str = 'matteout_MT'
-    if not cmds.objExists(material):
-        material = cmds.shadingNode(
-            'useBackground', name=material, asShader=True
-        )
-
-    sg: str = 'matteout_MTSG'
-    if not cmds.objExists(sg):
-        cmds.sets(renderable=True, noSurfaceShader=True, empty=True, name=sg)
-
-    src_plug: str = f'{material}.outColor'
-    dst_plug: str = f'{sg}.surfaceShader'
-    if not cmds.isConnected(src_plug, dst_plug):
-        cmds.connectAttr(src_plug, dst_plug, force=True)
-
-    cmds.select(*nodes)
-    for layer in layers:
-        for c in layer.getCollections():
-            if c.getNotes() == MATTE_OUT_GEOMETRY_SW_TAG:
-                collection.delete(c)
-
-        collect = layer.createCollection('Matte_Out_Geometry_SW')
-        collect.setNotes(MATTE_OUT_GEOMETRY_SW_TAG)
-        setExpandedStateValue(collect, False)
-
-        selector_: SimpleSelector = collect.getSelector()
-        selector_.setFilterType(selector.Filters.kTransforms)
-        selector_.staticSelection.set(nodes)
-
-        override_: MaterialOverride = collect.createOverride(
-            sg, typeIDs.materialOverride
-        )
-        override_.setMaterial(sg)
-    return True
-
-
-def add_matte_out_geometry_sw() -> bool:
-    '''Add matte out geometry.'''
-    nodes: list[str] = cmds.ls(selection=True, type='transform')
-    if not nodes:
-        _logger.error('Select nodes for layer addition.')
-        return False
-
-    layers: list[RenderLayer] = selected_render_layer()
-    if not layers:
-        _logger.error('Select layer for node addition.')
-        return False
-
-    for layer in layers:
-        collect: Collection | None = None
-        for c in layer.getCollections():
-            if c.getNotes() == MATTE_OUT_GEOMETRY_SW_TAG:
-                collect = c
-
-        if collect is None:
-            register_matte_out_geometry_sw()
-            continue
-
-        selector_: SimpleSelector = collect.getSelector()
-        selector_.staticSelection.add(nodes)
-
-    return True
-
-
-def remove_matte_out_geometry_sw() -> bool:
-    '''Remove matte out geometry.'''
-    nodes: list[str] = cmds.ls(selection=True, type='transform')
-    if not nodes:
-        _logger.error('Select nodes for layer removal.')
-        return False
-
-    layers: list[RenderLayer] = selected_render_layer()
-    if not layers:
-        _logger.error('Select layer for node removal.')
-        return False
-
-    for layer in layers:
-        collect: Collection | None = None
-        for c in layer.getCollections():
-            if c.getNotes() == MATTE_OUT_GEOMETRY_SW_TAG:
-                collect = c
-
-        if collect is None:
-            continue
-
-        selector_: SimpleSelector = collect.getSelector()
-        selector_.staticSelection.remove(nodes)
-
-    return True
-
-
-def delete_matte_out_geometry_sw() -> bool:
-    '''delete matte out geometry.'''
-    layers: list[RenderLayer] = selected_render_layer()
-    if not layers:
-        _logger.error('Select layer for node deletion.')
-        return False
-
-    for layer in layers:
-        collect: Collection | None = None
-        for c in layer.getCollections():
-            if c.getNotes() == MATTE_OUT_GEOMETRY_SW_TAG:
-                collect = c
-
-        if collect is None:
-            continue
-
-        collection.delete(collect)
-
-    return True
-
-
-# ------------------------------------------------------------------------------
-# Matte out Geometry(aiMatte)
-def register_matte_out_geometry_aimatte() -> bool:
-    '''Register matte out geometry.'''
-    nodes: list[str] = cmds.ls(selection=True, type='transform')
-    if not nodes:
-        _logger.error('Select nodes for layer registration.')
-        return False
-
-    layers: list[RenderLayer] = selected_render_layer()
-    if not layers:
-        _logger.error('Select layer for node registration.')
-        return False
-
-    shapes: list[str] = (
-        cmds.listRelatives(nodes[0], shapes=True, path=True) or []
-    )
-    if not shapes:
-        _logger.error(
-            'The selected nodes have no shapes, so the process cannot continue.'
-        )
-        return False
-
-    for layer in layers:
-        for c in layer.getCollections():
-            if c.getNotes() == MATTE_OUT_GEOMETRY_AIMATTE_TAG:
-                collection.delete(c)
-
-        collect = layer.createCollection('Matte_Out_Geometry_aiMatte')
-        collect.setNotes(MATTE_OUT_GEOMETRY_AIMATTE_TAG)
-        setExpandedStateValue(collect, False)
-
-        selector_: SimpleSelector = collect.getSelector()
-        selector_.setFilterType(selector.Filters.kTransforms)
-        selector_.staticSelection.set(nodes)
-
-        shape_collect: Collection = collect.createCollection('Matte_Out_Shape')
-        setExpandedStateValue(shape_collect, False)
-        shape_selector: SimpleSelector = shape_collect.getSelector()
-        shape_selector.setFilterType(selector.Filters.kShapes)
-        shape_selector.setPattern('*')
-        aiMatte_override: AbsUniqueOverride = (
-            shape_collect.createAbsoluteOverride(shapes[0], 'aiMatte')
-        )
-        aiMatte_override.setAttrValue(True)
-    return True
-
-
-def add_matte_out_geometry_aimatte() -> bool:
-    '''Add matte out geometry.'''
-    nodes: list[str] = cmds.ls(selection=True, type='transform')
-    if not nodes:
-        _logger.error('Select nodes for layer addition.')
-        return False
-
-    layers: list[RenderLayer] = selected_render_layer()
-    if not layers:
-        _logger.error('Select layer for node addition.')
-        return False
-
-    for layer in layers:
-        collect: Collection | None = None
-        for c in layer.getCollections():
-            if c.getNotes() == MATTE_OUT_GEOMETRY_AIMATTE_TAG:
-                collect = c
-
-        if collect is None:
-            register_matte_out_geometry_aimatte()
-            continue
-
-        selector_: SimpleSelector = collect.getSelector()
-        selector_.staticSelection.add(nodes)
-
-    return True
-
-
-def remove_matte_out_geometry_aimatte() -> bool:
-    '''Remove matte out geometry.'''
-    nodes: list[str] = cmds.ls(selection=True, type='transform')
-    if not nodes:
-        _logger.error('Select nodes for layer removal.')
-        return False
-
-    layers: list[RenderLayer] = selected_render_layer()
-    if not layers:
-        _logger.error('Select layer for node removal.')
-        return False
-
-    for layer in layers:
-        collect: Collection | None = None
-        for c in layer.getCollections():
-            if c.getNotes() == MATTE_OUT_GEOMETRY_AIMATTE_TAG:
-                collect = c
-
-        if collect is None:
-            continue
-
-        selector_: SimpleSelector = collect.getSelector()
-        selector_.staticSelection.remove(nodes)
-
-    return True
-
-
-def delete_matte_out_geometry_aimatte() -> bool:
-    '''delete matte out geometry.'''
-    layers: list[RenderLayer] = selected_render_layer()
-    if not layers:
-        _logger.error('Select layer for node deletion.')
-        return False
-
-    for layer in layers:
-        collect: Collection | None = None
-        for c in layer.getCollections():
-            if c.getNotes() == MATTE_OUT_GEOMETRY_AIMATTE_TAG:
-                collect = c
-
-        if collect is None:
-            continue
-
-        collection.delete(collect)
-
-    return True
-
-
-# ------------------------------------------------------------------------------
-# Disable Primary Visibility
-def register_disable_primary_visibility() -> bool:
-    '''Register disable primary visibility geometry.'''
-    nodes: list[str] = cmds.ls(selection=True, type='transform')
-    if not nodes:
-        _logger.error('Select nodes for layer registration.')
-        return False
-
-    layers: list[RenderLayer] = selected_render_layer()
-    if not layers:
-        _logger.error('Select layer for node registration.')
-        return False
-
-    dummy_mesh: str = ''
-    meshes: list[str] = cmds.ls(type='mesh')
-    if not meshes:
-        mesh: str = cmds.createNode('mesh')
-        dummy_mesh = cmds.listRelatives(mesh, parent=True, path=True)[0]
-        meshes.append(mesh)
-
-    for layer in layers:
-        for c in layer.getCollections():
-            if c.getNotes() == DISABLE_PRIMARY_VISIBILITY_TAG:
-                collection.delete(c)
-
-        collect = layer.createCollection('Disable_Primary_Visibility_Geometry')
-        collect.setNotes(DISABLE_PRIMARY_VISIBILITY_TAG)
-        setExpandedStateValue(collect, False)
-
-        selector_: SimpleSelector = collect.getSelector()
-        selector_.setFilterType(selector.Filters.kTransforms)
-        selector_.staticSelection.set(nodes)
-
-        shape_collect: Collection = collect.createCollection(
-            'Disable_Primary_Visibility_Shape'
-        )
-        setExpandedStateValue(shape_collect, False)
-        shape_selector: SimpleSelector = shape_collect.getSelector()
-        shape_selector.setFilterType(selector.Filters.kShapes)
-        shape_selector.setPattern('*')
-        aiMatte_override: AbsUniqueOverride = (
-            shape_collect.createAbsoluteOverride(meshes[0], 'primaryVisibility')
-        )
-        aiMatte_override.setAttrValue(False)
-
-    if dummy_mesh:
-        cmds.delete(dummy_mesh)
-
-    return True
-
-
-def add_disable_primary_visibility() -> bool:
-    '''Add disable primary visibility geometry.'''
-    nodes: list[str] = cmds.ls(selection=True, type='transform')
-    if not nodes:
-        _logger.error('Select nodes for layer addition.')
-        return False
-
-    layers: list[RenderLayer] = selected_render_layer()
-    if not layers:
-        _logger.error('Select layer for node addition.')
-        return False
-
-    for layer in layers:
-        collect: Collection | None = None
-        for c in layer.getCollections():
-            if c.getNotes() == DISABLE_PRIMARY_VISIBILITY_TAG:
-                collect = c
-
-        if collect is None:
-            register_disable_primary_visibility()
-            continue
-
-        selector_: SimpleSelector = collect.getSelector()
-        selector_.staticSelection.add(nodes)
-
-    return True
-
-
-def remove_disable_primary_visibility() -> bool:
-    '''Remove disable primary visibility geometry.'''
-    nodes: list[str] = cmds.ls(selection=True, type='transform')
-    if not nodes:
-        _logger.error('Select nodes for layer removal.')
-        return False
-
-    layers: list[RenderLayer] = selected_render_layer()
-    if not layers:
-        _logger.error('Select layer for node removal.')
-        return False
-
-    for layer in layers:
-        collect: Collection | None = None
-        for c in layer.getCollections():
-            if c.getNotes() == DISABLE_PRIMARY_VISIBILITY_TAG:
-                collect = c
-
-        if collect is None:
-            continue
-
-        selector_: SimpleSelector = collect.getSelector()
-        selector_.staticSelection.remove(nodes)
-
-    return True
-
-
-def delete_disable_primary_visibility() -> bool:
-    '''delete disable primary visibility geometry.'''
-    layers: list[RenderLayer] = selected_render_layer()
-    if not layers:
-        _logger.error('Select layer for node deletion.')
-        return False
-
-    for layer in layers:
-        collect: Collection | None = None
-        for c in layer.getCollections():
-            if c.getNotes() == DISABLE_PRIMARY_VISIBILITY_TAG:
-                collect = c
-
-        if collect is None:
-            continue
-
-        collection.delete(collect)
-
-    return True
-
-
-# ------------------------------------------------------------------------------
 def main() -> None:
     '''Show window.'''
     window: MainWindow = MainWindow()
