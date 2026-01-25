@@ -1119,9 +1119,20 @@ class FileBrowser(QWidget):
         main_layout: QVBoxLayout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
+        path_layout: QHBoxLayout = QHBoxLayout(self)
+        path_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addLayout(path_layout)
+
         self.__root_dir: QLineEdit = QLineEdit(self)
+        self.__root_dir.setEnabled(False)
         self.__root_dir.textChanged.connect(self.change_home_directory)
-        main_layout.addWidget(self.__root_dir)
+        path_layout.addWidget(self.__root_dir)
+
+        self.__edit_root_dir: QPushButton = QPushButton('Edit', self)
+        self.__edit_root_dir.setCheckable(True)
+        self.__edit_root_dir.setChecked(False)
+        self.__edit_root_dir.clicked[bool].connect(self.edit_root_dir)
+        path_layout.addWidget(self.__edit_root_dir)
 
         # Outline View
         outline_widget: QWidget = QWidget(self)
@@ -1261,6 +1272,11 @@ class FileBrowser(QWidget):
         # self.__splitter.addWidget(self.__option_widget)
         self.__splitter.setStretchFactor(1, 1)
         main_layout.addWidget(self.__splitter)
+
+    def edit_root_dir(self, enabled: bool) -> None:
+        '''Set enabled root dir.'''
+        self.__root_dir.setEnabled(enabled)
+        self.__edit_root_dir.setText('Lock' if enabled else 'Edit')
 
     def outline_context_menu(self, position: QPoint) -> None:
         '''Show context menu on outline.'''
