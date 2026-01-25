@@ -1,0 +1,3 @@
+*.mel linguist-language=MEL
+*.ma linguist-vendored
+*.mb linguist-vendored
