@@ -15,7 +15,9 @@ from maya import cmds
 __product__: str = 'Insert Space'
 __version__: str = '1.00'
 __doc__ = 'Inserts a zero-out offset group above the selected transforms.'
-__copyright__ = 'Copyright(c) 2025 @takkun3d. All Rights Reserved.'
+__copyright__ = (
+    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
+)
 _logger: logging.Logger = logging.getLogger(__product__)
 
 

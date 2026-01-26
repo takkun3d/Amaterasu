@@ -50,7 +50,9 @@ from ..lib import parser, widgets
 __product__: str = 'Playblast'
 __version__: str = '1.21'
 __doc__ = 'Quick playblast from the rendering setup.'
-__copyright__ = 'Copyright(c) 2018-2026 @takkun3d. All Rights Reserved.'
+__copyright__ = (
+    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
+)
 _logger: logging.Logger = logging.getLogger(__product__)
 
 DEFAULT_FILE_NAME_PREFIX: str = '<Scene>/<RenderLayer>/<RenderLayer>'

@@ -2,6 +2,8 @@
 #
 # Settings
 #
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
+#
 # ==============================================================================
 from __future__ import annotations
 from typing import Generic, TypeVar, Type, Callable, Any, Iterator, cast

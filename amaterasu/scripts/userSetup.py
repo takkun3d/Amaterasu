@@ -2,6 +2,8 @@
 #
 # Startup
 #
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
+#
 # ==============================================================================
 import sys
 

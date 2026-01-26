@@ -49,7 +49,9 @@ from ..lib import parser, utility, widgets
 __product__: str = 'Symmetry'
 __version__: str = '1.01'
 __doc__ = 'Generate fliped mesh or mirrored mesh from base mesh.'
-__copyright__ = 'Copyright(c) 2017-2024 @takkun3d. All Rights Reserved.'
+__copyright__ = (
+    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
+)
 _logger: logging.Logger = logging.getLogger(__product__)
 
 

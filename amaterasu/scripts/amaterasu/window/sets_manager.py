@@ -74,7 +74,9 @@ from ..lib import parser, widgets
 __product__: str = 'Sets Manager'
 __version__: str = '1.21'
 __doc__ = 'Sets manager.'
-__copyright__ = 'Copyright(c) 2017-2024 @takkun3d. All Rights Reserved.'
+__copyright__ = (
+    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
+)
 _logger: logging.Logger = logging.getLogger(__product__)
 
 FAVORITE_ATTR_NAME: str = 'amaterasu_sets_favorite'

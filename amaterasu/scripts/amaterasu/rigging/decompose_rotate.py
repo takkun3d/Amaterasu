@@ -17,7 +17,9 @@ from ..modify import history_visibility
 __product__: str = 'Decompose Rotate'
 __version__: str = '1.10'
 __doc__ = 'Decomposes the rotation of selected objects into separate X, Y, Z Euler angles.'
-__copyright__ = 'Copyright(c) 2025 @takkun3d. All Rights Reserved.'
+__copyright__ = (
+    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
+)
 _logger: logging.Logger = logging.getLogger(__product__)
 
 OP_CROSS_PRODUCT: int = 2

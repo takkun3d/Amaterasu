@@ -53,7 +53,9 @@ from ..lib import parser, widgets
 __product__: str = 'Renamer'
 __version__: str = '1.21'
 __doc__ = 'A tool to rename selected nodes at once.'
-__copyright__ = 'Copyright(c) 2014-2024 @takkun3d. All Rights Reserved.'
+__copyright__ = (
+    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
+)
 _logger: logging.Logger = logging.getLogger(__product__)
 
 RENDER_SETUP_NODES: tuple[str, ...] = (

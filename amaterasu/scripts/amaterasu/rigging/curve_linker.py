@@ -16,7 +16,9 @@ from ..modify import history_visibility
 __product__: str = 'Curve Linker'
 __version__: str = '1.00'
 __doc__ = 'Create a CV curve that follows a controller.'
-__copyright__ = 'Copyright(c) 2026 @takkun3d. All Rights Reserved.'
+__copyright__ = (
+    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
+)
 _logger: logging.Logger = logging.getLogger(__product__)
 
 

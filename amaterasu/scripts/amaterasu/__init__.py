@@ -36,10 +36,12 @@ from . import menu
 __product__: str = 'Amaterasu'
 __version__: int = 20260125
 __doc__ = '''
-Amaterasu is a tools for Autodesk Maya.
+Amaterasu is a toolset for Autodesk Maya.
 Amaterasu provides a set of convenient tools to your contents creation process.
 '''
-__copyright__ = 'Copyright(c) 2014-2025 @takkun3d. All Rights Reserved.'
+__copyright__ = (
+    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
+)
 ROOT_PATH: pathlib.Path = pathlib.Path(__file__).parent
 SCRIPT_PATH: pathlib.Path = ROOT_PATH.parent
 MODULE_PATH: pathlib.Path = SCRIPT_PATH.parent

@@ -16,7 +16,9 @@ from maya import cmds
 __product__: str = 'Camera Projection'
 __version__: str = '1.21'
 __doc__ = 'Creates UV for the selected object based on the current camera view as a planar projection.'
-__copyright__ = 'Copyright(c) 2025 @takkun3d. All Rights Reserved.'
+__copyright__ = (
+    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
+)
 _logger: logging.Logger = logging.getLogger(__product__)
 
 

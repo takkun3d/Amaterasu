@@ -39,7 +39,9 @@ from ..lib import parser, utility, widgets
 __product__: str = 'Copy Animation'
 __version__: str = '1.20'
 __doc__ = 'Copy animation to specific nodes from selected nodes.'
-__copyright__ = 'Copyright(c) 2017-2024 @takkun3d. All Rights Reserved.'
+__copyright__ = (
+    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
+)
 _logger: logging.Logger = logging.getLogger(__product__)
 
 MIRROR_CHANNELS: tuple[str, str, str] = ('translate', 'rotate', 'scale')

@@ -31,7 +31,9 @@ from ..lib import parser, widgets
 __product__: str = 'Add Attribute'
 __version__: str = '1.20'
 __doc__ = 'Add attribute to selected nodes.'
-__copyright__ = 'Copyright(c) 2024 @takkun3d. All Rights Reserved.'
+__copyright__ = (
+    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
+)
 _logger: logging.Logger = logging.getLogger(__product__)
 
 MTOA_SHAPE_LIST: tuple[str, str, str] = ('mesh', 'nurbsSurface', 'nurbsCurve')

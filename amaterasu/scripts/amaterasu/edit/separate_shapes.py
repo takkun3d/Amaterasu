@@ -17,7 +17,9 @@ from maya import cmds
 __product__: str = 'Separate Shapes'
 __version__: str = '1.00'
 __doc__ = 'Separate Shapes from selection.'
-__copyright__ = 'Copyright(c) 2017-2024 @takkun3d. All Rights Reserved.'
+__copyright__ = (
+    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
+)
 _logger: logging.Logger = logging.getLogger(__product__)
 
 

@@ -37,7 +37,9 @@ from ..display import drawing_color
 __product__: str = 'Perspective Guide'
 __version__: str = '1.00'
 __doc__ = 'Generates perspective grids and an eye level guide for the selected camera.'
-__copyright__ = 'Copyright(c) 2025 @takkun3d. All Rights Reserved.'
+__copyright__ = (
+    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
+)
 _logger: logging.Logger = logging.getLogger(__product__)
 
 EL_COLOR: tuple[float, float, float] = (0.2, 0.7, 1.0)

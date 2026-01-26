@@ -2,6 +2,8 @@
 #
 # Amaterasu Menus
 #
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
+#
 # ==============================================================================
 from __future__ import annotations
 from typing import Any

@@ -58,7 +58,9 @@ import amaterasu
 __product__: str = 'Material Library'
 __version__: str = '1.00'
 __doc__ = 'This tool manage material and matcap.'
-__copyright__ = 'Copyright(c) 2014-2024 @takkun3d. All Rights Reserved.'
+__copyright__ = (
+    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
+)
 _logger: logging.Logger = logging.getLogger(__product__)
 
 ROOT_DIR: str = os.path.join(amaterasu.USER_DATA_DIR, 'material_library')
