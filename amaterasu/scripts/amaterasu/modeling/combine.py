@@ -27,7 +27,9 @@ from ..lib import parser, widgets, utility
 __product__: str = 'Combine'
 __version__: str = '1.30'
 __doc__ = 'Combine polygons from selected it.'
-__copyright__ = 'Copyright(c) 2014-2024 @takkun3d. All Rights Reserved.'
+__copyright__ = (
+    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
+)
 _logger: logging.Logger = logging.getLogger(__product__)
 
 SMOOTH_MESH_ATTRS: list[str] = [

@@ -17,7 +17,9 @@ from . import replace_reference
 __product__: str = 'Rename Reference'
 __version__: str = '1.00'
 __doc__ = 'Rename reference node from file name.'
-__copyright__ = 'Copyright(c) 2025 @takkun3d. All Rights Reserved.'
+__copyright__ = (
+    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
+)
 _logger: logging.Logger = logging.getLogger(__product__)
 
 

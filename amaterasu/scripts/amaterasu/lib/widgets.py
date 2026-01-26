@@ -2,6 +2,8 @@
 #
 # widgets
 #
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
+#
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Callable
@@ -2020,7 +2022,7 @@ class AboutDialog(QDialog):
 <p>Version: {version}<br />{document}</p>
 <hr />
 <p>{copyright_}</p>
-<p>All use of this Software is subject to the terms and conditions of the license agreement accepted upon installation of this Software and/or packaged with the Software.</p>
+<p>This software is provided "AS IS", without warranty of any kind.</p>
 '''
         dialog = AboutDialog(parent)
         dialog.setWindowTitle(f'About {product}')

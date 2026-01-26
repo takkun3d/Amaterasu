@@ -109,7 +109,9 @@ from ..lib import parser, widgets, utility
 __product__: str = 'File Manager'
 __version__: str = '1.21'
 __doc__ = 'Manage external files.'
-__copyright__ = 'Copyright(c) 2014-2024 @takkun3d. All Rights Reserved.'
+__copyright__ = (
+    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
+)
 _logger: logging.Logger = logging.getLogger(__product__)
 
 FOLDER_ICON: str = 'view/a_folder.png'

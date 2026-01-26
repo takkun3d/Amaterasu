@@ -90,7 +90,9 @@ from ..lib import parser, widgets
 __product__: str = 'Shelf Stocker'
 __version__: str = '1.00'
 __doc__ = 'Stock shelf icon.'
-__copyright__ = 'Copyright(c) 2020-2024 @takkun3d. All Rights Reserved.'
+__copyright__ = (
+    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
+)
 _logger: logging.Logger = logging.getLogger(__product__)
 
 SHELF_MIME_TYPE: str = 'text/plain'

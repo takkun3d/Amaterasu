@@ -40,7 +40,9 @@ from ..modify import history_visibility
 __product__: str = 'Pivot Shifter'
 __version__: str = '1.00'
 __doc__ = 'Creates a controller based on a guide locator to drive the target object with an adjustable pivot.'
-__copyright__ = 'Copyright(c) 2025 @takkun3d. All Rights Reserved.'
+__copyright__ = (
+    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
+)
 _logger: logging.Logger = logging.getLogger(__product__)
 
 PLUGIN_NAME: str = 'quatNodes.mll'

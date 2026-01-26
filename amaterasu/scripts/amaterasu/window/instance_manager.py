@@ -35,7 +35,9 @@ from ..lib import parser, widgets
 __product__: str = 'Instance Manager'
 __version__: str = '1.10'
 __doc__ = 'Find instance nodes in the scene.'
-__copyright__ = 'Copyright(c) 2014-2024 @takkun3d. All Rights Reserved.'
+__copyright__ = (
+    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
+)
 _logger: logging.Logger = logging.getLogger(__product__)
 
 

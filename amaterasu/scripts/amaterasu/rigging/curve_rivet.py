@@ -28,7 +28,9 @@ from ..modify import history_visibility
 __product__: str = 'Curve Rivet'
 __version__: str = '1.00'
 __doc__ = 'Generates objects along curves that strictly follow surface deformation using matrix constraints.'
-__copyright__ = 'Copyright(c) 2025 @takkun3d. All Rights Reserved.'
+__copyright__ = (
+    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
+)
 _logger: logging.Logger = logging.getLogger(__product__)
 
 WORLD_DAG_PATH: str = '|'

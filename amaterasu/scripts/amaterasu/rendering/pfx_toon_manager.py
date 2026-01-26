@@ -93,7 +93,9 @@ from ..lib import parser, widgets
 __product__: str = 'PfxToon Manager'
 __version__: str = '1.10'
 __doc__ = 'Manages multiple pfxToon nodes and controls geometry assignments.'
-__copyright__ = 'Copyright(c) 2018-2025 @takkun3d. All Rights Reserved.'
+__copyright__ = (
+    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
+)
 _logger: logging.Logger = logging.getLogger(__product__)
 
 DEFAULT_NAME: str = 'outline'
