@@ -1,3 +1,10 @@
+# ==============================================================================
+#
+# Motion Tail Curve
+#
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
+#
+# ==============================================================================
 import maya.api.OpenMaya as om
 import maya.api.OpenMayaAnim as oma
 
@@ -143,7 +150,7 @@ def maya_useNewAPI() -> None:
 
 def initializePlugin(obj: om.MObject) -> None:
     '''Registering plug-ins to Maya.'''
-    mplugin = om.MFnPlugin(obj, '@takkun3d', '1.00')
+    mplugin = om.MFnPlugin(obj, 'takkun(takkun3d)', '1.00')
     try:
         mplugin.registerNode(
             'motionTrailCurve',

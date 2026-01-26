@@ -77,7 +77,9 @@ from ..lib import parser, widgets, utility
 __product__: str = 'Stocker'
 __version__: str = '1.10'
 __doc__ = 'This tool stocks the values of attributes and can be copy and paste.'
-__copyright__ = 'Copyright(c) 2017-2024 @takkun3d. All Rights Reserved.'
+__copyright__ = (
+    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
+)
 _logger: logging.Logger = logging.getLogger(__product__)
 
 MIME_TYPE: str = 'application/x-amaterasu-stocker-data'

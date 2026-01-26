@@ -45,7 +45,9 @@ from ..lib import parser, utility, widgets
 __product__: str = 'Joint Editor'
 __version__: str = '1.22'
 __doc__ = 'his tool helps to edit joint.'
-__copyright__ = 'Copyright(c) 2017-2025 @takkun3d. All Rights Reserved.'
+__copyright__ = (
+    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
+)
 _logger: logging.Logger = logging.getLogger(__product__)
 
 ICON_SIZE: QSize = QSize(24, 24)
