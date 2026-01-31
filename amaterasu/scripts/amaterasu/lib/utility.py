@@ -905,6 +905,7 @@ def closest_vertex_ids(
     dst_dag: OpenMaya.MDagPath = to_dag_path(dst_geo)
     src_mesh_dag: OpenMaya.MDagPath = to_shape_dag_path(src_dag)
     dst_mesh_dag: OpenMaya.MDagPath = to_shape_dag_path(dst_dag)
+    dst_full_path: str = dst_dag.fullPathName()
 
     world_matrix: OpenMaya.MMatrix = src_dag.inclusiveMatrix()
     world_matrix_inv: OpenMaya.MMatrix = world_matrix.inverse()
@@ -925,6 +926,6 @@ def closest_vertex_ids(
         closest_pt_local: OpenMaya.MPoint = OpenMaya.MPoint(point_info.point)
         closest_pt_world: OpenMaya.MPoint = closest_pt_local * world_matrix
         if point.distanceTo(closest_pt_world) < threshold:
-            result.append(f'{dst_geo}.vtx[{i}]')
+            result.append(f'{dst_full_path}.vtx[{i}]')
 
     return result
