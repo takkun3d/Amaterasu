@@ -47,7 +47,7 @@ from ..lib import parser, utility, widgets
 #
 # ==============================================================================
 __product__: str = 'Skin Weight Editor'
-__version__: str = '1.2'
+__version__: str = '1.3'
 __doc__ = 'This tool helps to edit skin weights.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
