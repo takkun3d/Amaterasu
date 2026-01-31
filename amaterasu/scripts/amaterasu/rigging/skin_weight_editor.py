@@ -715,12 +715,15 @@ def masked_transfer_skin_weight(
 ) -> bool:
     '''Masked Transfer skin weight'''
     selection: list[str] = cmds.ls(selection=True)
+    result: list[str] = []
+
     shapes: list[str] = cmds.listRelatives(dst, shapes=True, path=True) or []
     if not shapes:
         return False
 
     dst_skin_cluster: str = utility.find_related_skin_cluster(shapes[0])
 
+    cmds.select(clear=True)
     for src in srcs:
         shapes = cmds.listRelatives(src, shapes=True, path=True) or []
         if not shapes:
@@ -774,6 +777,7 @@ def masked_transfer_skin_weight(
         )
         if masked_vertices:
             cmds.select(*masked_vertices, replace=True)
+            result.extend(masked_vertices)
 
         cmds.copySkinWeights(
             sourceSkin=src_skin_cluster,
@@ -788,6 +792,9 @@ def masked_transfer_skin_weight(
 
     if selection:
         cmds.select(*selection)
+
+    if result:
+        cmds.select(*result)
 
     return True
 
