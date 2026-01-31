@@ -16,6 +16,8 @@ try:
         QVBoxLayout,
         QHBoxLayout,
         QCheckBox,
+        QDoubleSpinBox,
+        QButtonGroup,
         QPushButton,
         QMessageBox,
         QFileDialog,
@@ -29,6 +31,8 @@ except ImportError:
             QVBoxLayout,
             QHBoxLayout,
             QCheckBox,
+            QDoubleSpinBox,
+            QButtonGroup,
             QPushButton,
             QMessageBox,
             QFileDialog,
@@ -61,8 +65,91 @@ class Settings(parser.ToolSettings):
     '''Settings for tool.'''
 
     window_geo: parser.Variant[str] = parser.Variant('')
+    transfar_method: parser.Variant[int] = parser.Variant(0)
+    threshold: parser.Variant[float] = parser.Variant(0.1)
     across: parser.Variant[int] = parser.Variant(1)
     direction: parser.Variant[bool] = parser.Variant(True)
+
+
+class TransfarSkinWeight(QWidget):
+    '''Transfar Skin Weight Widget'''
+
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        flag: Qt.WindowFlags = Qt.WindowFlags(),
+    ) -> None:
+        '''Initialize widget.'''
+        super().__init__(parent, flag)
+
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.__layout = widgets.FormLayout(self)
+        self.__layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addLayout(self.__layout)
+
+        self.__method: widgets.RadioButtons = widgets.RadioButtons(self)
+        self.__method.set_labels(('Default', 'Proximity'))
+        button_group: QButtonGroup = self.__method.button_group()
+        button_group.buttonClicked.connect(self.update_ui)
+        self.__layout.addRow(widgets.FormLabel('Method'), self.__method)
+
+        self.__threshold: QDoubleSpinBox = QDoubleSpinBox(self)
+        self.__threshold.setRange(0, 1000)
+        self.__threshold.setDecimals(3)
+        self.__threshold.setSingleStep(0.05)
+        self.__layout.addRow(widgets.FormLabel('Threshold'), self.__threshold)
+        self.__threshold_idx: int = self.__layout.row_id()
+
+        button = QPushButton('Transfar Skin Weight', self)
+        button.clicked.connect(self.apply)
+        main_layout.addWidget(button)
+
+    def load_settings(self) -> None:
+        '''Load Settings.'''
+        settings: Settings = Settings.instance(__name__, True)
+        self.__method.set_check_id(settings.transfar_method.value())
+        self.__threshold.setValue(settings.threshold.value())
+        self.update_ui()
+
+    def save_settings(self) -> None:
+        '''Save Settings.'''
+        settings: Settings = Settings.instance(__name__, True)
+        settings.transfar_method.set_value(self.__method.check_id())
+        settings.threshold.set_value(self.__threshold.value())
+
+    def reset_settings(self) -> None:
+        '''Reset Settings.'''
+        settings: Settings = Settings.instance(__name__, True)
+        settings.reset()
+        self.load_settings()
+
+    def update_ui(self) -> None:
+        '''Update UI'''
+        self.__layout.set_row_enabled(
+            self.__threshold_idx, self.__method.check_id() == 1
+        )
+
+    @widgets.undo
+    def apply(self) -> None:
+        '''Apply'''
+        self.save_settings()
+
+        selection: list[str] = cmds.ls(selection=True, exactType='transform')
+        if not selection or len(selection) <= 1:
+            QMessageBox.critical(
+                self, 'Error', 'Must select a source and a destination skin.'
+            )
+            return
+
+        if self.__method.check_id() == 0:
+            transfar_skin_weight(selection[0], selection[1:])
+
+        else:
+            masked_transfar_skin_weight(
+                selection[:-1], selection[-1], self.__threshold.value()
+            )
 
 
 class MirrorSkinWeight(QWidget):
@@ -218,12 +305,12 @@ class Utilities(QWidget):
         icon_layout = QHBoxLayout(self)
         layout.addLayout(icon_layout)
 
-        button = widgets.IconButton(self)
-        button.set_icon('a_transfer.png')
-        button.setIconSize(ICON_SIZE)
-        button.setToolTip('Transfer Skin Weights')
-        button.clicked.connect(self.transfer_skin_weights)
-        icon_layout.addWidget(button)
+        # button = widgets.IconButton(self)
+        # button.set_icon('a_transfer.png')
+        # button.setIconSize(ICON_SIZE)
+        # button.setToolTip('Transfer Skin Weights')
+        # button.clicked.connect(self.transfer_skin_weights)
+        # icon_layout.addWidget(button)
 
         button = widgets.IconButton(self)
         button.set_icon('a_copy.png')
@@ -356,17 +443,17 @@ class Utilities(QWidget):
 
         remove_unused_influences(selection)
 
-    @widgets.undo
-    def transfer_skin_weights(self) -> None:
-        '''Apply'''
-        selection: list[str] = cmds.ls(selection=True, exactType='transform')
-        if not selection or len(selection) <= 1:
-            QMessageBox.critical(
-                self, 'Error', 'Must select a source and a destination skin.'
-            )
-            return
+    # @widgets.undo
+    # def transfer_skin_weights(self) -> None:
+    #     '''Apply'''
+    #     selection: list[str] = cmds.ls(selection=True, exactType='transform')
+    #     if not selection or len(selection) <= 1:
+    #         QMessageBox.critical(
+    #             self, 'Error', 'Must select a source and a destination skin.'
+    #         )
+    #         return
 
-        transfar_skin_weight(selection[0], selection[1:])
+    #     transfar_skin_weight(selection[0], selection[1:])
 
     @widgets.undo
     def copy_vertex_weights(self) -> None:
@@ -494,6 +581,11 @@ class MainWindow(widgets.ToolWidget):
 
         layout.addWidget(widgets.HorizontalLine())
 
+        self.__transfar_weight: TransfarSkinWeight = TransfarSkinWeight(self)
+        layout.addWidget(self.__transfar_weight)
+
+        layout.addWidget(widgets.HorizontalLine())
+
         self.__mirror_skin_weight = MirrorSkinWeight(self)
         layout.addWidget(self.__mirror_skin_weight)
         layout.addStretch()
@@ -503,6 +595,7 @@ class MainWindow(widgets.ToolWidget):
         '''Load ui settings from file.[override]'''
         settings: Settings = Settings.instance(__name__, True)
         self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
+        self.__transfar_weight.load_settings()
         self.__mirror_skin_weight.load_settings()
 
     # override
@@ -510,6 +603,7 @@ class MainWindow(widgets.ToolWidget):
         '''Save ui settings to file.[override]'''
         settings: Settings = Settings.instance(__name__, True)
         settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
+        self.__transfar_weight.save_settings()
         self.__mirror_skin_weight.save_settings()
         settings.write()
 
@@ -518,6 +612,7 @@ class MainWindow(widgets.ToolWidget):
         '''Reset ui settings.[override]'''
         settings: Settings = Settings.instance(__name__, True)
         settings.reset()
+        self.__transfar_weight.reset_settings()
         self.__mirror_skin_weight.reset_settings()
         self.load_settings()
 
@@ -592,6 +687,70 @@ def transfar_skin_weight(src: str, dsts: list[str]) -> bool:
         )
 
         _logger.info('Transfar skin weight : %s > %s', src, dst)
+
+    return True
+
+
+def masked_transfar_skin_weight(
+    srcs: list[str], dst: str, threshold: float
+) -> bool:
+    '''Masked Transfar skin weight'''
+    selection: list[str] = cmds.ls(selection=True)
+    shapes: list[str] = cmds.listRelatives(dst, shapes=True, path=True) or []
+    if not shapes:
+        return False
+
+    dst_skin_cluster: str = utility.find_related_skin_cluster(shapes[0])
+
+    for src in srcs:
+        shapes = cmds.listRelatives(src, shapes=True, path=True) or []
+        if not shapes:
+            continue
+
+        src_skin_cluster: str = utility.find_related_skin_cluster(shapes[0])
+        # TODO : Check diffarent influences.
+        if not dst_skin_cluster:
+            skinning_method: int = cmds.getAttr(f'{src_skin_cluster}.skm')
+            dropoff_rate: float = cmds.getAttr(f'{src_skin_cluster}.dr')
+            maintain_max_influences: int = cmds.getAttr(
+                f'{src_skin_cluster}.mmi'
+            )
+            max_influences: int = cmds.getAttr(f'{src_skin_cluster}.mi')
+            normalize_weights: bool = cmds.getAttr(f'{src_skin_cluster}.nw')
+            src_influences: list[str] = cmds.skinCluster(
+                src_skin_cluster, query=True, influence=True
+            )
+            temp: list[str] = cmds.skinCluster(
+                dst,
+                src_influences,
+                obeyMaxInfluences=maintain_max_influences,
+                maximumInfluences=max_influences,
+                dropoffRate=dropoff_rate,
+                skinMethod=skinning_method,
+                normalizeWeights=normalize_weights,
+                toSelectedBones=True,
+            )
+            dst_skin_cluster = temp[0]
+
+        masked_vertices: list[str] = utility.closest_vertex_ids(
+            src, dst, threshold
+        )
+        if masked_vertices:
+            cmds.select(*masked_vertices, replace=True)
+
+        cmds.copySkinWeights(
+            sourceSkin=src_skin_cluster,
+            destinationSkin=dst_skin_cluster,
+            surfaceAssociation='closestPoint',
+            influenceAssociation=['name', 'closestJoint', 'oneToOne'],
+            normalize=True,
+            noMirror=True,
+        )
+
+        _logger.info('Masked transfar skin weight : %s > %s', src, dst)
+
+    if selection:
+        cmds.select(*selection)
 
     return True
 
