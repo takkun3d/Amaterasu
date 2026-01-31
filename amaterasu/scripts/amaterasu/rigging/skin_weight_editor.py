@@ -652,7 +652,6 @@ def transfer_skin_weight(src: str, dsts: list[str]) -> bool:
     maintain_max_influences: int = cmds.getAttr(f'{src_skin_cluster}.mmi')
     max_influences: int = cmds.getAttr(f'{src_skin_cluster}.mi')
     normalize_weights: bool = cmds.getAttr(f'{src_skin_cluster}.nw')
-
     src_influences: list[str] = cmds.skinCluster(
         src_skin_cluster, query=True, influence=True
     )
@@ -663,7 +662,6 @@ def transfer_skin_weight(src: str, dsts: list[str]) -> bool:
             continue
 
         dst_skin_cluster: str = utility.find_related_skin_cluster(shapes[0])
-        # TODO : Check diffarent influences.
         if not dst_skin_cluster:
             temp: list[str] = cmds.skinCluster(
                 dst,
@@ -676,6 +674,27 @@ def transfer_skin_weight(src: str, dsts: list[str]) -> bool:
                 toSelectedBones=True,
             )
             dst_skin_cluster = temp[0]
+
+        dst_influences: list[str] = cmds.skinCluster(
+            dst_skin_cluster, query=True, influence=True
+        )
+        src_influences = cmds.ls(src_influences, long=True)
+        dst_influences = cmds.ls(dst_influences, long=True)
+        diff_influences: list[str] = list(
+            set(src_influences) - set(dst_influences)
+        )
+        if diff_influences:
+            cmds.skinCluster(
+                dst_skin_cluster,
+                edit=True,
+                dropoffRate=4.0,
+                useGeometry=True,
+                polySmoothness=0,
+                nurbsSamples=10,
+                lockWeights=True,
+                weight=0.0,
+                addInfluence=diff_influences,
+            )
 
         cmds.copySkinWeights(
             sourceSkin=src_skin_cluster,
@@ -708,18 +727,15 @@ def masked_transfer_skin_weight(
             continue
 
         src_skin_cluster: str = utility.find_related_skin_cluster(shapes[0])
-        # TODO : Check diffarent influences.
+        skinning_method: int = cmds.getAttr(f'{src_skin_cluster}.skm')
+        dropoff_rate: float = cmds.getAttr(f'{src_skin_cluster}.dr')
+        maintain_max_influences: int = cmds.getAttr(f'{src_skin_cluster}.mmi')
+        max_influences: int = cmds.getAttr(f'{src_skin_cluster}.mi')
+        normalize_weights: bool = cmds.getAttr(f'{src_skin_cluster}.nw')
+        src_influences: list[str] = cmds.skinCluster(
+            src_skin_cluster, query=True, influence=True
+        )
         if not dst_skin_cluster:
-            skinning_method: int = cmds.getAttr(f'{src_skin_cluster}.skm')
-            dropoff_rate: float = cmds.getAttr(f'{src_skin_cluster}.dr')
-            maintain_max_influences: int = cmds.getAttr(
-                f'{src_skin_cluster}.mmi'
-            )
-            max_influences: int = cmds.getAttr(f'{src_skin_cluster}.mi')
-            normalize_weights: bool = cmds.getAttr(f'{src_skin_cluster}.nw')
-            src_influences: list[str] = cmds.skinCluster(
-                src_skin_cluster, query=True, influence=True
-            )
             temp: list[str] = cmds.skinCluster(
                 dst,
                 src_influences,
@@ -731,6 +747,27 @@ def masked_transfer_skin_weight(
                 toSelectedBones=True,
             )
             dst_skin_cluster = temp[0]
+
+        dst_influences: list[str] = cmds.skinCluster(
+            dst_skin_cluster, query=True, influence=True
+        )
+        src_influences = cmds.ls(src_influences, long=True)
+        dst_influences = cmds.ls(dst_influences, long=True)
+        diff_influences: list[str] = list(
+            set(src_influences) - set(dst_influences)
+        )
+        if diff_influences:
+            cmds.skinCluster(
+                dst_skin_cluster,
+                edit=True,
+                dropoffRate=4.0,
+                useGeometry=True,
+                polySmoothness=0,
+                nurbsSamples=10,
+                lockWeights=True,
+                weight=0.0,
+                addInfluence=diff_influences,
+            )
 
         masked_vertices: list[str] = utility.closest_vertex_ids(
             src, dst, threshold
