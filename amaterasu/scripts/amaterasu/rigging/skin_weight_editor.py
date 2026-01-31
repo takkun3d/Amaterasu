@@ -65,14 +65,14 @@ class Settings(parser.ToolSettings):
     '''Settings for tool.'''
 
     window_geo: parser.Variant[str] = parser.Variant('')
-    transfar_method: parser.Variant[int] = parser.Variant(0)
+    transfer_method: parser.Variant[int] = parser.Variant(0)
     threshold: parser.Variant[float] = parser.Variant(0.1)
     across: parser.Variant[int] = parser.Variant(1)
     direction: parser.Variant[bool] = parser.Variant(True)
 
 
-class TransfarSkinWeight(QWidget):
-    '''Transfar Skin Weight Widget'''
+class TransferSkinWeight(QWidget):
+    '''Transfer Skin Weight Widget'''
 
     def __init__(
         self,
@@ -102,21 +102,21 @@ class TransfarSkinWeight(QWidget):
         self.__layout.addRow(widgets.FormLabel('Threshold'), self.__threshold)
         self.__threshold_idx: int = self.__layout.row_id()
 
-        button = QPushButton('Transfar Skin Weight', self)
+        button = QPushButton('Transfer Skin Weight', self)
         button.clicked.connect(self.apply)
         main_layout.addWidget(button)
 
     def load_settings(self) -> None:
         '''Load Settings.'''
         settings: Settings = Settings.instance(__name__, True)
-        self.__method.set_check_id(settings.transfar_method.value())
+        self.__method.set_check_id(settings.transfer_method.value())
         self.__threshold.setValue(settings.threshold.value())
         self.update_ui()
 
     def save_settings(self) -> None:
         '''Save Settings.'''
         settings: Settings = Settings.instance(__name__, True)
-        settings.transfar_method.set_value(self.__method.check_id())
+        settings.transfer_method.set_value(self.__method.check_id())
         settings.threshold.set_value(self.__threshold.value())
 
     def reset_settings(self) -> None:
@@ -144,10 +144,10 @@ class TransfarSkinWeight(QWidget):
             return
 
         if self.__method.check_id() == 0:
-            transfar_skin_weight(selection[0], selection[1:])
+            transfer_skin_weight(selection[0], selection[1:])
 
         else:
-            masked_transfar_skin_weight(
+            masked_transfer_skin_weight(
                 selection[:-1], selection[-1], self.__threshold.value()
             )
 
@@ -453,7 +453,7 @@ class Utilities(QWidget):
     #         )
     #         return
 
-    #     transfar_skin_weight(selection[0], selection[1:])
+    #     transfer_skin_weight(selection[0], selection[1:])
 
     @widgets.undo
     def copy_vertex_weights(self) -> None:
@@ -581,8 +581,8 @@ class MainWindow(widgets.ToolWidget):
 
         layout.addWidget(widgets.HorizontalLine())
 
-        self.__transfar_weight: TransfarSkinWeight = TransfarSkinWeight(self)
-        layout.addWidget(self.__transfar_weight)
+        self.__transfer_weight: TransferSkinWeight = TransferSkinWeight(self)
+        layout.addWidget(self.__transfer_weight)
 
         layout.addWidget(widgets.HorizontalLine())
 
@@ -595,7 +595,7 @@ class MainWindow(widgets.ToolWidget):
         '''Load ui settings from file.[override]'''
         settings: Settings = Settings.instance(__name__, True)
         self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
-        self.__transfar_weight.load_settings()
+        self.__transfer_weight.load_settings()
         self.__mirror_skin_weight.load_settings()
 
     # override
@@ -603,7 +603,7 @@ class MainWindow(widgets.ToolWidget):
         '''Save ui settings to file.[override]'''
         settings: Settings = Settings.instance(__name__, True)
         settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
-        self.__transfar_weight.save_settings()
+        self.__transfer_weight.save_settings()
         self.__mirror_skin_weight.save_settings()
         settings.write()
 
@@ -612,7 +612,7 @@ class MainWindow(widgets.ToolWidget):
         '''Reset ui settings.[override]'''
         settings: Settings = Settings.instance(__name__, True)
         settings.reset()
-        self.__transfar_weight.reset_settings()
+        self.__transfer_weight.reset_settings()
         self.__mirror_skin_weight.reset_settings()
         self.load_settings()
 
@@ -636,8 +636,8 @@ def import_export_dir() -> str:
     return directory
 
 
-def transfar_skin_weight(src: str, dsts: list[str]) -> bool:
-    '''Transfar skin weight'''
+def transfer_skin_weight(src: str, dsts: list[str]) -> bool:
+    '''Transfer skin weight'''
     shapes: list[str] = cmds.listRelatives(src, shapes=True, path=True) or []
     if not shapes:
         return False
@@ -686,15 +686,15 @@ def transfar_skin_weight(src: str, dsts: list[str]) -> bool:
             noMirror=True,
         )
 
-        _logger.info('Transfar skin weight : %s > %s', src, dst)
+        _logger.info('Transfer skin weight : %s > %s', src, dst)
 
     return True
 
 
-def masked_transfar_skin_weight(
+def masked_transfer_skin_weight(
     srcs: list[str], dst: str, threshold: float
 ) -> bool:
-    '''Masked Transfar skin weight'''
+    '''Masked Transfer skin weight'''
     selection: list[str] = cmds.ls(selection=True)
     shapes: list[str] = cmds.listRelatives(dst, shapes=True, path=True) or []
     if not shapes:
@@ -747,7 +747,7 @@ def masked_transfar_skin_weight(
             noMirror=True,
         )
 
-        _logger.info('Masked transfar skin weight : %s > %s', src, dst)
+        _logger.info('Masked transfer skin weight : %s > %s', src, dst)
 
     if selection:
         cmds.select(*selection)
