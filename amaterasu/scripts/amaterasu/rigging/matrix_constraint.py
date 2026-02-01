@@ -38,7 +38,7 @@ from ..modify import history_visibility
 #
 # ==============================================================================
 __product__: str = 'Matrix Constraint'
-__version__: str = '1.00'
+__version__: str = '1.10'
 __doc__ = 'Constrains the specified node using matrix calculations.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
@@ -203,7 +203,7 @@ def apply(
     )
     cmds.setAttr(f'{target_space}.visibility', False)
     cmds.setAttr(f'{target_space}.hiddenInOutliner', True)
-    target_space = cmds.parent(target_space, sources[0])[0]
+    target_space = cmds.parent(target_space, sources[-1])[0]
 
     for attr in ['translate', 'rotate', 'scale', 'visibility']:
         cmds.setAttr(
