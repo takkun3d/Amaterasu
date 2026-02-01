@@ -38,7 +38,7 @@ from ..modify import history_visibility
 #
 # ==============================================================================
 __product__: str = 'Matrix Constraint'
-__version__: str = '1.00'
+__version__: str = '1.20'
 __doc__ = 'Constrains the specified node using matrix calculations.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
@@ -189,7 +189,7 @@ def apply(
     if not cmds.pluginInfo(PLUGIN_NAME, query=True, loaded=True):
         cmds.loadPlugin(PLUGIN_NAME)
 
-    base_name: str = sources[0].split('|')[-1].split(':')[-1]
+    base_name: str = sources[-1].split('|')[-1].split(':')[-1]
     base_name = base_name.split('_')[0]
 
     target_base_name: str = target.split('|')[-1].split(':')[-1]
@@ -203,7 +203,7 @@ def apply(
     )
     cmds.setAttr(f'{target_space}.visibility', False)
     cmds.setAttr(f'{target_space}.hiddenInOutliner', True)
-    target_space = cmds.parent(target_space, sources[0])[0]
+    target_space = cmds.parent(target_space, sources[-1])[0]
 
     for attr in ['translate', 'rotate', 'scale', 'visibility']:
         cmds.setAttr(
@@ -217,16 +217,20 @@ def apply(
     mult_matrix: str = cmds.createNode(
         'multMatrix', name=f'{base_name}{target_base_name}_multMtx'
     )
-    cmds.connectAttr(f'{target_space}.matrix', f'{mult_matrix}.matrixIn[0]')
 
     if space == 0:
         # Calc Matrix
+        cmds.connectAttr(
+            f'{target_space}.worldMatrix[0]', f'{mult_matrix}.matrixIn[0]'
+        )
         cmds.connectAttr(
             f'{target}.parentInverseMatrix[0]',
             f'{mult_matrix}.matrixIn[1]',
         )
 
     else:
+        cmds.connectAttr(f'{target_space}.matrix', f'{mult_matrix}.matrixIn[0]')
+
         # Reverse sources.
         sources = list(reversed(sources))
 
