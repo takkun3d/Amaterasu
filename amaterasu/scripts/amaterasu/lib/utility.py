@@ -14,6 +14,7 @@ import platform
 import subprocess
 import getpass
 from maya import cmds
+from maya.api import OpenMaya
 
 
 # ==============================================================================
@@ -856,3 +857,75 @@ def surface_shader(node: str) -> list[str]:
     all_nodes: list[str] = cmds.listHistory(node, future=True)
     shading_group: list[str] = cmds.ls(*all_nodes, type='shadingEngine')
     return shading_group
+
+
+def to_dag_path(node: str) -> OpenMaya.MDagPath:
+    '''Returns OpenMaya.MDagPath'''
+    selection: OpenMaya.MSelectionList = OpenMaya.MSelectionList()
+    selection.add(node)
+    return selection.getDagPath(0)
+
+
+def to_shape_dag_path(node: OpenMaya.MDagPath) -> OpenMaya.MDagPath:
+    '''Returns Shape OpenMaya.MDagPath'''
+    shape_dag: OpenMaya.MDagPath = OpenMaya.MDagPath(node)
+    if shape_dag.apiType() == OpenMaya.MFn.kTransform:
+        shape_dag.extendToShape()
+
+    return shape_dag
+
+
+def closest_vertex_ids(
+    src_geo: str, dst_geo: str, threshold: float
+) -> list[str]:
+    '''Return closest vertex ids of dst_geo with src_geo.'''
+    # result: list[str] = []
+    # vertex_count: int = cmds.polyEvaluate(dst_geo, vertex=True)
+    # fn_mesh: OpenMaya.MFnMesh = OpenMaya.MFnMesh(to_dag_path(src_geo))
+    # for i in range(vertex_count):
+    #     vertex_name: str = f'{dst_geo}.vtx[{i}]'
+    #     position: list[float] = cmds.xform(
+    #         vertex_name, query=True, translation=True, worldSpace=True
+    #     )
+
+    #     point: OpenMaya.MPoint = OpenMaya.MPoint(*position)
+    #     closest_point: OpenMaya.MPoint
+    #     id: int
+    #     closest_point, id = fn_mesh.getClosestPoint(
+    #         point, OpenMaya.MSpace.kWorld
+    #     )
+    #     distance: float = point.distanceTo(closest_point)
+    #     if distance < threshold:
+    #         result.append(vertex_name)
+
+    # return result
+    result: list[str] = []
+
+    src_dag: OpenMaya.MDagPath = to_dag_path(src_geo)
+    dst_dag: OpenMaya.MDagPath = to_dag_path(dst_geo)
+    src_mesh_dag: OpenMaya.MDagPath = to_shape_dag_path(src_dag)
+    dst_mesh_dag: OpenMaya.MDagPath = to_shape_dag_path(dst_dag)
+    dst_full_path: str = dst_dag.fullPathName()
+
+    world_matrix: OpenMaya.MMatrix = src_dag.inclusiveMatrix()
+    world_matrix_inv: OpenMaya.MMatrix = world_matrix.inverse()
+
+    dst_fn_mesh: OpenMaya.MFnMesh = OpenMaya.MFnMesh(dst_mesh_dag)
+    dst_points: list[OpenMaya.MPoint] = dst_fn_mesh.getPoints(
+        OpenMaya.MSpace.kWorld
+    )
+
+    intersector: OpenMaya.MMeshIntersector = OpenMaya.MMeshIntersector()
+    intersector.create(src_mesh_dag.node())
+
+    for i, point in enumerate(dst_points):
+        point_in_src_local: OpenMaya.MPoint = point * world_matrix_inv
+        point_info: OpenMaya.MPointOnMesh = intersector.getClosestPoint(
+            point_in_src_local
+        )
+        closest_pt_local: OpenMaya.MPoint = OpenMaya.MPoint(point_info.point)
+        closest_pt_world: OpenMaya.MPoint = closest_pt_local * world_matrix
+        if point.distanceTo(closest_pt_world) < threshold:
+            result.append(f'{dst_full_path}.vtx[{i}]')
+
+    return result
