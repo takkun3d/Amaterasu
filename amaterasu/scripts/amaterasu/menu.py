@@ -560,6 +560,11 @@ def create_main_menu() -> None:
                 is_window_only=True,
             )
             m.add_item(
+                'Aim Matrix Constraint',
+                'amaterasu.rigging.aim_matrix_constraint',
+                is_window_only=True,
+            )
+            m.add_item(
                 'Geometry Constraint', 'amaterasu.rigging.geometry_constraint'
             )
             m.add_item(
