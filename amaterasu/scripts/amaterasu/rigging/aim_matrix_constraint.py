@@ -210,6 +210,34 @@ class MainWindow(widgets.ToolWidget):
 # Functions
 #
 # ==============================================================================
+def create_matrix_chain(
+    base_name: str,
+    aim_matrix_plug: str,
+    targets: list[str],
+    follows_parent: bool,
+) -> str:
+    '''Helper to create multMatrix chain for targets'''
+    mult_matrix: str = cmds.createNode(
+        'multMatrix', name=f'{base_name}_multMtx'
+    )
+    i: int = 0
+    for i, node in enumerate(targets):
+        cmds.connectAttr(f'{node}.matrix', f'{mult_matrix}.matrixIn[{i}]')
+
+    if follows_parent:
+        cmds.connectAttr(
+            f'{targets[-1]}.parentMatrix[0]',
+            f'{mult_matrix}.matrixIn[{i+1}]',
+        )
+
+    cmds.connectAttr(
+        f'{mult_matrix}.matrixSum',
+        aim_matrix_plug,
+    )
+
+    return mult_matrix
+
+
 def apply(
     sources: list[str],
     aim_targets: list[str],
@@ -312,44 +340,20 @@ def apply(
             )
 
         # Aim Matrix
-        aim_mult_matrix: str = cmds.createNode(
-            'multMatrix', name=f'{base_name}{target_base_name}Aim_multMtx'
-        )
-        cmds.connectAttr(
-            f'{aim_mult_matrix}.matrixSum',
+        create_matrix_chain(
+            f'{base_name}{target_base_name}Aim',
             f'{aim_matrix}.primaryTargetMatrix',
+            aim_targets,
+            follows_parent,
         )
-
-        for i, node in enumerate(aim_targets):
-            cmds.connectAttr(
-                f'{node}.matrix', f'{aim_mult_matrix}.matrixIn[{i}]'
-            )
-
-        if follows_parent:
-            cmds.connectAttr(
-                f'{aim_targets[-1]}.parentMatrix[0]',
-                f'{aim_mult_matrix}.matrixIn[{i+1}]',
-            )
 
         # Up Matrix
-        up_mult_matrix: str = cmds.createNode(
-            'multMatrix', name=f'{base_name}{target_base_name}Up_multMtx'
-        )
-        cmds.connectAttr(
-            f'{up_mult_matrix}.matrixSum',
+        create_matrix_chain(
+            f'{base_name}{target_base_name}Up',
             f'{aim_matrix}.secondaryTargetMatrix',
+            up_targets,
+            follows_parent,
         )
-
-        for i, node in enumerate(up_targets):
-            cmds.connectAttr(
-                f'{node}.matrix', f'{up_mult_matrix}.matrixIn[{i}]'
-            )
-
-        if follows_parent:
-            cmds.connectAttr(
-                f'{up_targets[-1]}.parentMatrix[0]',
-                f'{up_mult_matrix}.matrixIn[{i+1}]',
-            )
 
     # Decompose Matrix
     decompose_mtx: str = cmds.createNode(
@@ -361,6 +365,7 @@ def apply(
     )
 
     # Cancels out joint orient.
+    rotate_plug: str = f'{decompose_mtx}.outputRotate'
     if cmds.objectType(target) == 'joint':
         # Euler to Quat
         joint_orient_quat: str = cmds.createNode(
@@ -405,51 +410,28 @@ def apply(
             f'{joint_orient_euler}.inputRotateOrder',
         )
 
-        # Target
-        cmds.connectAttr(
-            f'{decompose_mtx}.outputTranslate',
-            f'{target}.translate',
-            force=True,
-        )
-        cmds.connectAttr(
-            f'{joint_orient_euler}.outputRotate',
-            f'{target}.rotate',
-            force=True,
-        )
-        cmds.connectAttr(
-            f'{decompose_mtx}.outputScale',
-            f'{target}.scale',
-            force=True,
-        )
-        cmds.connectAttr(
-            f'{decompose_mtx}.outputShear',
-            f'{target}.shear',
-            force=True,
-        )
+        rotate_plug = f'{joint_orient_euler}.outputRotate'
 
-    # Transform
-    else:
-        # Target
-        cmds.connectAttr(
-            f'{decompose_mtx}.outputTranslate',
-            f'{target}.translate',
-            force=True,
-        )
-        cmds.connectAttr(
-            f'{decompose_mtx}.outputRotate',
-            f'{target}.rotate',
-            force=True,
-        )
-        cmds.connectAttr(
-            f'{decompose_mtx}.outputScale',
-            f'{target}.scale',
-            force=True,
-        )
-        cmds.connectAttr(
-            f'{decompose_mtx}.outputShear',
-            f'{target}.shear',
-            force=True,
-        )
+    cmds.connectAttr(
+        f'{decompose_mtx}.outputTranslate',
+        f'{target}.translate',
+        force=True,
+    )
+    cmds.connectAttr(
+        rotate_plug,
+        f'{target}.rotate',
+        force=True,
+    )
+    cmds.connectAttr(
+        f'{decompose_mtx}.outputScale',
+        f'{target}.scale',
+        force=True,
+    )
+    cmds.connectAttr(
+        f'{decompose_mtx}.outputShear',
+        f'{target}.shear',
+        force=True,
+    )
 
     # Update Outliner
     for panel in cmds.getPanel(type='outlinerPanel'):
