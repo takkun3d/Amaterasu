@@ -1,4 +1,4 @@
-![Python 3.7+](https://img.shields.io/badge/Python-3.7%2B-3776AB?logo=python&logoColor=white)
+![Python 3.9+](https://img.shields.io/badge/Python-3.7%2B-3776AB?logo=python&logoColor=white)
 ![PySide 2 / 6](https://img.shields.io/badge/PySide-2_%2F_6-41CD52?logo=qt&logoColor=white)
 ![Maya 2023-2026](https://img.shields.io/badge/Maya-2023--2026-0696D7?logo=autodesk&logoColor=white)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
