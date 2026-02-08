@@ -22,6 +22,7 @@ try:
         QMouseEvent,
         QWheelEvent,
         QResizeEvent,
+        QPaintEvent,
     )
     from PySide2.QtWidgets import (
         QWidget,
@@ -55,6 +56,7 @@ except ImportError:
             QMouseEvent,
             QWheelEvent,
             QResizeEvent,
+            QPaintEvent,
         )
         from PySide6.QtWidgets import (
             QWidget,
@@ -149,6 +151,21 @@ class DragDropListWidget(QListWidget):
 
             if path not in [self.item(i).text() for i in range(self.count())]:
                 self.addItem(path)
+
+    def paintEvent(self, event: QPaintEvent) -> None:
+        '''Override'''
+        super().paintEvent(event)
+
+        if self.count() == 0:
+            painter: QPainter = QPainter(self.viewport())
+            painter.save()
+            painter.setPen(QColor(100, 100, 100))
+            painter.drawText(
+                self.viewport().rect(),
+                Qt.AlignCenter,
+                'Drag & Drop Folders Here',
+            )
+            painter.restore()
 
     def add_folder(self) -> None:
         '''Show file dialog.'''
@@ -396,7 +413,7 @@ class ImageCompareView(QGraphicsView):
 
     def update_slider_pos(self, x: float) -> None:
         '''Update slider position.'''
-        self.__slider_pos: float = max(0.0, min(1.0, float(x) / self.width()))
+        self.__slider_pos = max(0.0, min(1.0, float(x) / self.width()))
         self.update_split_line()
         self.viewport().update()
 
@@ -465,6 +482,7 @@ class MainWindow(widgets.ToolWidget):
 
         self.__variance: QDoubleSpinBox = QDoubleSpinBox(self)
         self.__variance.setRange(0.0, 1.0)
+        self.__variance.setSingleStep(0.1)
         self.__variance.setMinimumWidth(70)
         settings_layout.addRow(widgets.FormLabel('Variance'), self.__variance)
 
