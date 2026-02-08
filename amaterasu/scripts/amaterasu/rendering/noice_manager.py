@@ -11,13 +11,17 @@ import tempfile
 import subprocess
 
 try:
-    from PySide2.QtCore import Qt, QPoint, QRectF
+    from PySide2.QtCore import Qt, QPoint, QPointF, QRectF
     from PySide2.QtGui import (
         QColor,
         QPainter,
+        QPixmap,
+        QPen,
+        QFont,
         QDragEnterEvent,
         QMouseEvent,
         QWheelEvent,
+        QResizeEvent,
     )
     from PySide2.QtWidgets import (
         QWidget,
@@ -30,20 +34,27 @@ try:
         QListWidget,
         QGraphicsScene,
         QGraphicsView,
+        QGraphicsItem,
+        QStyleOptionGraphicsItem,
         QPushButton,
         QFileDialog,
         QMessageBox,
+        QApplication,
     )
 
 except ImportError:
     if not TYPE_CHECKING:
-        from PySide6.QtCore import Qt, QPoint, QRectF
+        from PySide6.QtCore import Qt, QPoint, QPointF, QRectF
         from PySide6.QtGui import (
             QColor,
             QPainter,
+            QPixmap,
+            QPen,
+            QFont,
             QDragEnterEvent,
             QMouseEvent,
             QWheelEvent,
+            QResizeEvent,
         )
         from PySide6.QtWidgets import (
             QWidget,
@@ -56,9 +67,12 @@ except ImportError:
             QListWidget,
             QGraphicsScene,
             QGraphicsView,
+            QGraphicsItem,
+            QStyleOptionGraphicsItem,
             QPushButton,
             QFileDialog,
             QMessageBox,
+            QApplication,
         )
 from maya import cmds
 from ..lib import parser, widgets
@@ -152,6 +166,61 @@ class DragDropListWidget(QListWidget):
         return [self.item(i).text() for i in range(self.count())]
 
 
+class CompareImageItem(QGraphicsItem):
+    '''Compare Image Item'''
+
+    def __init__(self, parent: QGraphicsItem | None = None) -> None:
+        '''Initialize item'''
+        super().__init__()
+        self.setAcceptHoverEvents(True)
+        self.__before_image: QPixmap = QPixmap()
+        self.__after_image: QPixmap = QPixmap()
+        self.__split_x: float = 0.0
+
+    def boundingRect(self) -> QRectF:
+        '''Override'''
+        if self.__before_image.isNull():
+            return QRectF()
+
+        return QRectF(self.__before_image.rect())
+
+    def paint(
+        self,
+        painter: QPainter,
+        option: QStyleOptionGraphicsItem,
+        widget: QWidget | None = None,
+    ) -> None:
+        '''Override'''
+        if self.__before_image.isNull():
+            return
+
+        painter.drawPixmap(0, 0, self.__before_image)
+
+        if self.__after_image.isNull():
+            return
+
+        w: int = self.__before_image.width()
+        h: int = self.__before_image.height()
+        clip_x: float = max(0, min(self.__split_x, w))
+        if clip_x < w:
+            painter.save()
+            painter.setClipRect(QRectF(clip_x, 0, w - clip_x, h))
+            painter.drawPixmap(0, 0, self.__after_image)
+            painter.restore()
+
+    def set_images(self, before_path: str, after_path: str) -> tuple[int, int]:
+        '''Load images.'''
+        self.__before_image = QPixmap(before_path)
+        self.__after_image = QPixmap(after_path)
+        self.update()
+        return (self.__before_image.width(), self.__before_image.height())
+
+    def set_split_x(self, x: float) -> None:
+        '''Set split potision X.'''
+        self.__split_x = x
+        self.update()
+
+
 class ImageCompareView(QGraphicsView):
     '''Image Compare View'''
 
@@ -168,20 +237,51 @@ class ImageCompareView(QGraphicsView):
         self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
         self.setResizeAnchor(QGraphicsView.AnchorUnderMouse)
         self.setRenderHint(QPainter.SmoothPixmapTransform)
+        self.setMouseTracking(True)
 
         self.__is_zooming: bool = False
         self.__is_panning: bool = False
+        self.__is_sliding: bool = False
         self.__last_pos: QPoint = QPoint()
+        self.__slider_pos: float = 0.5
+        self.__compare_image: CompareImageItem = CompareImageItem()
+        self.scene().addItem(self.__compare_image)
 
     def drawForeground(self, painter: QPainter, rect: QRectF) -> None:
         '''Override'''
         painter.save()
         painter.resetTransform()
 
-        painter.setPen(QColor(100, 100, 100))
-        painter.drawText(
-            self.viewport().rect(), Qt.AlignCenter, 'No Preview Loaded'
-        )
+        # No preview loaded
+        if self.__compare_image.boundingRect().isEmpty():
+            painter.setPen(QColor(100, 100, 100))
+            painter.drawText(
+                self.viewport().rect(), Qt.AlignCenter, 'No Preview Loaded'
+            )
+            painter.restore()
+            return
+
+        # Split line
+        view_w: int = self.width()
+        view_h: int = self.height()
+        split_x = int(view_w * self.__slider_pos)
+        pen = QPen(QColor(255, 255, 255), 2)
+        painter.setPen(pen)
+        painter.drawLine(split_x, 0, split_x, view_h)
+
+        # Background label
+        painter.setBrush(QColor(0, 0, 0, 100))
+        painter.setPen(Qt.NoPen)
+        painter.drawRect(split_x - 80, view_h - 35, 160, 30)
+
+        # Text
+        painter.setPen(QColor(255, 255, 255))
+        font: QFont = painter.font()
+        font.setBold(True)
+        painter.setFont(font)
+        painter.drawText(split_x - 60, view_h - 15, 'Original')
+        painter.drawText(split_x + 15, view_h - 15, 'Denoised')
+
         painter.restore()
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
@@ -202,6 +302,14 @@ class ImageCompareView(QGraphicsView):
                 self.__last_pos = event.pos()
                 self.setTransformationAnchor(QGraphicsView.AnchorViewCenter)
                 self.setCursor(Qt.SizeVerCursor)
+                event.accept()
+                return
+
+        else:
+            if event.button() == Qt.LeftButton:
+                self.__is_sliding = True
+                self.update_slider_pos(event.pos().x())
+                self.setCursor(Qt.SplitHCursor)
                 event.accept()
                 return
 
@@ -226,6 +334,12 @@ class ImageCompareView(QGraphicsView):
             self.verticalScrollBar().setValue(
                 self.verticalScrollBar().value() - delta.y()
             )
+            self.update_split_line()
+            event.accept()
+            return
+
+        if self.__is_sliding:
+            self.update_slider_pos(event.pos().x())
             event.accept()
             return
 
@@ -233,9 +347,10 @@ class ImageCompareView(QGraphicsView):
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         '''Override'''
-        if self.__is_panning or self.__is_zooming:
+        if self.__is_panning or self.__is_zooming or self.__is_sliding:
             self.__is_zooming = False
             self.__is_panning = False
+            self.__is_sliding = False
             self.setCursor(Qt.ArrowCursor)
             event.accept()
             return
@@ -249,6 +364,49 @@ class ImageCompareView(QGraphicsView):
             self.scale(factor, factor)
         else:
             self.scale(1.0 / factor, 1.0 / factor)
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        '''Override'''
+        super().resizeEvent(event)
+        self.update_split_line()
+
+    def set_images(self, before_image: str, after_image: str) -> None:
+        '''Set image compare item.'''
+        width, height = self.__compare_image.set_images(
+            before_image, after_image
+        )
+
+        margin: int = 100000
+        rect: QRectF = QRectF(
+            -margin,
+            -margin,
+            width + margin * 2,
+            height + margin * 2,
+        )
+        self.scene().setSceneRect(rect)
+        self.fit_to_window()
+
+    def fit_to_window(self) -> None:
+        '''Fit image to window.'''
+        if self.__compare_image.boundingRect().isEmpty():
+            return
+
+        self.fitInView(self.__compare_image, Qt.KeepAspectRatio)
+        self.update_split_line()
+
+    def update_slider_pos(self, x: float) -> None:
+        '''Update slider position.'''
+        self.__slider_pos: float = max(0.0, min(1.0, float(x) / self.width()))
+        self.update_split_line()
+        self.viewport().update()
+
+    def update_split_line(self) -> None:
+        '''Update split line'''
+        screen_x: float = self.width() * self.__slider_pos
+        scene_pt: QPointF = self.mapToScene(QPoint(int(screen_x), 0))
+        item_pt: QPointF = self.__compare_image.mapFromScene(scene_pt)
+        self.__compare_image.set_split_x(item_pt.x())
+        self.scene().update()
 
 
 class MainWindow(widgets.ToolWidget):
@@ -348,6 +506,7 @@ class MainWindow(widgets.ToolWidget):
         left_layout.addLayout(button_layout)
 
         button = QPushButton('Preview', self)
+        button.clicked.connect(self.preview)
         button_layout.addWidget(button)
 
         button = QPushButton('Run in Consle', self)
@@ -473,6 +632,47 @@ class MainWindow(widgets.ToolWidget):
                 self, 'Error', f'Failed to save file.\n{str(e)}'
             )
             return
+
+    def preview(self) -> None:
+        '''Preview'''
+        self.save_settings()
+        folder_paths: list[str] = self.__folder_list.as_list()
+        if not folder_paths:
+            QMessageBox.critical(
+                self, 'Error', 'Add a folder to preview denoised image.'
+            )
+            return
+
+        exr_files: list[str] = exr_list(folder_paths[0])
+        if not exr_files:
+            QMessageBox.critical(
+                self, 'Error', f'Not found EXR files.\n{folder_paths[0]}'
+            )
+            return
+
+        try:
+            QApplication.setOverrideCursor(Qt.WaitCursor)
+
+            before_image: str
+            after_image: str
+            before_image, after_image = generate_preview_images(
+                exr_files[0],
+                self.__variance.value(),
+                self.__search_radius.value(),
+                self.__patch_radius.value(),
+                self.__extra_frames.value(),
+            )
+
+        except subprocess.CalledProcessError as e:
+            QMessageBox.critical(
+                self, 'Error', f'Failed to generate preview image.\n{e}'
+            )
+            return
+
+        finally:
+            QApplication.restoreOverrideCursor()
+
+        self.__preview.set_images(before_image, after_image)
 
 
 # ==============================================================================
@@ -631,6 +831,96 @@ def generate_batch_content(
     lines.append('echo ' + ('=' * 80))
     lines.append('pause')
     return '\n'.join(lines)
+
+
+def denoise_image(
+    filename: str,
+    variance: float,
+    search_radius: int,
+    patch_radius: int,
+    extra_frames: int,
+    output: str = 'amaterasu_noice_manager_denoise.exr',
+) -> str:
+    '''Denoise image.'''
+    noice: str = noice_path()
+    if not noice:
+        _logger.error('Not found noice.')
+        return ''
+
+    temp_dir: str = tempfile.gettempdir()
+    output = os.path.join(temp_dir, output)
+
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
+    command: list[str] = [
+        noice,
+        '-i',
+        filename,
+        '-o',
+        output,
+        '-v',
+        str(variance),
+        '-sr',
+        str(search_radius),
+        '-pr',
+        str(patch_radius),
+        '-ef',
+        str(extra_frames),
+    ]
+
+    subprocess.run(command, startupinfo=startupinfo, check=True)
+    return output
+
+
+def convert_to_png(
+    filename: str,
+    output: str = 'amaterasu_noice_manager_preview.png',
+) -> str:
+    '''Convert EXR image to PNG.'''
+    oiiotool: str = oiiotool_path()
+    if not oiiotool:
+        _logger.error('Not found oiiotool.')
+        return ''
+
+    temp_dir: str = tempfile.gettempdir()
+    output: str = os.path.join(temp_dir, output)
+
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
+    command: list[str] = [oiiotool, filename, '-o', output]
+    subprocess.run(command, startupinfo=startupinfo, check=True)
+    return output
+
+
+def generate_preview_images(
+    filename: str,
+    variance: float,
+    search_radius: int,
+    patch_radius: int,
+    extra_frames: int,
+) -> tuple[str, str]:
+    '''Generate Preview image'''
+    denoised_exr: str = denoise_image(
+        filename, variance, search_radius, patch_radius, extra_frames
+    )
+    if not denoised_exr:
+        return ('', '')
+
+    before_png: str = convert_to_png(
+        filename, 'amaterasu_noice_manager_previewA.png'
+    )
+    if not before_png:
+        return ('', '')
+
+    after_png: str = convert_to_png(
+        denoised_exr, 'amaterasu_noice_manager_previewB.png'
+    )
+    if not after_png:
+        return ('', '')
+
+    return (before_png, after_png)
 
 
 def main() -> None:
