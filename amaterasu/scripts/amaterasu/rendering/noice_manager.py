@@ -406,6 +406,12 @@ class MainWindow(widgets.ToolWidget):
     def __batch_contents(self) -> str:
         '''Retrun batch contents from UI.'''
         folder_paths: list[str] = self.__folder_list.as_list()
+        if not folder_paths:
+            QMessageBox.critical(
+                self, 'Error', 'Add a folder to denoise the image.'
+            )
+            return ''
+
         contents: str = generate_batch_content(
             folder_paths,
             self.__variance.value(),
@@ -415,6 +421,12 @@ class MainWindow(widgets.ToolWidget):
             self.__auto_frames.isChecked(),
             self.__override_frames.value(),
         )
+        if not contents:
+            QMessageBox.critical(
+                self, 'Error', 'Failed to generate batch commands.'
+            )
+            return ''
+
         return contents
 
     def run_console(self) -> None:
@@ -422,9 +434,6 @@ class MainWindow(widgets.ToolWidget):
         self.save_settings()
         contents: str = self.__batch_contents()
         if not contents:
-            QMessageBox.critical(
-                self, 'Error', 'Failed to generate batch commands.'
-            )
             return
 
         bat: str = os.path.join(
@@ -447,9 +456,6 @@ class MainWindow(widgets.ToolWidget):
         self.save_settings()
         contents: str = self.__batch_contents()
         if not contents:
-            QMessageBox.critical(
-                self, 'Error', 'Failed to generate batch commands.'
-            )
             return
 
         path, _ = QFileDialog.getSaveFileName(
@@ -541,7 +547,7 @@ def build_command(
     folder_path = os.path.normpath(folder_path)
     exr_files: list[str] = exr_list(folder_path)
     if not exr_files:
-        _logger.error('Not found EXR files.')
+        _logger.error('Not found EXR files. %s', folder_path)
         return ('', '')
 
     start_file: str = exr_files[0]
