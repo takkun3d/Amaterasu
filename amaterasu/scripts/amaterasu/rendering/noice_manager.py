@@ -318,8 +318,10 @@ class MainWindow(widgets.ToolWidget):
             with open(bat, 'w', encoding='cp932', errors='ignore') as f:
                 f.write(contents)
 
-        except Exception as e:
-            QMessageBox.critical(self, 'Error', str(e))
+        except IOError as e:
+            QMessageBox.critical(
+                self, 'Error', f'Failed to save file.\n{str(e)}'
+            )
             return
 
         subprocess.Popen([bat], creationflags=subprocess.CREATE_NEW_CONSOLE)
@@ -344,8 +346,10 @@ class MainWindow(widgets.ToolWidget):
             with open(path, 'w', encoding='cp932', errors='ignore') as f:
                 f.write(contents)
 
-        except Exception as e:
-            QMessageBox.critical(self, 'Error', str(e))
+        except IOError as e:
+            QMessageBox.critical(
+                self, 'Error', f'Failed to save file.\n{str(e)}'
+            )
             return
 
 
