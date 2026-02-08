@@ -11,8 +11,14 @@ import tempfile
 import subprocess
 
 try:
-    from PySide2.QtCore import Qt
-    from PySide2.QtGui import QDragEnterEvent
+    from PySide2.QtCore import Qt, QPoint, QRectF
+    from PySide2.QtGui import (
+        QColor,
+        QPainter,
+        QDragEnterEvent,
+        QMouseEvent,
+        QWheelEvent,
+    )
     from PySide2.QtWidgets import (
         QWidget,
         QHBoxLayout,
@@ -22,6 +28,8 @@ try:
         QCheckBox,
         QLabel,
         QListWidget,
+        QGraphicsScene,
+        QGraphicsView,
         QPushButton,
         QFileDialog,
         QMessageBox,
@@ -29,8 +37,14 @@ try:
 
 except ImportError:
     if not TYPE_CHECKING:
-        from PySide6.QtCore import Qt
-        from PySide6.QtGui import QDragEnterEvent
+        from PySide6.QtCore import Qt, QPoint, QRectF
+        from PySide6.QtGui import (
+            QColor,
+            QPainter,
+            QDragEnterEvent,
+            QMouseEvent,
+            QWheelEvent,
+        )
         from PySide6.QtWidgets import (
             QWidget,
             QHBoxLayout,
@@ -40,6 +54,8 @@ except ImportError:
             QCheckBox,
             QLabel,
             QListWidget,
+            QGraphicsScene,
+            QGraphicsView,
             QPushButton,
             QFileDialog,
             QMessageBox,
@@ -134,6 +150,105 @@ class DragDropListWidget(QListWidget):
     def as_list(self) -> list[str]:
         '''Return list[str] from my data.'''
         return [self.item(i).text() for i in range(self.count())]
+
+
+class ImageCompareView(QGraphicsView):
+    '''Image Compare View'''
+
+    def __init__(
+        self,
+        scene: QGraphicsScene,
+        parent: QWidget | None = None,
+    ) -> None:
+        '''Initialize widget.'''
+        super().__init__(scene, parent)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setDragMode(QGraphicsView.NoDrag)
+        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setResizeAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setRenderHint(QPainter.SmoothPixmapTransform)
+
+        self.__is_zooming: bool = False
+        self.__is_panning: bool = False
+        self.__last_pos: QPoint = QPoint()
+
+    def drawForeground(self, painter: QPainter, rect: QRectF) -> None:
+        '''Override'''
+        painter.save()
+        painter.resetTransform()
+
+        painter.setPen(QColor(100, 100, 100))
+        painter.drawText(
+            self.viewport().rect(), Qt.AlignCenter, 'No Preview Loaded'
+        )
+        painter.restore()
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        '''Override'''
+        if event.modifiers() == Qt.AltModifier:
+            if (
+                event.button() == Qt.MiddleButton
+                or event.button() == Qt.LeftButton
+            ):
+                self.__is_panning = True
+                self.__last_pos = event.pos()
+                self.setCursor(Qt.ClosedHandCursor)
+                event.accept()
+                return
+
+            if event.button() == Qt.RightButton:
+                self.__is_zooming = True
+                self.__last_pos = event.pos()
+                self.setTransformationAnchor(QGraphicsView.AnchorViewCenter)
+                self.setCursor(Qt.SizeVerCursor)
+                event.accept()
+                return
+
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        '''Override'''
+        delta: QPoint = event.pos() - self.__last_pos
+        if self.__is_zooming:
+            zoom_input: int = delta.x() - delta.y()
+            zoom_factor: float = 1.0 + (zoom_input * 0.003)
+            if zoom_factor > 0:
+                self.scale(zoom_factor, zoom_factor)
+                self.__last_pos = event.pos()
+            return
+
+        if self.__is_panning:
+            self.__last_pos = event.pos()
+            self.horizontalScrollBar().setValue(
+                self.horizontalScrollBar().value() - delta.x()
+            )
+            self.verticalScrollBar().setValue(
+                self.verticalScrollBar().value() - delta.y()
+            )
+            event.accept()
+            return
+
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        '''Override'''
+        if self.__is_panning or self.__is_zooming:
+            self.__is_zooming = False
+            self.__is_panning = False
+            self.setCursor(Qt.ArrowCursor)
+            event.accept()
+            return
+
+        super().mouseReleaseEvent(event)
+
+    def wheelEvent(self, event: QWheelEvent) -> None:
+        '''Override'''
+        factor = 1.1
+        if event.delta() > 0:
+            self.scale(factor, factor)
+        else:
+            self.scale(1.0 / factor, 1.0 / factor)
 
 
 class MainWindow(widgets.ToolWidget):
@@ -245,7 +360,8 @@ class MainWindow(widgets.ToolWidget):
 
         # Right
         # Preview
-        self.__preview: QWidget = QWidget(self)
+        self.__scene: QGraphicsScene = QGraphicsScene()
+        self.__preview: ImageCompareView = ImageCompareView(self.__scene, self)
         main_layout.addWidget(self.__preview)
 
     # override
