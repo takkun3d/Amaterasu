@@ -187,7 +187,8 @@ class RenderSetupGeometryManager:
     @widgets.undo
     def remove(self) -> bool:
         '''Remove geometry from my collection.'''
-        nodes: list[str] = cmds.ls(selection=True, type='transform')
+        # nodes: list[str] = cmds.ls(selection=True, type='transform')
+        nodes: list[str] = self.get_target_nodes()
         if not nodes:
             _logger.error('Select nodes for layer removal.')
             return False
