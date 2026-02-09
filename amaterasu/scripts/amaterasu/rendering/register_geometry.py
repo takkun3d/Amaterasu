@@ -4,7 +4,7 @@
 #
 # ==============================================================================
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 import logging
 
@@ -14,6 +14,7 @@ try:
         QWidget,
         QHBoxLayout,
         QVBoxLayout,
+        QCheckBox,
     )
 
 except ImportError:
@@ -23,6 +24,7 @@ except ImportError:
             QWidget,
             QHBoxLayout,
             QVBoxLayout,
+            QCheckBox,
         )
 from maya import cmds
 from maya.app.renderSetup.model import (
@@ -34,6 +36,7 @@ from maya.app.renderSetup.model import (
     override,
     connectionOverride,
     typeIDs,
+    renderSetup,
 )  # type: ignore
 from maya.app.renderSetup.views import viewCmds  # type: ignore
 from ..lib import parser, widgets
@@ -45,7 +48,7 @@ from ..lib import parser, widgets
 #
 # ==============================================================================
 __product__: str = 'Register Geometry'
-__version__: str = '1.10'
+__version__: str = '1.20'
 __doc__ = 'Register geometry to the selected layers.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
@@ -62,6 +65,8 @@ class Settings(parser.ToolSettings):
     '''Settings for tool.'''
 
     window_geo: parser.Variant[str] = parser.Variant('')
+    collect_meshes: parser.Variant[bool] = parser.Variant(True)
+    visible_only: parser.Variant[bool] = parser.Variant(False)
 
 
 class RenderSetupGeometryManager:
@@ -71,6 +76,8 @@ class RenderSetupGeometryManager:
         '''Initialize'''
         self.__tag: str = tag
         self.__name: str = name
+        self.__collect_meshes_cb: Callable[[], bool] = lambda: False
+        self.__visible_only_cb: Callable[[], bool] = lambda: False
 
     def tag(self) -> str:
         '''Returns tag'''
@@ -96,6 +103,13 @@ class RenderSetupGeometryManager:
 
         return [utils.nameToUserNode(x) for x in selected_layers]
 
+    def refresh_layer(self, layer: renderLayer.RenderLayer) -> None:
+        '''Refresh layer if it is currently active.'''
+        rs: renderSetup.RenderSetup = renderSetup.instance()
+        # if rs.getVisibleRenderLayer() == layer:
+        if rs.getVisibleRenderLayer().name() == layer.name():
+            rs.switchToLayer(layer)
+
     def find_collection(
         self, layer: renderLayer.RenderLayer
     ) -> collection.Collection | None:
@@ -107,6 +121,38 @@ class RenderSetupGeometryManager:
 
         return collect
 
+    def set_filter_callbacks(
+        self, collect_cb: Callable[[], bool], visible_cb: Callable[[], bool]
+    ) -> None:
+        '''Set callbacks to get filter options'''
+        self.__collect_meshes_cb = collect_cb
+        self.__visible_only_cb = visible_cb
+
+    def get_target_nodes(self) -> list[str]:
+        '''Get target nodes based on selection and filters.'''
+        nodes: list[str] = cmds.ls(selection=True, long=True)
+        if not nodes:
+            return []
+
+        if self.__collect_meshes_cb():
+            shapes: list[str] = (
+                cmds.listRelatives(
+                    *nodes, allDescendents=True, type='mesh', fullPath=True
+                )
+                or []
+            )
+            if shapes:
+                parents: list[str] = (
+                    cmds.listRelatives(*shapes, parent=True, fullPath=True)
+                    or []
+                )
+                nodes = list(set(parents))
+
+        if self.__visible_only_cb():
+            nodes = cmds.ls(*nodes, visible=True, long=True)
+
+        return nodes
+
     @widgets.undo
     def register(self) -> bool:
         '''Register collection to Render Layer.'''
@@ -115,7 +161,8 @@ class RenderSetupGeometryManager:
     @widgets.undo
     def add(self) -> bool:
         '''Add geometry to my collection.'''
-        nodes: list[str] = cmds.ls(selection=True, type='transform')
+        # nodes: list[str] = cmds.ls(selection=True, type='transform')
+        nodes: list[str] = self.get_target_nodes()
         if not nodes:
             _logger.error('Select nodes for layer addition.')
             return False
@@ -133,13 +180,15 @@ class RenderSetupGeometryManager:
 
             selector_: selector.SimpleSelector = collect.getSelector()
             selector_.staticSelection.add(nodes)
+            self.refresh_layer(layer)
 
         return True
 
     @widgets.undo
     def remove(self) -> bool:
         '''Remove geometry from my collection.'''
-        nodes: list[str] = cmds.ls(selection=True, type='transform')
+        # nodes: list[str] = cmds.ls(selection=True, type='transform')
+        nodes: list[str] = self.get_target_nodes()
         if not nodes:
             _logger.error('Select nodes for layer removal.')
             return False
@@ -154,7 +203,7 @@ class RenderSetupGeometryManager:
             if collect:
                 selector_: selector.SimpleSelector = collect.getSelector()
                 selector_.staticSelection.remove(nodes)
-
+                self.refresh_layer(layer)
         return True
 
     @widgets.undo
@@ -169,6 +218,7 @@ class RenderSetupGeometryManager:
             collect: collection.Collection | None = self.find_collection(layer)
             if collect:
                 collection.delete(collect)
+                self.refresh_layer(layer)
 
         return True
 
@@ -201,7 +251,8 @@ class AttrOverrideManager(RenderSetupGeometryManager):
     @widgets.undo
     def register(self) -> bool:
         '''Override'''
-        nodes: list[str] = cmds.ls(selection=True, type='transform')
+        # nodes: list[str] = cmds.ls(selection=True, type='transform')
+        nodes: list[str] = self.get_target_nodes()
         if not nodes:
             _logger.error('Select nodes for layer registration.')
             return False
@@ -228,6 +279,8 @@ class AttrOverrideManager(RenderSetupGeometryManager):
                 collect.createAbsoluteOverride(nodes[0], self.attr_name())
             )
             override_.setAttrValue(self.value())
+            self.refresh_layer(layer)
+
         return True
 
 
@@ -237,7 +290,8 @@ class ShapeAttrOverrideManager(AttrOverrideManager):
     @widgets.undo
     def register(self) -> bool:
         '''Override'''
-        nodes: list[str] = cmds.ls(selection=True, type='transform')
+        # nodes: list[str] = cmds.ls(selection=True, type='transform')
+        nodes: list[str] = self.get_target_nodes()
         if not nodes:
             _logger.error('Select nodes for layer registration.')
             return False
@@ -282,6 +336,7 @@ class ShapeAttrOverrideManager(AttrOverrideManager):
                 )
             )
             unique_override.setAttrValue(self.value())
+            self.refresh_layer(layer)
 
         if dummy_mesh:
             cmds.delete(dummy_mesh)
@@ -295,7 +350,8 @@ class MaterialOverrideManager(RenderSetupGeometryManager):
     @widgets.undo
     def register(self) -> bool:
         '''Override'''
-        nodes: list[str] = cmds.ls(selection=True, type='transform')
+        current_selection: list[str] = cmds.ls(selection=True)
+        nodes: list[str] = self.get_target_nodes()
         if not nodes:
             _logger.error('Select nodes for layer registration.')
             return False
@@ -322,7 +378,7 @@ class MaterialOverrideManager(RenderSetupGeometryManager):
         if not cmds.isConnected(src_plug, dst_plug):
             cmds.connectAttr(src_plug, dst_plug, force=True)
 
-        cmds.select(*nodes)
+        cmds.select(*current_selection)
         for layer in layers:
             collect: collection.Collection | None = self.find_collection(layer)
             if collect:
@@ -340,6 +396,7 @@ class MaterialOverrideManager(RenderSetupGeometryManager):
                 collect.createOverride(sg, typeIDs.materialOverride)
             )
             override_.setMaterial(sg)
+            self.refresh_layer(layer)
 
         return True
 
@@ -454,15 +511,26 @@ class MainWindow(widgets.ToolWidget):
 
         main_layout: QVBoxLayout = QVBoxLayout(self.option_widget())
 
+        option_layout: QHBoxLayout = QHBoxLayout(self)
+        main_layout.addLayout(option_layout)
+
+        self.__collect_meshes: QCheckBox = QCheckBox('Collect Meshes', self)
+        option_layout.addWidget(self.__collect_meshes)
+
+        self.__visible_only: QCheckBox = QCheckBox('Visible Only', self)
+        option_layout.addWidget(self.__visible_only)
+
+        main_layout.addWidget(widgets.HorizontalLine(self))
+
         manager: RenderSetupGeometryManager = AttrOverrideManager(
             tag='AMATERASU_RENDERABLE_GEOMETRY',
             name='Renderable_Geometry',
             attr='visibility',
             value=True,
         )
-        widget: ContainerWidget = ContainerWidget('Renderable Geometry', self)
-        widget.set_manager(manager)
-        main_layout.addWidget(widget)
+        main_layout.addWidget(
+            self._create_container('Renderable Geometry', manager)
+        )
 
         manager = AttrOverrideManager(
             tag='AMATERASU_HIDE_GEOMETRY',
@@ -470,9 +538,7 @@ class MainWindow(widgets.ToolWidget):
             attr='visibility',
             value=False,
         )
-        widget = ContainerWidget('Hide Geometry', self)
-        widget.set_manager(manager)
-        main_layout.addWidget(widget)
+        main_layout.addWidget(self._create_container('Hide Geometry', manager))
 
         main_layout.addWidget(widgets.HorizontalLine(self))
 
@@ -480,9 +546,9 @@ class MainWindow(widgets.ToolWidget):
             tag='AMATERASU_MATTE_OUT_GEOMETRY_SW',
             name='Matte_Out_Geometry_SW',
         )
-        widget = ContainerWidget('Matte out Geometry(SW)', self)
-        widget.set_manager(manager)
-        main_layout.addWidget(widget)
+        main_layout.addWidget(
+            self._create_container('Matte out Geometry(SW)', manager)
+        )
 
         manager = ShapeAttrOverrideManager(
             tag='AMATERASU_MATTE_OUT_GEOMETRY_AIMATTE',
@@ -490,9 +556,9 @@ class MainWindow(widgets.ToolWidget):
             attr='aiMatte',
             value=True,
         )
-        widget = ContainerWidget('Matte out Geometry(Arnold)', self)
-        widget.set_manager(manager)
-        main_layout.addWidget(widget)
+        main_layout.addWidget(
+            self._create_container('Matte out Geometry(Arnold)', manager)
+        )
 
         main_layout.addWidget(widgets.HorizontalLine(self))
 
@@ -502,9 +568,9 @@ class MainWindow(widgets.ToolWidget):
             attr='primaryVisibility',
             value=False,
         )
-        widget = ContainerWidget('Disable Primary Visibility', self)
-        widget.set_manager(manager)
-        main_layout.addWidget(widget)
+        main_layout.addWidget(
+            self._create_container('Disable Primary Visibility', manager)
+        )
 
         manager = ShapeAttrOverrideManager(
             tag='AMATERASU_DISABLE_CASTS_SHADOWS',
@@ -512,9 +578,9 @@ class MainWindow(widgets.ToolWidget):
             attr='castsShadows',
             value=False,
         )
-        widget = ContainerWidget('Disable Casts Shadows', self)
-        widget.set_manager(manager)
-        main_layout.addWidget(widget)
+        main_layout.addWidget(
+            self._create_container('Disable Casts Shadows', manager)
+        )
 
         manager = ShapeAttrOverrideManager(
             tag='AMATERASU_DISABLE_RECEIVE_SHADOWS',
@@ -522,9 +588,9 @@ class MainWindow(widgets.ToolWidget):
             attr='receiveShadows',
             value=False,
         )
-        widget = ContainerWidget('Disable Receive Shadows', self)
-        widget.set_manager(manager)
-        main_layout.addWidget(widget)
+        main_layout.addWidget(
+            self._create_container('Disable Receive Shadows', manager)
+        )
 
         main_layout.addStretch(True)
 
@@ -533,12 +599,16 @@ class MainWindow(widgets.ToolWidget):
         '''Load ui settings from file.[override]'''
         settings: Settings = Settings.instance(__name__, True)
         self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
+        self.__collect_meshes.setChecked(settings.collect_meshes.value())
+        self.__visible_only.setChecked(settings.visible_only.value())
 
     # override
     def save_settings(self) -> None:
         '''Save ui settings to file.[override]'''
         settings: Settings = Settings.instance(__name__, True)
         settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
+        settings.collect_meshes.set_value(self.__collect_meshes.isChecked())
+        settings.visible_only.set_value(self.__visible_only.isChecked())
         settings.write()
 
     # override
@@ -554,6 +624,17 @@ class MainWindow(widgets.ToolWidget):
         widgets.AboutDialog.info(
             self, __product__, __version__, __copyright__, __doc__
         )
+
+    def _create_container(
+        self, label: str, manager: RenderSetupGeometryManager
+    ) -> ContainerWidget:
+        '''Helper to create container and connect filters.'''
+        manager.set_filter_callbacks(
+            self.__collect_meshes.isChecked, self.__visible_only.isChecked
+        )
+        widget = ContainerWidget(label, self)
+        widget.set_manager(manager)
+        return widget
 
 
 # ==============================================================================
