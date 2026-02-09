@@ -36,6 +36,7 @@ from maya.app.renderSetup.model import (
     override,
     connectionOverride,
     typeIDs,
+    renderSetup,
 )  # type: ignore
 from maya.app.renderSetup.views import viewCmds  # type: ignore
 from ..lib import parser, widgets
@@ -101,6 +102,13 @@ class RenderSetupGeometryManager:
             return []
 
         return [utils.nameToUserNode(x) for x in selected_layers]
+
+    def refresh_layer(self, layer: renderLayer.RenderLayer) -> None:
+        '''Refresh layer if it is currently active.'''
+        rs: renderSetup.RenderSetup = renderSetup.instance()
+        # if rs.getVisibleRenderLayer() == layer:
+        if rs.getVisibleRenderLayer().name() == layer.name():
+            rs.switchToLayer(layer)
 
     def find_collection(
         self, layer: renderLayer.RenderLayer
@@ -172,6 +180,7 @@ class RenderSetupGeometryManager:
 
             selector_: selector.SimpleSelector = collect.getSelector()
             selector_.staticSelection.add(nodes)
+            self.refresh_layer(layer)
 
         return True
 
@@ -193,7 +202,7 @@ class RenderSetupGeometryManager:
             if collect:
                 selector_: selector.SimpleSelector = collect.getSelector()
                 selector_.staticSelection.remove(nodes)
-
+                self.refresh_layer(layer)
         return True
 
     @widgets.undo
@@ -208,6 +217,7 @@ class RenderSetupGeometryManager:
             collect: collection.Collection | None = self.find_collection(layer)
             if collect:
                 collection.delete(collect)
+                self.refresh_layer(layer)
 
         return True
 
@@ -268,6 +278,8 @@ class AttrOverrideManager(RenderSetupGeometryManager):
                 collect.createAbsoluteOverride(nodes[0], self.attr_name())
             )
             override_.setAttrValue(self.value())
+            self.refresh_layer(layer)
+
         return True
 
 
@@ -323,6 +335,7 @@ class ShapeAttrOverrideManager(AttrOverrideManager):
                 )
             )
             unique_override.setAttrValue(self.value())
+            self.refresh_layer(layer)
 
         if dummy_mesh:
             cmds.delete(dummy_mesh)
@@ -382,6 +395,7 @@ class MaterialOverrideManager(RenderSetupGeometryManager):
                 collect.createOverride(sg, typeIDs.materialOverride)
             )
             override_.setMaterial(sg)
+            self.refresh_layer(layer)
 
         return True
 
