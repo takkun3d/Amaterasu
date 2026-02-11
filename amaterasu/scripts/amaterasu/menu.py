@@ -560,6 +560,11 @@ def create_main_menu() -> None:
                 is_window_only=True,
             )
             m.add_item(
+                'Aim Matrix Constraint',
+                'amaterasu.rigging.aim_matrix_constraint',
+                is_window_only=True,
+            )
+            m.add_item(
                 'Geometry Constraint', 'amaterasu.rigging.geometry_constraint'
             )
             m.add_item(
@@ -628,10 +633,20 @@ def create_main_menu() -> None:
                 is_window_only=True,
             )
 
-            m.add_divider('Settings')
+            m.add_divider('Maya Software')
             m.add_item(
-                'Disable anti-aliasing(SW)',
+                'Disable anti-aliasing',
                 'amaterasu.rendering.disable_anti_aliasing',
+            )
+
+            m.add_divider('Arnold')
+            m.add_item(
+                'Setup Noice',
+                'amaterasu.rendering.setup_noice',
+            )
+            m.add_item(
+                'Noice Manager',
+                'amaterasu.rendering.noice_manager',
             )
 
         with SubMenu(label='Development') as m:
