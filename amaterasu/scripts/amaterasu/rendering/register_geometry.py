@@ -66,7 +66,7 @@ class Settings(parser.ToolSettings):
 
     window_geo: parser.Variant[str] = parser.Variant('')
     collect_meshes: parser.Variant[bool] = parser.Variant(True)
-    visible_only: parser.Variant[bool] = parser.Variant(False)
+    visible_only: parser.Variant[bool] = parser.Variant(True)
 
 
 class RenderSetupGeometryManager:
