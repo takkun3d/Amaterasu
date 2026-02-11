@@ -641,6 +641,10 @@ def create_main_menu() -> None:
 
             m.add_divider('Arnold')
             m.add_item(
+                'Setup Noice',
+                'amaterasu.rendering.setup_noice',
+            )
+            m.add_item(
                 'Noice Manager',
                 'amaterasu.rendering.noice_manager',
             )
