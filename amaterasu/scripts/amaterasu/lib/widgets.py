@@ -163,6 +163,7 @@ except ImportError:
         from PySide6.QtWebEngineWidgets import QWebEngineView
 
 from maya import OpenMaya, OpenMayaUI, cmds, mel
+from maya.app.general.mayaMixin import MayaQWidgetDockableMixin
 from . import utility
 
 # ==============================================================================
@@ -2030,22 +2031,29 @@ class AboutDialog(QDialog):
         dialog.show()
 
 
-class ToolWidget(QWidget, ABC, metaclass=QWidgetABCMeta):
+class BaseToolWidget(MayaQWidgetDockableMixin, QWidget):  # type: ignore
+    '''Base Tool Widget'''
+
+
+class ToolWidget(BaseToolWidget, ABC, metaclass=QWidgetABCMeta):  # type: ignore
     '''Template for tools.'''
 
     def __init__(
         self,
         parent: QWidget | None = None,
         flag: Qt.WindowFlags = Qt.WindowFlags(),
+        unique_id: str = '',
     ) -> None:
         '''Initialize widget.'''
         if parent is None:
-            # ptr: Any = OpenMayaUI.MQtUtil.mainWindow()
-            # parent = wrapInstance(int(ptr), QWidget)
             parent = maya_window_to_qt()
             flag = Qt.Window
 
-        super().__init__(parent, flag)
+        super().__init__(parent=parent, windowFlags=flag)
+
+        if unique_id:
+            self.setObjectName(unique_id)
+
         self.setWindowIcon(icon_from_file_name(LOGO))
 
         main_layout: QVBoxLayout = QVBoxLayout(self)
@@ -2097,7 +2105,23 @@ class ToolWidget(QWidget, ABC, metaclass=QWidgetABCMeta):
     def show(self) -> None:
         '''show[override]'''
         self.load_settings()
-        super().show()
+        if cmds.workspaceControl(
+            f'{self.objectName()}WorkspaceControl', query=True, exists=True
+        ):
+            parent_ptr = OpenMayaUI.MQtUtil.getCurrentParent()
+            mixin_ptr = OpenMayaUI.MQtUtil.findControl(self.objectName())
+            OpenMayaUI.MQtUtil.addWidgetToMayaLayout(
+                int(mixin_ptr), int(parent_ptr)
+            )
+            if not self.isVisible():
+                QWidget.setVisible(self, True)
+
+        else:
+            ui_script: str = (
+                f'import {self.__module__};'
+                f'{self.__module__}.main(\'{self.objectName()}\')'
+            )
+            super().show(dockable=True, uiScript=ui_script, retain=False)
 
     @abstractmethod
     def load_settings(self) -> None:
@@ -2139,22 +2163,25 @@ class ToolWidget(QWidget, ABC, metaclass=QWidgetABCMeta):
         return self.__sub_layout
 
 
-class StandardToolWidget(QWidget, ABC, metaclass=QWidgetABCMeta):
+class StandardToolWidget(BaseToolWidget, ABC, metaclass=QWidgetABCMeta):  # type: ignore
     '''Template for standard tools.'''
 
     def __init__(
         self,
         parent: QWidget | None = None,
         flag: Qt.WindowFlags = Qt.WindowFlags(),
+        unique_id: str = '',
     ) -> None:
         '''Initialize widget.'''
         if parent is None:
-            # ptr: Any = OpenMayaUI.MQtUtil.mainWindow()
-            # parent = wrapInstance(int(ptr), QWidget)
             parent = maya_window_to_qt()
             flag = Qt.Window
 
-        super().__init__(parent, flag)
+        super().__init__(parent=parent, windowFlags=flag)
+
+        if unique_id:
+            self.setObjectName(unique_id)
+
         self.setWindowIcon(icon_from_file_name(LOGO))
 
         main_layout: QVBoxLayout = QVBoxLayout(self)
@@ -2224,7 +2251,23 @@ class StandardToolWidget(QWidget, ABC, metaclass=QWidgetABCMeta):
     def show(self) -> None:
         '''show[override]'''
         self.load_settings()
-        super().show()
+        if cmds.workspaceControl(
+            f'{self.objectName()}WorkspaceControl', query=True, exists=True
+        ):
+            parent_ptr = OpenMayaUI.MQtUtil.getCurrentParent()
+            mixin_ptr = OpenMayaUI.MQtUtil.findControl(self.objectName())
+            OpenMayaUI.MQtUtil.addWidgetToMayaLayout(
+                int(mixin_ptr), int(parent_ptr)
+            )
+            if not self.isVisible():
+                QWidget.setVisible(self, True)
+
+        else:
+            ui_script: str = (
+                f'import {self.__module__};'
+                f'{self.__module__}.main(\'{self.objectName()}\')'
+            )
+            super().show(dockable=True, uiScript=ui_script, retain=False)
 
     @abstractmethod
     def load_settings(self) -> None:
