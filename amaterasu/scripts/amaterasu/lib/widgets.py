@@ -2049,7 +2049,7 @@ class ToolWidget(BaseToolWidget, ABC, metaclass=QWidgetABCMeta):  # type: ignore
             parent = maya_window_to_qt()
             flag = Qt.Window
 
-        super().__init__(parent=parent, windowFlags=flag)
+        super().__init__(parent=parent, f=flag)
 
         if unique_id:
             self.setObjectName(unique_id)
@@ -2177,7 +2177,7 @@ class StandardToolWidget(BaseToolWidget, ABC, metaclass=QWidgetABCMeta):  # type
             parent = maya_window_to_qt()
             flag = Qt.Window
 
-        super().__init__(parent=parent, windowFlags=flag)
+        super().__init__(parent=parent, f=flag)
 
         if unique_id:
             self.setObjectName(unique_id)
