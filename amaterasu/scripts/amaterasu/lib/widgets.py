@@ -9,6 +9,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Callable
 from abc import ABC, ABCMeta, abstractmethod
 import os
+import sys
+import types
 import random
 import shutil
 import functools
@@ -2117,9 +2119,14 @@ class ToolWidget(BaseToolWidget, ABC, metaclass=QWidgetABCMeta):  # type: ignore
                 QWidget.setVisible(self, True)
 
         else:
+            entry_func: str = 'main'
+            module: types.ModuleType | None = sys.modules.get(self.__module__)
+            if module and hasattr(module, 'option'):
+                entry_func = 'option'
+
             ui_script: str = (
                 f'import {self.__module__};'
-                f'{self.__module__}.main(\'{self.objectName()}\')'
+                f'{self.__module__}.{entry_func}(\'{self.objectName()}\')'
             )
             super().show(dockable=True, uiScript=ui_script, retain=False)
 
@@ -2263,9 +2270,14 @@ class StandardToolWidget(BaseToolWidget, ABC, metaclass=QWidgetABCMeta):  # type
                 QWidget.setVisible(self, True)
 
         else:
+            entry_func: str = 'main'
+            module: types.ModuleType | None = sys.modules.get(self.__module__)
+            if module and hasattr(module, 'option'):
+                entry_func = 'option'
+
             ui_script: str = (
                 f'import {self.__module__};'
-                f'{self.__module__}.main(\'{self.objectName()}\')'
+                f'{self.__module__}.{entry_func}(\'{self.objectName()}\')'
             )
             super().show(dockable=True, uiScript=ui_script, retain=False)
 
