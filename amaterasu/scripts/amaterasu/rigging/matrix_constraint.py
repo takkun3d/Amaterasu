@@ -38,7 +38,7 @@ from ..modify import history_visibility
 #
 # ==============================================================================
 __product__: str = 'Matrix Constraint'
-__version__: str = '1.20'
+__version__: str = '1.30'
 __doc__ = 'Constrains the specified node using matrix calculations.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
@@ -68,9 +68,10 @@ class MainWindow(widgets.ToolWidget):
         self,
         parent: QWidget | None = None,
         flag: Qt.WindowFlags = Qt.WindowFlags(),
+        unique_id: str = '',
     ) -> None:
         '''Initialize widget.'''
-        super().__init__(parent, flag)
+        super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
         self.resize(400, 200)
 
@@ -355,7 +356,7 @@ def apply(
     history_visibility.main([target, *sources], 0)
 
 
-def main() -> None:
+def main(unique_id: str = '') -> None:
     '''Show window.'''
-    window: MainWindow = MainWindow()
+    window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()
