@@ -51,7 +51,7 @@ from ..lib import parser, widgets
 #
 # ==============================================================================
 __product__: str = 'Renamer'
-__version__: str = '1.21'
+__version__: str = '1.30'
 __doc__ = 'A tool to rename selected nodes at once.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
@@ -442,9 +442,10 @@ class MainWindow(widgets.ToolWidget):
         self,
         parent: QWidget | None = None,
         flag: Qt.WindowFlags = Qt.WindowFlags(),
+        unique_id: str = '',
     ) -> None:
         '''Initialize widget.'''
-        super().__init__(parent, flag)
+        super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
         self.resize(400, 200)
 
@@ -770,7 +771,7 @@ def rename(find: str, replace: str, number: int = 0) -> None:
         _logger.info('Done')
 
 
-def main() -> None:
+def main(unique_id: str = '') -> None:
     '''Show window.'''
-    window: MainWindow = MainWindow()
+    window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()
