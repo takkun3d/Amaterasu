@@ -86,7 +86,7 @@ from ..lib import parser, widgets
 #
 # ==============================================================================
 __product__: str = 'Noice Manager'
-__version__: str = '1.00'
+__version__: str = '1.10'
 __doc__ = 'Easy tool to control Arnold Noice. Check images and export batch.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
@@ -433,9 +433,10 @@ class MainWindow(widgets.ToolWidget):
         self,
         parent: QWidget | None = None,
         flag: Qt.WindowFlags = Qt.WindowFlags(),
+        unique_id: str = '',
     ) -> None:
         '''Initialize widget.'''
-        super().__init__(parent, flag)
+        super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
         self.resize(1200, 700)
 
@@ -941,7 +942,7 @@ def generate_preview_images(
     return (before_png, after_png)
 
 
-def main() -> None:
+def main(unique_id: str = '') -> None:
     '''Show window.'''
-    window: MainWindow = MainWindow()
+    window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()

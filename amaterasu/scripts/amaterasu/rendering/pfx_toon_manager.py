@@ -91,7 +91,7 @@ from ..lib import parser, widgets
 #
 # ==============================================================================
 __product__: str = 'PfxToon Manager'
-__version__: str = '1.10'
+__version__: str = '1.20'
 __doc__ = 'Manages multiple pfxToon nodes and controls geometry assignments.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
@@ -283,9 +283,10 @@ class MainWindow(widgets.ToolWidget):
         self,
         parent: QWidget | None = None,
         flag: Qt.WindowFlags = Qt.WindowFlags(),
+        unique_id: str = '',
     ) -> None:
         '''Initialize widget.'''
-        super().__init__(parent, flag)
+        super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
         self.resize(400, 200)
 
@@ -653,8 +654,8 @@ def create_pfx_toon(camera: str = 'persp') -> str:
     return pfx_toon
 
 
-def main() -> None:
+def main(unique_id: str = '') -> None:
     '''Show window.'''
-    window: MainWindow = MainWindow()
+    window: MainWindow = MainWindow(unique_id=unique_id)
     window.update_model()
     window.show()
