@@ -88,7 +88,7 @@ from ..lib import parser, widgets
 #
 # ==============================================================================
 __product__: str = 'Noice Manager'
-__version__: str = '1.00'
+__version__: str = '1.10'
 __doc__ = 'Easy tool to control Arnold Noice. Check images and export batch.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
