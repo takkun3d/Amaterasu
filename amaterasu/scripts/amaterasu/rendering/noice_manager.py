@@ -541,16 +541,26 @@ class MainWindow(widgets.ToolWidget):
         button_layout.addWidget(button)
 
         # Right
-        right_layout: QVBoxLayout = QVBoxLayout(left_panel)
+        right_layout: QVBoxLayout = QVBoxLayout(self)
         right_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.addLayout(right_layout)
+
+        tool_layout: QHBoxLayout = QHBoxLayout(self)
+        tool_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.addLayout(tool_layout)
 
         # AOV
         self.__current_raw_exr: str = ''
         self.__current_denoised_exr: str = ''
         self.__aov: QComboBox = QComboBox(self)
         self.__aov.currentIndexChanged.connect(self.update_preview_image)
-        right_layout.addWidget(self.__aov)
+        tool_layout.addWidget(self.__aov)
+
+        label: QLabel = QLabel(
+            '<strong>* Preview is converted from linear to sRGB.</strong>',
+            self,
+        )
+        tool_layout.addWidget(label)
 
         # Preview
         self.__scene: QGraphicsScene = QGraphicsScene()
@@ -1018,6 +1028,7 @@ def convert_to_png(
     else:
         command.extend(['--ch', 'R,G,B'])
 
+    command.extend(['--colorconvert', 'linear', 'sRGB'])
     command.extend(['-o', output])
 
     try:
