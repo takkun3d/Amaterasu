@@ -25,7 +25,7 @@ from ..lib import parser, widgets, utility
 #
 # ==============================================================================
 __product__: str = 'Apply Crease Edge'
-__version__: str = '1.10'
+__version__: str = '1.20'
 __doc__ = 'Apply Crease Edge from hard edge.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
@@ -52,9 +52,10 @@ class MainWindow(widgets.StandardToolWidget):
         self,
         parent: QWidget | None = None,
         flag: Qt.WindowFlags = Qt.WindowFlags(),
+        unique_id: str = '',
     ) -> None:
         '''Initialize widget.'''
-        super().__init__(parent, flag)
+        super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
         self.resize(400, 200)
 
@@ -131,9 +132,9 @@ def apply(edges: list[str], crease_value: float) -> bool:
     return True
 
 
-def option() -> None:
+def option(unique_id: str = '') -> None:
     '''Show window.'''
-    window: MainWindow = MainWindow()
+    window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()
 
 

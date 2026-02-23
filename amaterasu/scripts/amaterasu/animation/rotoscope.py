@@ -49,7 +49,7 @@ from ..lib import parser, widgets
 #
 # ==============================================================================
 __product__: str = 'Rotoscope'
-__version__: str = '1.40'
+__version__: str = '1.50'
 __doc__ = 'This tool is usefull operation for the layout and the animation.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
@@ -807,13 +807,13 @@ class OptionWidget(QWidget):
     def shift_lens_callback(self) -> None:
         '''Shift lens callback'''
         camera: str = self.__camera.current_checked_item()
-        shift_lens.main(camera)
+        shift_lens.main(camera=camera)
 
     @widgets.undo
     def dolly_zoom_callback(self) -> None:
         '''Dolly zoom callback'''
         camera: str = self.__camera.current_checked_item()
-        dolly_zoom.main(camera)
+        dolly_zoom.main(camera=camera)
 
     @widgets.undo
     def set_film_offset(

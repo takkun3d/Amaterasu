@@ -9,13 +9,17 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Callable
 from abc import ABC, ABCMeta, abstractmethod
 import os
+import sys
+import types
 import random
 import shutil
 import functools
+import uuid
 
 try:
     from shiboken2 import wrapInstance
     from PySide2.QtCore import (
+        QObject,
         Qt,
         Signal,
         Slot,
@@ -91,6 +95,7 @@ except ImportError:
     if not TYPE_CHECKING:
         from shiboken6 import wrapInstance
         from PySide6.QtCore import (
+            QObject,
             Qt,
             Signal,
             Slot,
@@ -2030,23 +2035,111 @@ class AboutDialog(QDialog):
         dialog.show()
 
 
-class ToolWidget(QWidget, ABC, metaclass=QWidgetABCMeta):
+WORKSPACE_WIDGETS: dict[str, QWidget] = {}
+
+
+class BaseToolWidget(QWidget):
+    '''Base Tool Widget'''
+
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        flag: Qt.WindowFlags = Qt.WindowFlags(),
+        unique_id: str = '',
+    ) -> None:
+        '''Initialize widget.'''
+        super(BaseToolWidget, self).__init__(parent)
+        self.setAttribute(Qt.WA_DontCreateNativeAncestors)
+        if flag:
+            self.setWindowFlags(flag)
+
+        if unique_id:
+            self.setObjectName(unique_id)
+
+        else:
+            module_name: str = self.__module__
+            class_name: str = self.__class__.__name__
+            uuid4: str = str(uuid.uuid4())
+            self.setObjectName(f'{module_name}_{class_name}_{uuid4}')
+
+    # override
+    def show(self) -> None:
+        '''show[override]'''
+        workspace: str = f'{self.objectName()}WorkspaceControl'
+        if not cmds.workspaceControl(workspace, query=True, exists=True):
+            entry_func: str = 'main'
+            module: types.ModuleType | None = sys.modules.get(self.__module__)
+            if module and hasattr(module, 'option'):
+                entry_func = 'option'
+
+            ui_script: str = (
+                f'import {self.__module__};'
+                f'{self.__module__}.{entry_func}(\'{self.objectName()}\')'
+            )
+
+            close_callback: str = (
+                f'import {__name__};'
+                f'{__name__}.BaseToolWidget.close_workspace(\'{workspace}\')'
+            )
+
+            workspace = cmds.workspaceControl(
+                workspace,
+                label=self.windowTitle(),
+                retain=False,
+                loadImmediately=True,
+                floating=True,
+                initialWidth=self.size().width(),
+                widthProperty='free',
+                initialHeight=self.size().height(),
+                heightProperty='free',
+                requiredPlugin=[],
+                requiredControl=[],
+            )
+            cmds.workspaceControl(
+                workspace,
+                edit=True,
+                uiScript=ui_script,
+                closeCommand=close_callback,
+            )
+
+        parent_ptr: int = int(OpenMayaUI.MQtUtil.getCurrentParent())
+        self_ptr: int = int(OpenMayaUI.MQtUtil.findControl(self.objectName()))
+        OpenMayaUI.MQtUtil.addWidgetToMayaLayout(self_ptr, parent_ptr)
+        QWidget.setVisible(self, True)
+        WORKSPACE_WIDGETS[workspace] = self
+
+    # override
+    def close(self) -> bool:
+        '''close[override]'''
+        parent: QObject = self.parent()
+        if parent:
+            workspace: str = parent.objectName()
+            if cmds.workspaceControl(workspace, query=True, exists=True):
+                cmds.deleteUI(workspace)
+                if workspace in WORKSPACE_WIDGETS:
+                    del WORKSPACE_WIDGETS[workspace]
+                return True
+
+        return QWidget.close(self)
+
+    @staticmethod
+    def close_workspace(workspace: str) -> None:
+        '''Close workspace widget'''
+        if workspace in WORKSPACE_WIDGETS:
+            WORKSPACE_WIDGETS[workspace].close()
+
+
+class ToolWidget(BaseToolWidget, ABC, metaclass=QWidgetABCMeta):
     '''Template for tools.'''
 
     def __init__(
         self,
         parent: QWidget | None = None,
         flag: Qt.WindowFlags = Qt.WindowFlags(),
+        unique_id: str = '',
     ) -> None:
         '''Initialize widget.'''
-        if parent is None:
-            # ptr: Any = OpenMayaUI.MQtUtil.mainWindow()
-            # parent = wrapInstance(int(ptr), QWidget)
-            parent = maya_window_to_qt()
-            flag = Qt.Window
-
-        super().__init__(parent, flag)
-        self.setWindowIcon(icon_from_file_name(LOGO))
+        super().__init__(parent=parent, flag=flag, unique_id=unique_id)
 
         main_layout: QVBoxLayout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -2088,10 +2181,10 @@ class ToolWidget(QWidget, ABC, metaclass=QWidgetABCMeta):
         self.__sub_layout.addWidget(self.__option_widget, True)
 
     # override
-    def closeEvent(self, event: QCloseEvent) -> None:
+    def close(self) -> bool:
         '''Close Event[override]'''
         self.save_settings()
-        super().closeEvent(event)
+        return super().close()
 
     # override
     def show(self) -> None:
@@ -2139,23 +2232,17 @@ class ToolWidget(QWidget, ABC, metaclass=QWidgetABCMeta):
         return self.__sub_layout
 
 
-class StandardToolWidget(QWidget, ABC, metaclass=QWidgetABCMeta):
+class StandardToolWidget(BaseToolWidget, ABC, metaclass=QWidgetABCMeta):
     '''Template for standard tools.'''
 
     def __init__(
         self,
         parent: QWidget | None = None,
         flag: Qt.WindowFlags = Qt.WindowFlags(),
+        unique_id: str = '',
     ) -> None:
         '''Initialize widget.'''
-        if parent is None:
-            # ptr: Any = OpenMayaUI.MQtUtil.mainWindow()
-            # parent = wrapInstance(int(ptr), QWidget)
-            parent = maya_window_to_qt()
-            flag = Qt.Window
-
-        super().__init__(parent, flag)
-        self.setWindowIcon(icon_from_file_name(LOGO))
+        super().__init__(parent=parent, flag=flag, unique_id=unique_id)
 
         main_layout: QVBoxLayout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -2215,10 +2302,10 @@ class StandardToolWidget(QWidget, ABC, metaclass=QWidgetABCMeta):
         sub_layout.addWidget(self.__close, 2, 2)
 
     # override
-    def closeEvent(self, event: QCloseEvent) -> None:
+    def close(self) -> bool:
         '''Close Event[override]'''
         self.save_settings()
-        super().closeEvent(event)
+        return super().close()
 
     # override
     def show(self) -> None:

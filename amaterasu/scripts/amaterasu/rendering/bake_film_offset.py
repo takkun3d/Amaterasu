@@ -57,7 +57,7 @@ from ..lib import parser, widgets
 #
 # ==============================================================================
 __product__: str = 'Bake Film Offset'
-__version__: str = '1.00'
+__version__: str = '1.10'
 __doc__ = (
     'Bakes film offset into resolution and post scale with overscan support.'
 )
@@ -251,9 +251,10 @@ class MainWindow(widgets.ToolWidget):
         self,
         parent: QWidget | None = None,
         flag: Qt.WindowFlags = Qt.WindowFlags(),
+        unique_id: str = '',
     ) -> None:
         '''Initialize widget.'''
-        super().__init__(parent, flag)
+        super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
         self.resize(300, 100)
 
@@ -530,7 +531,7 @@ def apply(camera: str, margin: int) -> None:
     cmds.setAttr(f'{camera_shapes[0]}.verticalFilmOffset', 0)
 
 
-def main() -> None:
+def main(unique_id: str = '') -> None:
     '''Show window.'''
-    window: MainWindow = MainWindow()
+    window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()

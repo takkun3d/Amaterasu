@@ -57,7 +57,7 @@ from ..development import package_installer
 #
 # ==============================================================================
 __product__: str = 'Motion Denoiser'
-__version__: str = '1.00'
+__version__: str = '1.10'
 __doc__ = (
     'Removes noise and jitter from animation curves to create smooth motion.'
 )
@@ -254,9 +254,10 @@ class MainWindow(widgets.StandardToolWidget):
         self,
         parent: QWidget | None = None,
         flag: Qt.WindowFlags = Qt.WindowFlags(),
+        unique_id: str = '',
     ) -> None:
         '''Initialize widget.'''
-        super().__init__(parent, flag)
+        super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
         self.resize(400, 200)
 
@@ -466,9 +467,9 @@ def apply(
     return True
 
 
-def option() -> None:
+def option(unique_id: str = '') -> None:
     '''Show window.'''
-    window: MainWindow = MainWindow()
+    window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()
 
 

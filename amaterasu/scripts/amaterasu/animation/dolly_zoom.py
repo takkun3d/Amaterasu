@@ -27,7 +27,7 @@ from ..lib import parser, widgets
 #
 # ==============================================================================
 __product__: str = 'Dolly Zoom'
-__version__: str = '1.01'
+__version__: str = '1.10'
 __doc__ = 'Applies a Dolly Zoom by adjusting camera distance relative to focal length.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
@@ -87,9 +87,10 @@ class MainWindow(widgets.ToolWidget):
         self,
         parent: QWidget | None = None,
         flag: Qt.WindowFlags = Qt.WindowFlags(),
+        unique_id: str = '',
     ) -> None:
         '''Initialize widget.'''
-        super().__init__(parent, flag)
+        super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
         self.resize(400, 200)
         self.__current_focal_length: float = 35
@@ -289,9 +290,9 @@ def apply(
     return True
 
 
-def main(camera: str | None = None) -> None:
+def main(unique_id: str = '', camera: str | None = None) -> None:
     '''Show window.'''
-    window: MainWindow = MainWindow()
+    window: MainWindow = MainWindow(unique_id=unique_id)
     if camera is not None:
         window.set_camera(camera)
     window.show()

@@ -26,7 +26,7 @@ from ..lib import parser, widgets
 #
 # ==============================================================================
 __product__: str = 'Xray Geometry'
-__version__: str = '1.00'
+__version__: str = '1.10'
 __doc__ = 'Set Xray for per geometry.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
@@ -52,9 +52,10 @@ class MainWindow(widgets.ToolWidget):
         self,
         parent: QWidget | None = None,
         flag: Qt.WindowFlags = Qt.WindowFlags(),
+        unique_id: str = '',
     ) -> None:
         '''Initialize widget.'''
-        super().__init__(parent, flag)
+        super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
         self.resize(50, 50)
 
@@ -117,7 +118,7 @@ def apply(xray: bool) -> None:
         cmds.displaySurface(node, xRay=xray)
 
 
-def main() -> None:
+def main(unique_id: str = '') -> None:
     '''Show window.'''
-    window: MainWindow = MainWindow()
+    window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()
