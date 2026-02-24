@@ -89,7 +89,7 @@ def create_variance_filter() -> None:
         if aov.type not in (5, 6):
             continue
 
-        if aov.name in IGNORE_VARIANCE_AOVS:
+        if str(aov.name).lower() in IGNORE_VARIANCE_AOVS:
             continue
 
         indices: list[int] = (
