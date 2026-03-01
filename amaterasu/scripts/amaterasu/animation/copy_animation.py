@@ -37,7 +37,7 @@ from ..lib import parser, utility, widgets
 #
 # ==============================================================================
 __product__: str = 'Copy Animation'
-__version__: str = '1.20'
+__version__: str = '1.30'
 __doc__ = 'Copy animation to specific nodes from selected nodes.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
@@ -79,9 +79,10 @@ class MainWindow(widgets.StandardToolWidget):
         self,
         parent: QWidget | None = None,
         flag: Qt.WindowFlags = Qt.WindowFlags(),
+        unique_id: str = '',
     ) -> None:
         '''Initialize widget.'''
-        super().__init__(parent, flag)
+        super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
         self.resize(400, 200)
 
@@ -411,9 +412,9 @@ def apply(
                     )
 
 
-def option() -> None:
+def option(unique_id: str = '') -> None:
     '''Show window.'''
-    window: MainWindow = MainWindow()
+    window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()
 
 

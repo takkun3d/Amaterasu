@@ -33,6 +33,7 @@ try:
         QCheckBox,
         QLabel,
         QListWidget,
+        QComboBox,
         QGraphicsScene,
         QGraphicsView,
         QGraphicsItem,
@@ -67,6 +68,7 @@ except ImportError:
             QCheckBox,
             QLabel,
             QListWidget,
+            QComboBox,
             QGraphicsScene,
             QGraphicsView,
             QGraphicsItem,
@@ -86,7 +88,7 @@ from ..lib import parser, widgets
 #
 # ==============================================================================
 __product__: str = 'Noice Manager'
-__version__: str = '1.00'
+__version__: str = '1.10'
 __doc__ = 'Easy tool to control Arnold Noice. Check images and export batch.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
@@ -262,6 +264,7 @@ class ImageCompareView(QGraphicsView):
         self.__last_pos: QPoint = QPoint()
         self.__slider_pos: float = 0.5
         self.__compare_image: CompareImageItem = CompareImageItem()
+        self.__is_first: bool = True
         self.scene().addItem(self.__compare_image)
 
     def drawForeground(self, painter: QPainter, rect: QRectF) -> None:
@@ -401,7 +404,9 @@ class ImageCompareView(QGraphicsView):
             height + margin * 2,
         )
         self.scene().setSceneRect(rect)
-        self.fit_to_window()
+        if self.__is_first:
+            self.fit_to_window()
+            self.__is_first = False
 
     def fit_to_window(self) -> None:
         '''Fit image to window.'''
@@ -433,9 +438,10 @@ class MainWindow(widgets.ToolWidget):
         self,
         parent: QWidget | None = None,
         flag: Qt.WindowFlags = Qt.WindowFlags(),
+        unique_id: str = '',
     ) -> None:
         '''Initialize widget.'''
-        super().__init__(parent, flag)
+        super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
         self.resize(1200, 700)
 
@@ -536,10 +542,31 @@ class MainWindow(widgets.ToolWidget):
         button_layout.addWidget(button)
 
         # Right
+        right_layout: QVBoxLayout = QVBoxLayout(self)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addLayout(right_layout)
+
+        tool_layout: QHBoxLayout = QHBoxLayout(self)
+        tool_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.addLayout(tool_layout)
+
+        # AOV
+        self.__current_raw_exr: str = ''
+        self.__current_denoised_exr: str = ''
+        self.__aov: QComboBox = QComboBox(self)
+        self.__aov.currentIndexChanged.connect(self.update_preview_image)
+        tool_layout.addWidget(self.__aov)
+
+        label: QLabel = QLabel(
+            '<strong>* Preview is converted from linear to sRGB.</strong>',
+            self,
+        )
+        tool_layout.addWidget(label)
+
         # Preview
         self.__scene: QGraphicsScene = QGraphicsScene()
         self.__preview: ImageCompareView = ImageCompareView(self.__scene, self)
-        main_layout.addWidget(self.__preview)
+        right_layout.addWidget(self.__preview)
 
     # override
     def load_settings(self) -> None:
@@ -668,29 +695,61 @@ class MainWindow(widgets.ToolWidget):
             )
             return
 
-        try:
-            QApplication.setOverrideCursor(Qt.WaitCursor)
+        QApplication.setOverrideCursor(Qt.WaitCursor)
 
-            before_image: str
-            after_image: str
-            before_image, after_image = generate_preview_images(
-                exr_files[0],
-                self.__variance.value(),
-                self.__search_radius.value(),
-                self.__patch_radius.value(),
-                self.__extra_frames.value(),
-            )
+        denoised_exr: str = denoise_image(
+            exr_files[0],
+            self.__variance.value(),
+            self.__search_radius.value(),
+            self.__patch_radius.value(),
+            self.__extra_frames.value(),
+        )
+        if not denoised_exr:
+            QApplication.restoreOverrideCursor()
+            QMessageBox.critical(self, 'Error', 'Failed to denoise EXR.')
+            return
 
-        except subprocess.CalledProcessError as e:
+        self.__current_raw_exr = exr_files[0]
+        self.__current_denoised_exr = denoised_exr
+        aovs: list[str] = get_denoise_aovs(exr_files[0])
+
+        self.__aov.blockSignals(True)
+        self.__aov.clear()
+        self.__aov.addItem('Beauty')
+        if aovs:
+            self.__aov.addItems(aovs)
+        self.__aov.blockSignals(False)
+
+        self.update_preview_image()
+        QApplication.restoreOverrideCursor()
+
+    def update_preview_image(self, is_cursor: bool = True) -> None:
+        '''Update preview image.'''
+        if not self.__current_raw_exr or not self.__current_denoised_exr:
+            return
+
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+
+        selected_aov: str = self.__aov.currentText()
+        temp_dir: str = tempfile.gettempdir()
+        before_image: str = os.path.join(temp_dir, 'amaterasu_before.png')
+        after_image: str = os.path.join(temp_dir, 'amaterasu_after.png')
+
+        before_image = convert_to_png(
+            self.__current_raw_exr, before_image, selected_aov
+        )
+        after_image = convert_to_png(
+            self.__current_denoised_exr, after_image, selected_aov
+        )
+        if not before_image or not after_image:
+            QApplication.restoreOverrideCursor()
             QMessageBox.critical(
-                self, 'Error', f'Failed to generate preview image.\n{e}'
+                self, 'Error', 'Failed to generate preview image.'
             )
             return
 
-        finally:
-            QApplication.restoreOverrideCursor()
-
         self.__preview.set_images(before_image, after_image)
+        QApplication.restoreOverrideCursor()
 
 
 # ==============================================================================
@@ -788,6 +847,9 @@ def build_command(
     if extra_frames > 0:
         batch_args.append(f'-ef {extra_frames}')
 
+    for aov in get_denoise_aovs(start_file):
+        batch_args.extend(['-l', aov])
+
     args: str = ' '.join(batch_args)
     command: str = f'"{noice}" {args}'
     return (command, out_dir)
@@ -868,9 +930,6 @@ def denoise_image(
     temp_dir: str = tempfile.gettempdir()
     output = os.path.join(temp_dir, output)
 
-    startupinfo = subprocess.STARTUPINFO()
-    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-
     command: list[str] = [
         noice,
         '-i',
@@ -886,14 +945,74 @@ def denoise_image(
         '-ef',
         str(extra_frames),
     ]
+    for aov in get_denoise_aovs(filename):
+        command.extend(['-l', aov])
 
-    subprocess.run(command, startupinfo=startupinfo, check=True)
+    try:
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        subprocess.run(command, startupinfo=startupinfo, check=True)
+
+    except subprocess.CalledProcessError as e:
+        _logger.error('Failed to denoise image : %s', e)
+        return ''
+
     return output
+
+
+def get_denoise_aovs(filename: str) -> list[str]:
+    '''Returns denoise aovs from EXR file.'''
+    oiiotool: str = oiiotool_path()
+    if not oiiotool:
+        _logger.error('Not found oiiotool.')
+        return []
+
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
+    try:
+        command: list[str] = [oiiotool, '--info', '-v', filename]
+        result: subprocess.CompletedProcess[str] = subprocess.run(
+            command,
+            startupinfo=startupinfo,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+    except subprocess.CalledProcessError as e:
+        _logger.error('Error running oiiotool: %s', e)
+        return []
+
+    aovs: set[str] = set()
+    for line in result.stdout.splitlines():
+        if 'channel list:' in line:
+            channels: str = line.split('channel list:')[1]
+            raw_channels: list[str] = channels.split(',')
+            for raw_ch in raw_channels:
+                channel: str = raw_ch.strip().split(' ')[-1]
+                if '.' in channel:
+                    aov_name: str = channel.split('.')[0]
+                    aovs.add(aov_name)
+
+                else:
+                    aovs.add(channel)
+
+    valid_aovs: list[str] = []
+    for aov in aovs:
+        if aov.endswith('_1'):
+            continue
+
+        if f'{aov}_1' in aovs:
+            valid_aovs.append(aov)
+
+    return valid_aovs
 
 
 def convert_to_png(
     filename: str,
     output: str = 'amaterasu_noice_manager_preview.png',
+    aov: str = 'Beauty',
 ) -> str:
     '''Convert EXR image to PNG.'''
     oiiotool: str = oiiotool_path()
@@ -904,44 +1023,28 @@ def convert_to_png(
     temp_dir: str = tempfile.gettempdir()
     output: str = os.path.join(temp_dir, output)
 
-    startupinfo = subprocess.STARTUPINFO()
-    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    command: list[str] = [oiiotool, filename]
+    if aov and aov != 'Beauty':
+        command.extend(['--ch', f'R={aov}.R,G={aov}.G,B={aov}.B'])
+    else:
+        command.extend(['--ch', 'R,G,B'])
 
-    command: list[str] = [oiiotool, filename, '-o', output]
-    subprocess.run(command, startupinfo=startupinfo, check=True)
+    command.extend(['--colorconvert', 'linear', 'sRGB'])
+    command.extend(['-o', output])
+
+    try:
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        subprocess.run(command, startupinfo=startupinfo, check=True)
+
+    except subprocess.CalledProcessError as e:
+        _logger.error('Failed to convert EXR to PNG: %s', e)
+        return ''
+
     return output
 
 
-def generate_preview_images(
-    filename: str,
-    variance: float,
-    search_radius: int,
-    patch_radius: int,
-    extra_frames: int,
-) -> tuple[str, str]:
-    '''Generate Preview image'''
-    denoised_exr: str = denoise_image(
-        filename, variance, search_radius, patch_radius, extra_frames
-    )
-    if not denoised_exr:
-        return ('', '')
-
-    before_png: str = convert_to_png(
-        filename, 'amaterasu_noice_manager_previewA.png'
-    )
-    if not before_png:
-        return ('', '')
-
-    after_png: str = convert_to_png(
-        denoised_exr, 'amaterasu_noice_manager_previewB.png'
-    )
-    if not after_png:
-        return ('', '')
-
-    return (before_png, after_png)
-
-
-def main() -> None:
+def main(unique_id: str = '') -> None:
     '''Show window.'''
-    window: MainWindow = MainWindow()
+    window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()

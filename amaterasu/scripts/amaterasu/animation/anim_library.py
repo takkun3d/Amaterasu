@@ -55,15 +55,13 @@ from maya import cmds
 from ..lib import parser, utility, widgets
 import amaterasu
 
-# atomImport時に、ループの設定が消えるバグの対応(2022.3では治ってる？)
-
 # ==============================================================================
 #
 # Variables
 #
 # ==============================================================================
 __product__: str = 'Anim Library'
-__version__: str = '1.20'
+__version__: str = '1.30'
 __doc__ = 'This tool manage poses and animation.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
@@ -92,7 +90,9 @@ ANIM_CURVE_TYPE: list[str] = [
     'animCurveTA',
     'animCurveTU',
     'animCurveTT',
-]  # TODO: utity.getAnimCurves or utity.getAnimCurveに変更可能?
+]
+
+PLUGINS: str = 'atomImportExport.mll'
 
 
 # ==============================================================================
@@ -1633,9 +1633,10 @@ class MainWindow(widgets.ToolWidget):
         self,
         parent: QWidget | None = None,
         flag: Qt.WindowFlags = Qt.WindowFlags(),
+        unique_id: str = '',
     ) -> None:
         '''Initialize widget.'''
-        super().__init__(parent, flag)
+        super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
         self.resize(400, 200)
 
@@ -1804,12 +1805,12 @@ class MainWindow(widgets.ToolWidget):
 # Functions
 #
 # ==============================================================================
-def main() -> None:
+def main(unique_id: str = '') -> None:
     '''Show window.'''
     # Load atom.
-    atom = cmds.pluginInfo('atomImportExport.mll', query=True, loaded=True)
+    atom: bool = cmds.pluginInfo(PLUGINS, query=True, loaded=True)
     if not atom:
-        cmds.loadPlugin('atomImportExport.mll')
+        cmds.loadPlugin(PLUGINS)
 
     if not os.path.exists(ROOT_DIR):
         try:
@@ -1817,5 +1818,5 @@ def main() -> None:
         except IOError as e:
             _logger.error('Failed to make folder. %s', e)
 
-    window: MainWindow = MainWindow()
+    window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()

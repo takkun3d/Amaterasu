@@ -43,7 +43,7 @@ from ..lib import parser, utility, widgets
 #
 # ==============================================================================
 __product__: str = 'Joint Editor'
-__version__: str = '1.22'
+__version__: str = '1.30'
 __doc__ = 'his tool helps to edit joint.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
@@ -903,9 +903,10 @@ class MainWindow(widgets.ToolWidget):
         self,
         parent: QWidget | None = None,
         flag: Qt.WindowFlags = Qt.WindowFlags(),
+        unique_id: str = '',
     ) -> None:
         '''Initialize widget.'''
-        super().__init__(parent, flag)
+        super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
         self.resize(400, 200)
 
@@ -1185,7 +1186,7 @@ def safe_set_attr(plug: str, value: Any) -> None:
         cmds.setAttr(plug, lock=True, keyable=False)
 
 
-def main() -> None:
+def main(unique_id: str = '') -> None:
     '''Show window.'''
-    window: MainWindow = MainWindow()
+    window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()
