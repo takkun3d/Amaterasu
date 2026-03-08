@@ -13,7 +13,6 @@ try:
     from PySide2.QtGui import QCloseEvent
     from PySide2.QtWidgets import (
         QWidget,
-        QMainWindow,
         QVBoxLayout,
         QHBoxLayout,
         QPushButton,
@@ -30,7 +29,6 @@ except ImportError:
         from PySide6.QtGui import QCloseEvent, QActionGroup, QAction
         from PySide6.QtWidgets import (
             QWidget,
-            QMainWindow,
             QVBoxLayout,
             QHBoxLayout,
             QPushButton,
@@ -38,7 +36,7 @@ except ImportError:
             QMessageBox,
             QMenu,
         )
-from maya import cmds, mel
+from maya import OpenMayaUI, cmds, mel
 from . import shift_lens, dolly_zoom, camera_rig
 from ..lib import parser, widgets
 
@@ -286,72 +284,6 @@ class CameraItemButton(ChooseItemButton):
 
     def create_camera(self) -> None:
         '''Create camera.'''
-        # camera_root: str = cmds.group(name='cameraRoot_ctrl', empty=True)
-        # camera_offset_a: str = cmds.group(
-        #     name='cameraOffsetA_ctrl', empty=True, parent=camera_root
-        # )
-        # camera_offset_b: str = cmds.group(
-        #     name='cameraOffsetB_ctrl', empty=True, parent=camera_offset_a
-        # )
-        # camera, camera_shape = cmds.camera()
-        # cmds.setAttr(f'{camera_shape}.focalLength', 50)
-        # cmds.setAttr(f'{camera_shape}.bestFitClippingPlanes', False)
-        # cmds.setAttr(f'{camera_shape}.nearClipPlane', 1.0)
-        # cmds.setAttr(f'{camera_shape}.farClipPlane', 10000.0)
-        # cmds.setAttr(f'{camera_shape}.displayResolution', True)
-        # cmds.setAttr(f'{camera_shape}.overscan', 1.3)
-        # cmds.setAttr(f'{camera_shape}.displayGateMaskOpacity', 1.0)
-        # cmds.setAttr(
-        #     f'{camera_shape}.displayGateMaskColor', 0, 0, 0, type='double3'
-        # )
-        # cmds.setAttr(f'{camera_shape}.locatorScale', 10)
-
-        # camera = cmds.parent(camera, camera_offset_b)[0]
-        # camera = cmds.rename(camera, 'render_cam')
-        # for attr in ('tx', 'ty', 'tz', 'rx', 'ry', 'rz', 'sx', 'sy', 'sz'):
-        #     cmds.setAttr(f'{camera}.{attr}', lock=True)
-
-        # persp_guide: str = cmds.group(
-        #     name='perspectiveGuide_grp', empty=True, parent=camera_root
-        # )
-        # persp_guide_offset: str = cmds.group(
-        #     name='perspectiveGuideOffset_grp', empty=True, parent=persp_guide
-        # )
-        # horizontal_curve: str = cmds.circle(
-        #     name='horizontalLine_crv',
-        #     center=(0, 0, 0),
-        #     normal=(0, 1, 0),
-        #     sweep=360,
-        #     radius=10,
-        #     degree=3,
-        #     useTolerance=False,
-        #     tolerance=0.01,
-        #     sections=8,
-        #     ch=False,
-        # )[0]
-        # cmds.setAttr(f'{horizontal_curve}.overrideEnabled', 1)
-        # cmds.setAttr(f'{horizontal_curve}.overrideDisplayType', 2)
-        # cmds.setAttr(f'{horizontal_curve}.lineWidth', 3)
-        # horizontal_curve = cmds.parent(horizontal_curve, persp_guide_offset)[0]
-
-        # vertical_curve: str = cmds.circle(
-        #     name='verticalLine_crv',
-        #     center=(0, 0, 0),
-        #     normal=(1, 0, 0),
-        #     sweep=360,
-        #     radius=10,
-        #     degree=3,
-        #     useTolerance=False,
-        #     tolerance=0.01,
-        #     sections=8,
-        #     ch=False,
-        # )[0]
-        # cmds.setAttr(f'{vertical_curve}.overrideEnabled', 1)
-        # cmds.setAttr(f'{vertical_curve}.overrideDisplayType', 2)
-        # cmds.setAttr(f'{vertical_curve}.lineWidth', 3)
-        # vertical_curve = cmds.parent(vertical_curve, persp_guide_offset)[0]
-
-        # cmds.pointConstraint(camera, persp_guide, maintainOffset=False)
         camera_rig.main()
         cmds.select(clear=True)
         self.update_menu()
@@ -513,33 +445,28 @@ class ImagePlaneItemButton(ChooseItemButton):
                 cmds.setAttr(f"{image_plane[1]}.sizeY", camera_y)
 
 
-class OptionWidget(QWidget):
-    '''Option Widget'''
-
-    main_layout_name: str = 'AmaterasuRotoScopeMainLayout'
+class MainWindow(widgets.BaseToolWidget):
+    '''Tool main window'''
 
     def __init__(
         self,
         parent: QWidget | None = None,
         flag: Qt.WindowFlags = Qt.WindowFlags(),
+        unique_id: str = '',
     ) -> None:
         '''Initialize widget.'''
-        super().__init__(parent, flag)
-        self.setObjectName('RotoScope' + str(id(self)))
+        super().__init__(parent, flag, unique_id)
+        self.setWindowTitle(__product__)
+        self.resize(720, 640)
+
+        self.__panel_layout: str = ''
+        self.__model_panel_name: str = ''
 
         # Main Layout
         main_layout: QVBoxLayout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         main_layout.setObjectName('Layout' + str(id(self)))
-
-        # Viewport
-        cmds.setParent(main_layout.objectName())
-        self.__pane_layout_name: str = cmds.paneLayout()
-        self.__model_panel_name: str = cmds.modelPanel()
-        main_layout.addWidget(
-            widgets.maya_control_to_qt(self.__pane_layout_name), True
-        )
 
         # Rotoscope Tool(1)
         layout: QHBoxLayout = QHBoxLayout()
@@ -562,7 +489,9 @@ class OptionWidget(QWidget):
             columnWidth=([1, 10], [2, 50], [3, 1], [4, 1]),
             adjustableColumn=2,
         )
-        display_mode_qt = widgets.maya_control_to_qt(self.__display_mode)
+        display_mode_qt: QWidget = widgets.maya_control_to_qt(
+            self.__display_mode
+        )
         layout.addWidget(display_mode_qt)
         self.__display_mode = display_mode_qt.objectName()
 
@@ -573,7 +502,7 @@ class OptionWidget(QWidget):
             columnWidth=([1, 10], [2, 60], [4, 1]),
             adjustableColumn=3,
         )
-        alpha_qt = widgets.maya_control_to_qt(self.__alpha)
+        alpha_qt: QWidget = widgets.maya_control_to_qt(self.__alpha)
         layout.addWidget(alpha_qt, True)
         self.__alpha = alpha_qt.objectName()
 
@@ -598,7 +527,7 @@ class OptionWidget(QWidget):
             columnWidth=([1, 10], [2, 70], [4, 1]),
             adjustableColumn=3,
         )
-        depth_qt = widgets.maya_control_to_qt(self.__depth)
+        depth_qt: QWidget = widgets.maya_control_to_qt(self.__depth)
         layout.addWidget(depth_qt, True)
         self.__depth = depth_qt.objectName()
 
@@ -618,7 +547,7 @@ class OptionWidget(QWidget):
             columnWidth=([1, 10], [2, 60], [4, 1]),
             adjustableColumn=3,
         )
-        offset_x_qt = widgets.maya_control_to_qt(self.__offset_x)
+        offset_x_qt: QWidget = widgets.maya_control_to_qt(self.__offset_x)
         layout.addWidget(offset_x_qt, True)
         self.__offset_x = offset_x_qt.objectName()
 
@@ -668,7 +597,7 @@ class OptionWidget(QWidget):
             columnWidth=([1, 10], [2, 60], [4, 1]),
             adjustableColumn=3,
         )
-        offset_y_qt = widgets.maya_control_to_qt(self.__offset_y)
+        offset_y_qt: QWidget = widgets.maya_control_to_qt(self.__offset_y)
         layout.addWidget(offset_y_qt, True)
         self.__offset_y = offset_y_qt.objectName()
 
@@ -715,17 +644,10 @@ class OptionWidget(QWidget):
         icon_btn.clicked.connect(self.show_attribute_editor)
         layout.addWidget(icon_btn)
 
-        model_editor: str = cmds.modelPanel(
-            self.__model_panel_name, query=True, modelEditor=True
-        )
-        image_plane_vis: bool = cmds.modelEditor(
-            model_editor, query=True, imagePlane=True
-        )
         self.__toggle_image_plane: widgets.IconButton = widgets.IconButton(self)
         self.__toggle_image_plane.set_icon('a_image_plane.png')
         self.__toggle_image_plane.setToolTip('Toggle display image planes.')
         self.__toggle_image_plane.setCheckable(True)
-        self.__toggle_image_plane.setChecked(image_plane_vis)
         self.__toggle_image_plane.clicked.connect(self.toggle_image_plane)
         layout.addWidget(self.__toggle_image_plane)
 
@@ -747,12 +669,70 @@ class OptionWidget(QWidget):
         icon_btn.clicked.connect(self.update_ui)
         layout.addWidget(icon_btn)
 
+    # Override
+    def show(self) -> None:
+        '''Show'''
+        self.initialize_workspace()
+
+        # Main Layout
+        self.__panel_layout = cmds.paneLayout(
+            configuration='horizontal2',
+            paneSize=[2, 1, 1],
+            parent=self.workspace_window(),
+        )
+
+        # Viewport
+        self.__model_panel_name = cmds.modelPanel(
+            unParent=True, menuBarVisible=True
+        )
+        cmds.modelPanel(
+            self.__model_panel_name, edit=True, parent=self.__panel_layout
+        )
+
+        model_editor: str = cmds.modelPanel(
+            self.__model_panel_name, query=True, modelEditor=True
+        )
+        image_plane_vis: bool = cmds.modelEditor(
+            model_editor, query=True, imagePlane=True
+        )
+        self.__toggle_image_plane.setChecked(image_plane_vis)
+
         # Event
         self.__camera.changed_item[str].connect(self.change_camera_callback)
         self.__image_plane.changed_item[str].connect(
             self.change_image_plane_callback
         )
         self.update_ui()
+
+        # Pyside widget move to Maya UI.
+        self_ptr: int = int(OpenMayaUI.MQtUtil.findControl(self.objectName()))
+        maya_pane_ptr: int = int(
+            OpenMayaUI.MQtUtil.findLayout(self.__panel_layout)
+        )
+        OpenMayaUI.MQtUtil.addWidgetToMayaLayout(self_ptr, maya_pane_ptr)
+        QWidget.setVisible(self, True)
+
+    # Override
+    def closeEvent(self, event: QCloseEvent) -> None:
+        '''Close Event[override]'''
+        self.save_settings()
+        self.cleanup()
+        super().closeEvent(event)
+
+    # Override
+    def load_settings(self) -> None:
+        '''Load ui settings from file.'''
+        settings: Settings = Settings.instance(__name__, True)
+        self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
+        settings.write_to_model_panel(self.__model_panel_name)
+
+    # Override
+    def save_settings(self) -> None:
+        '''Save ui settings to file.'''
+        settings: Settings = Settings.instance(__name__, True)
+        settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
+        settings.write_from_model_panel(self.__model_panel_name)
+        settings.write()
 
     def cleanup(self) -> None:
         '''Clean up maya ui.'''
@@ -761,25 +741,6 @@ class OptionWidget(QWidget):
         cmds.deleteUI(self.__depth)
         cmds.deleteUI(self.__offset_x)
         cmds.deleteUI(self.__offset_y)
-        cmds.deleteUI(self.__model_panel_name)
-        cmds.deleteUI(self.__pane_layout_name)
-
-    def load_settings(self) -> None:
-        '''Load ui settings from file.'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.parent().restoreGeometry(
-            widgets.to_qt(settings.window_geo.value())
-        )
-        settings.write_to_model_panel(self.__model_panel_name)
-
-    def save_settings(self) -> None:
-        '''Save ui settings to file.'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.window_geo.set_value(
-            widgets.to_ascii(self.parent().saveGeometry())
-        )
-        settings.write_from_model_panel(self.__model_panel_name)
-        settings.write()
 
     def show_attribute_editor(self) -> None:
         '''Show attribute editor.'''
@@ -803,13 +764,11 @@ class OptionWidget(QWidget):
             imagePlane=self.__toggle_image_plane.isChecked(),
         )
 
-    @widgets.undo
     def shift_lens_callback(self) -> None:
         '''Shift lens callback'''
         camera: str = self.__camera.current_checked_item()
         shift_lens.main(camera=camera)
 
-    @widgets.undo
     def dolly_zoom_callback(self) -> None:
         '''Dolly zoom callback'''
         camera: str = self.__camera.current_checked_item()
@@ -884,40 +843,12 @@ class OptionWidget(QWidget):
         self.__camera.update_menu()
 
 
-# QMainWindow is required to convert Maya's UI to QT.
-class MainWindow(QMainWindow):
-    '''Tool main window'''
-
-    def __init__(
-        self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-    ) -> None:
-        '''Initialize widget.'''
-        if not parent:
-            parent = widgets.maya_window_to_qt()
-
-        super().__init__(parent, flag)
-        self.setWindowTitle(__product__)
-        self.resize(720, 640)
-
-        self.__option_widget: OptionWidget = OptionWidget(self)
-        self.__option_widget.load_settings()
-        self.setCentralWidget(self.__option_widget)
-
-    def closeEvent(self, event: QCloseEvent) -> None:
-        '''Close Event[override]'''
-        # Cleanup so that Maya will not crash.
-        self.__option_widget.save_settings()
-        self.__option_widget.cleanup()
-
-
 # ==============================================================================
 #
 # Functions
 #
 # ==============================================================================
-def main() -> None:
+def main(unique_id: str = '') -> None:
     '''Show window.'''
-    window: MainWindow = MainWindow()
+    window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()
