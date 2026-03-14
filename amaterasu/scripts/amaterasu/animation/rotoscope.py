@@ -215,6 +215,218 @@ class Settings(parser.ToolSettings):
                 _logger.warning('Unsupport flag : %s', element.name())
 
 
+class BaseCameraDraggerContext:
+    '''Base Camera Dragger Context'''
+
+    def __init__(
+        self,
+        tool_name: str,
+        cursor: str = 'crossHair',
+        tool_image: str = '',
+        help_string: str = '',
+        camera: str = '',
+    ) -> None:
+        '''Initialize'''
+        self.__tool_name: str = tool_name
+        self.__cursor: str = cursor
+        self.__tool_image: str = tool_image
+        self.__help: str = help_string
+        self.__camera: str = camera
+        self.__start_x: float = 0.0
+        self.__start_y: float = 0.0
+        self.__start_z: float = 0.0
+
+    def cursor(self) -> str:
+        '''Return cursor'''
+        return self.__cursor
+
+    def set_cursor(self, cursor: str) -> None:
+        '''Set cursor'''
+        self.__cursor = cursor
+
+    def camera(self) -> str:
+        '''Returns camera'''
+        return self.__camera
+
+    def set_camera(self, camera: str) -> None:
+        '''Set Camera'''
+        self.__camera = camera
+
+    def start_x(self) -> float:
+        '''Returns start X position'''
+        return self.__start_x
+
+    def start_y(self) -> float:
+        '''Returns start Y position'''
+        return self.__start_y
+
+    def start_z(self) -> float:
+        '''Returns start Z position'''
+        return self.__start_z
+
+    def press_event(self) -> None:
+        '''Press Event'''
+        x: float
+        y: float
+        z: float
+        x, y, z = cmds.draggerContext(
+            self.__tool_name, query=True, anchorPoint=True
+        )  # type: ignore
+        self.__start_x = x
+        self.__start_y = y
+        self.__start_z = z
+
+        self.__camera = self.camera()
+        self.setup_drag()
+
+    def drag_event(self) -> None:
+        '''Drag Event'''
+        x: float
+        y: float
+        z: float
+        x, y, z = cmds.draggerContext(
+            self.__tool_name, query=True, dragPoint=True
+        )  # type: ignore
+
+        mods: int = cmds.getModifiers()
+        is_shift: bool = (mods & 1) > 0
+        is_ctrl: bool = (mods & 4) > 0
+        self.execute_drag(x, y, z, is_shift, is_ctrl)
+        cmds.refresh()
+
+    def setup_drag(self) -> None:
+        '''Setup Drag'''
+
+    def execute_drag(
+        self,
+        x: float,
+        y: float,
+        z: float,
+        is_shift: bool,
+        is_ctrl: bool,
+    ) -> None:
+        '''Execute Drag'''
+
+    def set_tool(self) -> None:
+        '''Execute Tool'''
+        if cmds.draggerContext(self.__tool_name, exists=True):
+            cmds.deleteUI(self.__tool_name)
+
+        cmds.draggerContext(
+            self.__tool_name,
+            pressCommand=self.press_event,
+            dragCommand=self.drag_event,
+            cursor=self.__cursor,
+            undoMode='step',
+            image1=self.__tool_image,
+            helpString=self.__help,
+        )
+        cmds.setToolTo(self.__tool_name)
+
+
+class FilmOffsetContext(BaseCameraDraggerContext):
+    '''Film Offset Context'''
+
+    def __init__(self, camera: str = '') -> None:
+        super().__init__(
+            'FilmOffsetTool',
+            'track',
+            'a_move.png',
+            'Film Offset Tool: Drag in the viewport to adjust. (Shift: Fast / Ctrl: Fine)',
+            camera,
+        )
+        self.__start_offset_x: float = 0.0
+        self.__start_offset_y: float = 0.0
+        self.__horizontal_plug: str = ''
+        self.__vertical_plug: str = ''
+
+    def setup_drag(self) -> None:
+        '''Setup Drag (override)'''
+        self.__horizontal_plug = find_target_plug(
+            self.camera(),
+            'horizontalFilmOffset',
+            'filmOffsetSlider_C_ctrl',
+            'translateX',
+        )
+        self.__start_offset_x = cmds.getAttr(self.__horizontal_plug)
+
+        self.__vertical_plug = find_target_plug(
+            self.camera(),
+            'verticalFilmOffset',
+            'filmOffsetSlider_C_ctrl',
+            'translateY',
+        )
+        self.__start_offset_y = cmds.getAttr(self.__vertical_plug)
+
+    def execute_drag(
+        self,
+        x: float,
+        y: float,
+        z: float,
+        is_shift: bool,
+        is_ctrl: bool,
+    ) -> None:
+        '''Execute Drag (override)'''
+        sensitivity: float = -0.0002
+        if is_shift:
+            sensitivity = sensitivity * 10.0
+
+        elif is_ctrl:
+            sensitivity = sensitivity / 10.0
+
+        delta_x: float = (x - self.start_x()) * sensitivity
+        delta_y: float = (y - self.start_y()) * sensitivity
+        cmds.setAttr(self.__horizontal_plug, self.__start_offset_x + delta_x)
+        cmds.setAttr(self.__vertical_plug, self.__start_offset_y + delta_y)
+
+
+class PostScaleContext(BaseCameraDraggerContext):
+    '''Post Scale Context'''
+
+    def __init__(self, camera: str = '') -> None:
+        '''Initialize'''
+        super().__init__(
+            'PostScaleTool',
+            'dolly',
+            'a_zoom.png',
+            'Post Scale Tool: Drag in the viewport to adjust. (Shift: Fast / Ctrl: Fine)',
+            camera,
+        )
+        self.__start_post_scale: float = 1.0
+        self.__scale_plug: str = ''
+
+    def setup_drag(self) -> None:
+        '''Setup Drag (override)'''
+        self.__scale_plug = find_target_plug(
+            self.camera(),
+            'postScale',
+            'camera_C_ctrl',
+            'postScale',
+        )
+        self.__start_post_scale = cmds.getAttr(self.__scale_plug)
+
+    def execute_drag(
+        self,
+        x: float,
+        y: float,
+        z: float,
+        is_shift: bool,
+        is_ctrl: bool,
+    ) -> None:
+        '''Execute Drag (override)'''
+        sensitivity: float = 0.0002
+        if is_shift:
+            sensitivity = sensitivity * 10.0
+        elif is_ctrl:
+            sensitivity = sensitivity / 10.0
+
+        delta: float = (
+            (x - self.start_x()) + (y - self.start_y())
+        ) * sensitivity
+        new_scale: float = max(0.001, self.__start_post_scale + delta)
+        cmds.setAttr(self.__scale_plug, new_scale)
+
+
 class LayerItemWidget(QWidget):
     '''Layer Item Widget'''
 
@@ -274,6 +486,7 @@ class LayerItemWidget(QWidget):
         new_name: str = self.__name.text()
         if new_name and new_name != self.__node:
             try:
+                # TODO: Emit renamed signal
                 self.__node = cmds.rename(self.__node, new_name)
                 self.__node = self.__node.split('->')[-1]
                 self.__name.setText(self.__node)
@@ -380,9 +593,23 @@ class SubToolManager(QWidget):
         main_layout.addLayout(layout)
 
         button = widgets.IconButton(self)
+        button.set_icon('a_move.png')
+        button.setToolTip('Film Offset Tool')
+        button.clicked.connect(self.film_offset_context)
+        layout.addWidget(button)
+
+        button = widgets.IconButton(self)
+        button.set_icon('a_zoom.png')
+        button.setToolTip('Post Scale Tool')
+        button.clicked.connect(self.post_scale_context)
+        layout.addWidget(button)
+
+        layout.addWidget(widgets.VerticalLine(self))
+
+        button = widgets.IconButton(self)
         button.set_icon('a_shift_lens.png')
         button.setToolTip('Show Shift Lens')
-        button.clicked.connect(self.show_dolly_zoom)
+        button.clicked.connect(self.show_shift_lens)
         layout.addWidget(button)
 
         button: widgets.IconButton = widgets.IconButton(self)
@@ -420,6 +647,16 @@ class SubToolManager(QWidget):
     def update_ui(self) -> None:
         '''Update UI'''
         self.update_requested.emit()
+
+    def film_offset_context(self) -> None:
+        '''Film offset context'''
+        context: FilmOffsetContext = FilmOffsetContext(self.camera())
+        context.set_tool()
+
+    def post_scale_context(self) -> None:
+        '''Post scale context'''
+        context: PostScaleContext = PostScaleContext(self.camera())
+        context.set_tool()
 
 
 class CameraInfoManager(QWidget):
