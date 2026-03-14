@@ -435,6 +435,7 @@ class LayerItemWidget(QWidget):
     '''Layer Item Widget'''
 
     visibility_toggled: Signal = Signal(str, bool)
+    name_changed = Signal(str, str)
 
     def __init__(self, node: str, parent: QWidget | None = None) -> None:
         '''Initialize widget.'''
@@ -490,10 +491,11 @@ class LayerItemWidget(QWidget):
         new_name: str = self.__name.text()
         if new_name and new_name != self.__node:
             try:
-                # TODO: Emit renamed signal
+                old_name: str = self.__node
                 self.__node = cmds.rename(self.__node, new_name)
                 self.__node = self.__node.split('->')[-1]
                 self.__name.setText(self.__node)
+                self.name_changed.emit(old_name, new_name)
 
             except RuntimeError:
                 self.__name.setText(self.__node)
@@ -1167,6 +1169,14 @@ class ImagePlaneManager(QWidget):
             )
             widget.update_visible_state()
 
+    def on_layer_name_changed(self, old_name: str, new_name: str) -> None:
+        '''Change image plane name'''
+        for i in range(self.__image_list.count()):
+            item: QListWidgetItem = self.__image_list.item(i)
+            if item.data(Qt.UserRole) == old_name:
+                item.setData(Qt.UserRole, new_name)
+                break
+
     def update_image_planes(self) -> None:
         '''Update image plane view'''
         selected_nodes: list[str] = [
@@ -1190,13 +1200,15 @@ class ImagePlaneManager(QWidget):
 
         image_planes.sort(key=lambda node: cmds.getAttr(f'{node}.depth'))
         for image_plane in image_planes:
+            node: str = image_plane.split('->')[-1]
+
             item = QListWidgetItem(self.__image_list)
             item.setSizeHint(QSize(0, 35))
-            item.setData(Qt.UserRole, image_plane)
+            item.setData(Qt.UserRole, node)
 
-            node: str = image_plane.split('->')[-1]
             row_widget = LayerItemWidget(node)
             row_widget.visibility_toggled.connect(self.on_visibility_toggled)
+            row_widget.name_changed.connect(self.on_layer_name_changed)
             self.__image_list.setItemWidget(item, row_widget)
 
             if image_plane in selected_nodes:
