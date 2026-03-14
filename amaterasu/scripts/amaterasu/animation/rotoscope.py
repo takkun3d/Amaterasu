@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 import logging
 import os
+from functools import partial
 
 try:
     from PySide2.QtCore import Qt, Signal, QTimer, QSize
@@ -684,6 +685,7 @@ class CameraInfoManager(QWidget):
         main_layout: QVBoxLayout = QVBoxLayout(self)
         main_layout.setObjectName(f'Layout{str(id(self))}')
         main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(2)
 
         layout: QHBoxLayout = QHBoxLayout()
         layout.setObjectName(f'Layout{str(id(layout))}')
@@ -693,7 +695,7 @@ class CameraInfoManager(QWidget):
         self.__dummy_layout: str = cmds.columnLayout()  # type:ignore
         self.__focal_length: str = cmds.attrFieldSliderGrp(
             label='Lens',
-            columnWidth=[(1, 30), (2, 60)],
+            columnWidth=[(1, 40), (2, 60)],
             adjustableColumn=0,
             parent=self.__dummy_layout,
         )  # type: ignore
@@ -704,9 +706,18 @@ class CameraInfoManager(QWidget):
         self.__focal_length = focal_length_qt.objectName()
         layout.addWidget(focal_length_qt, True)
 
+        button = widgets.IconButton(self)
+        button.set_icon('a_reset.png')
+        button.clicked.connect(
+            partial(self.reset_value, self.__focal_length, 35)
+        )
+        layout.addWidget(button)
+
+        layout.addWidget(widgets.VerticalLine(self))
+
         self.__offset_x: str = cmds.attrFieldSliderGrp(
             label='Film X',
-            columnWidth=[(1, 30), (2, 60)],
+            columnWidth=[(1, 40), (2, 60)],
             adjustableColumn=0,
             parent=self.__dummy_layout,
         )  # type: ignore
@@ -715,9 +726,14 @@ class CameraInfoManager(QWidget):
         self.__offset_x = offset_x_qt.objectName()
         layout.addWidget(offset_x_qt, True)
 
+        button: widgets.IconButton = widgets.IconButton(self)
+        button.set_icon('a_reset.png')
+        button.clicked.connect(partial(self.reset_value, self.__offset_x, 0.0))
+        layout.addWidget(button)
+
         self.__offset_y: str = cmds.attrFieldSliderGrp(
             label='Film Y',
-            columnWidth=[(1, 30), (2, 60)],
+            columnWidth=[(1, 40), (2, 60)],
             adjustableColumn=0,
             parent=self.__dummy_layout,
         )  # type: ignore
@@ -726,9 +742,16 @@ class CameraInfoManager(QWidget):
         self.__offset_y = offset_y_qt.objectName()
         layout.addWidget(offset_y_qt, True)
 
+        button = widgets.IconButton(self)
+        button.set_icon('a_reset.png')
+        button.clicked.connect(partial(self.reset_value, self.__offset_y, 0.0))
+        layout.addWidget(button)
+
+        layout.addWidget(widgets.VerticalLine(self))
+
         self.__post_scale: str = cmds.attrFieldSliderGrp(
             label='Scale',
-            columnWidth=[(1, 30), (2, 60)],
+            columnWidth=[(1, 40), (2, 60)],
             adjustableColumn=0,
             parent=self.__dummy_layout,
         )  # type: ignore
@@ -736,6 +759,13 @@ class CameraInfoManager(QWidget):
         post_scale_qt.setMaximumWidth(100)
         self.__post_scale = post_scale_qt.objectName()
         layout.addWidget(post_scale_qt, True)
+
+        button = widgets.IconButton(self)
+        button.set_icon('a_reset.png')
+        button.clicked.connect(
+            partial(self.reset_value, self.__post_scale, 1.0)
+        )
+        layout.addWidget(button)
 
         layout.addStretch(True)
         cmds.setParent(current_parent)
@@ -748,6 +778,11 @@ class CameraInfoManager(QWidget):
     def camera(self) -> str:
         '''Returns current camera'''
         return self.__camera
+
+    def reset_value(self, widget: str, value: float) -> None:
+        '''Reset widget value'''
+        plug: str = cmds.attrFieldSliderGrp(widget, query=True, attribute=True)  # type: ignore
+        cmds.setAttr(plug, value)
 
     def update_controllers(self) -> None:
         '''Update controllers'''
