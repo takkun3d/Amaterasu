@@ -117,7 +117,7 @@ class Settings(parser.ToolSettings):
     fogStart: parser.Variant[float] = parser.Variant(0.0)
     fogColor: parser.Variant[list[float]] = parser.Variant([0.5, 0.5, 0.5, 1])
     shadows: parser.Variant[bool] = parser.Variant(False)
-    rendererName: parser.Variant[str] = parser.Variant('vp2Renderer')
+    # rendererName: parser.Variant[str] = parser.Variant('vp2Renderer')
     colorResolution: parser.Variant[list[int]] = parser.Variant([256, 156])
     bumpResolution: parser.Variant[list[int]] = parser.Variant([512, 512])
     transparencyAlgorithm: parser.Variant[str] = parser.Variant(
@@ -204,6 +204,10 @@ class Settings(parser.ToolSettings):
             try:
                 if element.name() == 'window_geo':
                     continue
+
+                if element.name() == 'camera':
+                    if not cmds.objExists(element.value()):
+                        element.set_value('persp')
 
                 kwargs: dict[str, Any] = {
                     'edit': True,
@@ -673,6 +677,7 @@ class CameraInfoManager(QWidget):
         self.setObjectName(f'CameraInfoManager{str(id(self))}')
 
         self.__camera: str = ''
+        current_parent: str = cmds.setParent(query=True)  # type: ignore
 
         main_layout: QVBoxLayout = QVBoxLayout(self)
         main_layout.setObjectName(f'Layout{str(id(self))}')
@@ -731,6 +736,7 @@ class CameraInfoManager(QWidget):
         layout.addWidget(post_scale_qt, True)
 
         layout.addStretch(True)
+        cmds.setParent(current_parent)
 
     def set_camera(self, camera: str) -> None:
         '''Set camera'''
@@ -1417,7 +1423,6 @@ class MainWindow(widgets.BaseToolWidget):
         )
         self.__camera_mgr.camera_changed.connect(self.set_camera)
         self.__subtool_mgr.update_requested.connect(self.update_ui)
-        self.update_ui()
 
         # ----------------------------------------------------------------------
         # Move PySide Widget to Maya's UI
@@ -1425,6 +1430,10 @@ class MainWindow(widgets.BaseToolWidget):
         add_widget_to_maya(self.__subtool_mgr, self.__right_panel)
         add_widget_to_maya(self.__camera_mgr, self.__right_panel)
         add_widget_to_maya(self.__image_plane_mgr, self.__right_panel)
+
+        # ----------------------------------------------------------------------
+        self.load_settings()
+        self.update_ui()
 
     # Override
     def closeEvent(self, event: QCloseEvent) -> None:
