@@ -103,7 +103,7 @@ class Settings(parser.ToolSettings):
     jointXray: parser.Variant[bool] = parser.Variant(False)
     activeComponentsXray: parser.Variant[bool] = parser.Variant(False)
     maxConstantTransparency: parser.Variant[float] = parser.Variant(1.0)
-    displayTextures: parser.Variant[bool] = parser.Variant(False)
+    displayTextures: parser.Variant[bool] = parser.Variant(True)
     smoothWireframe: parser.Variant[bool] = parser.Variant(False)
     lineWidth: parser.Variant[float] = parser.Variant(1.0)
     textureAnisotropic: parser.Variant[bool] = parser.Variant(False)
@@ -135,31 +135,31 @@ class Settings(parser.ToolSettings):
 
     controllers: parser.Variant[bool] = parser.Variant(True)
     nurbsCurves: parser.Variant[bool] = parser.Variant(True)
-    nurbsSurfaces: parser.Variant[bool] = parser.Variant(True)
-    controlVertices: parser.Variant[bool] = parser.Variant(True)
-    hulls: parser.Variant[bool] = parser.Variant(True)
+    nurbsSurfaces: parser.Variant[bool] = parser.Variant(False)
+    controlVertices: parser.Variant[bool] = parser.Variant(False)
+    hulls: parser.Variant[bool] = parser.Variant(False)
     polymeshes: parser.Variant[bool] = parser.Variant(True)
     subdivSurfaces: parser.Variant[bool] = parser.Variant(True)
-    planes: parser.Variant[bool] = parser.Variant(True)
+    planes: parser.Variant[bool] = parser.Variant(False)
     lights: parser.Variant[bool] = parser.Variant(True)
-    cameras: parser.Variant[bool] = parser.Variant(True)
+    cameras: parser.Variant[bool] = parser.Variant(False)
     imagePlane: parser.Variant[bool] = parser.Variant(True)
-    joints: parser.Variant[bool] = parser.Variant(True)
-    ikHandles: parser.Variant[bool] = parser.Variant(True)
-    deformers: parser.Variant[bool] = parser.Variant(True)
+    joints: parser.Variant[bool] = parser.Variant(False)
+    ikHandles: parser.Variant[bool] = parser.Variant(False)
+    deformers: parser.Variant[bool] = parser.Variant(False)
     dynamics: parser.Variant[bool] = parser.Variant(True)
     particleInstancers: parser.Variant[bool] = parser.Variant(True)
-    fluids: parser.Variant[bool] = parser.Variant(True)
-    hairSystems: parser.Variant[bool] = parser.Variant(True)
-    follicles: parser.Variant[bool] = parser.Variant(True)
-    nCloths: parser.Variant[bool] = parser.Variant(True)
+    fluids: parser.Variant[bool] = parser.Variant(False)
+    hairSystems: parser.Variant[bool] = parser.Variant(False)
+    follicles: parser.Variant[bool] = parser.Variant(False)
+    nCloths: parser.Variant[bool] = parser.Variant(False)
     nParticles: parser.Variant[bool] = parser.Variant(True)
-    nRigids: parser.Variant[bool] = parser.Variant(True)
-    dynamicConstraints: parser.Variant[bool] = parser.Variant(True)
-    locators: parser.Variant[bool] = parser.Variant(True)
-    dimensions: parser.Variant[bool] = parser.Variant(True)
-    pivots: parser.Variant[bool] = parser.Variant(True)
-    handles: parser.Variant[bool] = parser.Variant(True)
+    nRigids: parser.Variant[bool] = parser.Variant(False)
+    dynamicConstraints: parser.Variant[bool] = parser.Variant(False)
+    locators: parser.Variant[bool] = parser.Variant(False)
+    dimensions: parser.Variant[bool] = parser.Variant(False)
+    pivots: parser.Variant[bool] = parser.Variant(False)
+    handles: parser.Variant[bool] = parser.Variant(False)
     textures: parser.Variant[bool] = parser.Variant(True)
     strokes: parser.Variant[bool] = parser.Variant(True)
     motionTrails: parser.Variant[bool] = parser.Variant(True)
@@ -168,7 +168,7 @@ class Settings(parser.ToolSettings):
     greasePencils: parser.Variant[bool] = parser.Variant(True)
     manipulators: parser.Variant[bool] = parser.Variant(True)
     headsUpDisplay: parser.Variant[bool] = parser.Variant(True)
-    grid: parser.Variant[bool] = parser.Variant(True)
+    grid: parser.Variant[bool] = parser.Variant(False)
     selectionHiliteDisplay: parser.Variant[bool] = parser.Variant(True)
 
     def write_from_model_panel(self, model_panel: str) -> None:
@@ -680,6 +680,7 @@ class CameraInfoManager(QWidget):
         self.setObjectName(f'CameraInfoManager{str(id(self))}')
 
         self.__camera: str = ''
+        self.__model_editor: str = ''
         current_parent: str = cmds.setParent(query=True)  # type: ignore
 
         main_layout: QVBoxLayout = QVBoxLayout(self)
@@ -693,6 +694,7 @@ class CameraInfoManager(QWidget):
 
         self.__dummy_window: str = cmds.window()  # type:ignore
         self.__dummy_layout: str = cmds.columnLayout()  # type:ignore
+
         self.__focal_length: str = cmds.attrFieldSliderGrp(
             label='Lens',
             columnWidth=[(1, 40), (2, 60)],
@@ -768,6 +770,25 @@ class CameraInfoManager(QWidget):
         layout.addWidget(button)
 
         layout.addStretch(True)
+
+        self.__curve: widgets.IconButton = widgets.IconButton(self)
+        self.__curve.set_icon('a_curve.png')
+        self.__curve.setCheckable(True)
+        self.__curve.clicked.connect(self.set_displayed_filter)
+        layout.addWidget(self.__curve)
+
+        self.__polygon: widgets.IconButton = widgets.IconButton(self)
+        self.__polygon.set_icon('a_polygon.png')
+        self.__polygon.setCheckable(True)
+        self.__polygon.clicked.connect(self.set_displayed_filter)
+        layout.addWidget(self.__polygon)
+
+        self.__image_plane: widgets.IconButton = widgets.IconButton(self)
+        self.__image_plane.set_icon('a_image_plane.png')
+        self.__image_plane.setCheckable(True)
+        self.__image_plane.clicked.connect(self.set_displayed_filter)
+        layout.addWidget(self.__image_plane)
+
         cmds.setParent(current_parent)
 
     def set_camera(self, camera: str) -> None:
@@ -778,6 +799,35 @@ class CameraInfoManager(QWidget):
     def camera(self) -> str:
         '''Returns current camera'''
         return self.__camera
+
+    def set_model_editor(self, model_editor: str) -> None:
+        '''Set model editor name'''
+        self.__model_editor = model_editor
+
+        visible: bool = cmds.modelEditor(
+            self.__model_editor, query=True, nurbsCurves=True
+        )  # type: ignore
+        self.__curve.setChecked(visible)
+
+        visible = cmds.modelEditor(
+            self.__model_editor, query=True, polymeshes=True
+        )  # type: ignore
+        self.__polygon.setChecked(visible)
+
+        visible = cmds.modelEditor(
+            self.__model_editor, query=True, imagePlane=True
+        )  # type: ignore
+        self.__image_plane.setChecked(visible)
+
+    def set_displayed_filter(self) -> None:
+        '''Set displayed filter'''
+        cmds.modelEditor(
+            self.__model_editor,
+            edit=True,
+            nurbsCurves=self.__curve.isChecked(),
+            polymeshes=self.__polygon.isChecked(),
+            imagePlane=self.__image_plane.isChecked(),
+        )
 
     def reset_value(self, widget: str, value: float) -> None:
         '''Reset widget value'''
@@ -1413,6 +1463,7 @@ class MainWindow(widgets.BaseToolWidget):
         self.__left_panel: str = ''
         self.__right_panel: str = ''
         self.__model_panel_name: str = ''
+        self.__model_editor_name: str = ''
 
         self.__subtool_mgr: SubToolManager = SubToolManager(self)
         self.__camera_info_mgr: CameraInfoManager = CameraInfoManager(self)
@@ -1458,6 +1509,11 @@ class MainWindow(widgets.BaseToolWidget):
             edit=True,
             parent=self.__left_panel,
         )
+        self.__model_editor_name = cmds.modelPanel(
+            self.__model_panel_name,
+            query=True,
+            modelEditor=True,
+        )  # type: ignore
 
         # ----------------------------------------------------------------------
         # Event
@@ -1522,6 +1578,7 @@ class MainWindow(widgets.BaseToolWidget):
     def update_ui(self) -> None:
         '''Update ui'''
         self.__camera_mgr.update_cameras(self.current_camera())
+        self.__camera_info_mgr.set_model_editor(self.__model_editor_name)
 
 
 # ==============================================================================
