@@ -88,6 +88,15 @@ class Settings(parser.ToolSettings):
     '''Settings for tool.'''
 
     window_geo: parser.Variant[str] = parser.Variant('')
+    main_panel: parser.Variant[list[tuple[int, int, int]]] = parser.Variant(
+        [(1, 80, 100), (2, 20, 100)]
+    )
+    left_panel: parser.Variant[list[tuple[int, int, int]]] = parser.Variant(
+        [(1, 100, 99), (2, 100, 1)]
+    )
+    right_panel: parser.Variant[list[tuple[int, int, int]]] = parser.Variant(
+        [(1, 100, 1), (2, 100, 29), (3, 100, 70)]
+    )
 
     camera: parser.Variant[str] = parser.Variant('persp')
     displayLights: parser.Variant[str] = parser.Variant('default')
@@ -133,7 +142,7 @@ class Settings(parser.ToolSettings):
     sortTransparent: parser.Variant[bool] = parser.Variant(True)
     viewSelected: parser.Variant[bool] = parser.Variant(False)
 
-    controllers: parser.Variant[bool] = parser.Variant(True)
+    controllers: parser.Variant[bool] = parser.Variant(False)
     nurbsCurves: parser.Variant[bool] = parser.Variant(True)
     nurbsSurfaces: parser.Variant[bool] = parser.Variant(False)
     controlVertices: parser.Variant[bool] = parser.Variant(False)
@@ -141,7 +150,7 @@ class Settings(parser.ToolSettings):
     polymeshes: parser.Variant[bool] = parser.Variant(True)
     subdivSurfaces: parser.Variant[bool] = parser.Variant(True)
     planes: parser.Variant[bool] = parser.Variant(False)
-    lights: parser.Variant[bool] = parser.Variant(True)
+    lights: parser.Variant[bool] = parser.Variant(False)
     cameras: parser.Variant[bool] = parser.Variant(False)
     imagePlane: parser.Variant[bool] = parser.Variant(True)
     joints: parser.Variant[bool] = parser.Variant(False)
@@ -160,7 +169,7 @@ class Settings(parser.ToolSettings):
     dimensions: parser.Variant[bool] = parser.Variant(False)
     pivots: parser.Variant[bool] = parser.Variant(False)
     handles: parser.Variant[bool] = parser.Variant(False)
-    textures: parser.Variant[bool] = parser.Variant(True)
+    textures: parser.Variant[bool] = parser.Variant(False)
     strokes: parser.Variant[bool] = parser.Variant(True)
     motionTrails: parser.Variant[bool] = parser.Variant(True)
     pluginShapes: parser.Variant[bool] = parser.Variant(True)
@@ -171,17 +180,22 @@ class Settings(parser.ToolSettings):
     grid: parser.Variant[bool] = parser.Variant(False)
     selectionHiliteDisplay: parser.Variant[bool] = parser.Variant(True)
 
-    def write_from_model_panel(self, model_panel: str) -> None:
+    def read_from_model_panel(self, model_panel: str) -> None:
         '''Write flag value from model panel.'''
-        self.write_from_model_editor(
+        self.read_from_model_editor(
             cmds.modelPanel(model_panel, query=True, modelEditor=True)  # type: ignore
         )
 
-    def write_from_model_editor(self, model_editor: str) -> None:
+    def read_from_model_editor(self, model_editor: str) -> None:
         '''Write flag value from model editor.'''
         for element in self:
             try:
-                if element.name() == 'window_geo':
+                if element.name() in [
+                    'window_geo',
+                    'main_panel',
+                    'left_panel',
+                    'right_panel',
+                ]:
                     continue
 
                 kwargs: dict[str, Any] = {
@@ -193,17 +207,22 @@ class Settings(parser.ToolSettings):
             except RuntimeError:
                 _logger.warning('Unsupport flag : %s', element.name())
 
-    def write_to_model_panel(self, model_panel: str) -> None:
+    def write_from_model_panel(self, model_panel: str) -> None:
         '''Write flag value to model panel.'''
-        self.write_to_model_editor(
+        self.write_from_model_editor(
             cmds.modelPanel(model_panel, query=True, modelEditor=True)  # type: ignore
         )
 
-    def write_to_model_editor(self, model_editor: str) -> None:
+    def write_from_model_editor(self, model_editor: str) -> None:
         '''Write flag value to model editor.'''
         for element in self:
             try:
-                if element.name() == 'window_geo':
+                if element.name() in [
+                    'window_geo',
+                    'main_panel',
+                    'left_panel',
+                    'right_panel',
+                ]:
                     continue
 
                 if element.name() == 'camera':
@@ -809,21 +828,15 @@ class CameraInfoManager(QWidget):
     def set_model_editor(self, model_editor: str) -> None:
         '''Set model editor name'''
         self.__model_editor = model_editor
-
-        visible: bool = cmds.modelEditor(
-            self.__model_editor, query=True, nurbsCurves=True
-        )  # type: ignore
-        self.__curve.setChecked(visible)
-
-        visible = cmds.modelEditor(
-            self.__model_editor, query=True, polymeshes=True
-        )  # type: ignore
-        self.__polygon.setChecked(visible)
-
-        visible = cmds.modelEditor(
-            self.__model_editor, query=True, imagePlane=True
-        )  # type: ignore
-        self.__image_plane.setChecked(visible)
+        self.__curve.setChecked(
+            cmds.modelEditor(self.__model_editor, query=True, nurbsCurves=True)  # type: ignore
+        )
+        self.__polygon.setChecked(
+            cmds.modelEditor(self.__model_editor, query=True, polymeshes=True)  # type: ignore
+        )
+        self.__image_plane.setChecked(
+            cmds.modelEditor(self.__model_editor, query=True, imagePlane=True)  # type: ignore
+        )
 
     def set_displayed_filter(self) -> None:
         '''Set displayed filter'''
@@ -1490,19 +1503,16 @@ class MainWindow(widgets.BaseToolWidget):
         self.__main_panel = cmds.paneLayout(
             configuration='vertical2',
             parent=parent_path,
-            paneSize=[(1, 80, 100), (2, 20, 100)],
         )  # type: ignore
 
         self.__left_panel = cmds.paneLayout(
             configuration='horizontal2',
             parent=self.__main_panel,
-            paneSize=[(1, 100, 99), (2, 100, 1)],
         )  # type: ignore
 
         self.__right_panel = cmds.paneLayout(
             configuration='horizontal3',
             parent=self.__main_panel,
-            paneSize=[(1, 100, 1), (2, 100, 29), (3, 100, 70)],
         )  # type: ignore
 
         # ----------------------------------------------------------------------
@@ -1557,14 +1567,35 @@ class MainWindow(widgets.BaseToolWidget):
         '''Load ui settings from file.'''
         settings: Settings = Settings.instance(__name__, True)
         self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
-        settings.write_to_model_panel(self.__model_panel_name)
+        cmds.paneLayout(
+            self.__main_panel, edit=True, paneSize=settings.main_panel.value()
+        )
+        cmds.paneLayout(
+            self.__left_panel, edit=True, paneSize=settings.left_panel.value()
+        )
+        cmds.paneLayout(
+            self.__right_panel, edit=True, paneSize=settings.right_panel.value()
+        )
+        settings.write_from_model_panel(self.__model_panel_name)
 
     # Override
     def save_settings(self) -> None:
         '''Save ui settings to file.'''
+
+        def convert_panel_size(panel: str) -> list[tuple[int, int, int]]:
+            '''Convert panel size'''
+            data: list[int] = cmds.paneLayout(panel, query=True, paneSize=True)  # type: ignore
+            return [
+                (index, data[i], data[i + 1])
+                for index, i in enumerate(range(0, len(data), 2), 1)
+            ]
+
         settings: Settings = Settings.instance(__name__, True)
         settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
-        settings.write_from_model_panel(self.__model_panel_name)
+        settings.main_panel.set_value(convert_panel_size(self.__main_panel))
+        settings.left_panel.set_value(convert_panel_size(self.__left_panel))
+        settings.right_panel.set_value(convert_panel_size(self.__right_panel))
+        settings.read_from_model_panel(self.__model_panel_name)
         settings.write()
 
     def set_camera(self, camera: str) -> None:
