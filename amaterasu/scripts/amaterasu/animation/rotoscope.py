@@ -71,7 +71,7 @@ from ..lib import parser, widgets
 #
 # ==============================================================================
 __product__: str = 'Rotoscope'
-__version__: str = '1.50'
+__version__: str = '1.60'
 __doc__ = 'This tool is usefull operation for the layout and the animation.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
