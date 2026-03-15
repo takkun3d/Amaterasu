@@ -465,11 +465,17 @@ class LayerItemWidget(QWidget):
     def on_visible_clicked(self) -> None:
         '''Clicked visible button'''
         visible: bool = cmds.getAttr(f'{self.__node}.visibility')
+        if cmds.getAttr(f'{self.__node}.displayMode') != 3:
+            visible = False
+
         self.visibility_toggled.emit(self.__node, not visible)
 
     def update_visible_state(self) -> None:
         '''Update visible state'''
         visible: bool = cmds.getAttr(f'{self.__node}.visibility')
+        if cmds.getAttr(f'{self.__node}.displayMode') != 3:
+            visible = False
+
         icon: str = 'view/a_show.png' if visible else 'view/a_hide.png'
         self.__visible.set_icon(icon)
 
@@ -1247,6 +1253,7 @@ class ImagePlaneManager(QWidget):
         selected_nodes.append(trigger_node)
         for node in selected_nodes:
             cmds.setAttr(f'{node}.visibility', new_vis)
+            cmds.setAttr(f'{node}.displayMode', 3 if new_vis else 0)
 
         for i in range(self.__image_list.count()):
             widget: LayerItemWidget = self.__image_list.itemWidget(
