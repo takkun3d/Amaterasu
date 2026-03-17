@@ -276,18 +276,6 @@ class BaseCameraDraggerContext:
         '''Set Camera'''
         self.__camera = camera
 
-    def start_x(self) -> float:
-        '''Returns start X position'''
-        return self.__start_x
-
-    def start_y(self) -> float:
-        '''Returns start Y position'''
-        return self.__start_y
-
-    def start_z(self) -> float:
-        '''Returns start Z position'''
-        return self.__start_z
-
     def press_event(self) -> None:
         '''Press Event'''
         x: float
@@ -305,17 +293,16 @@ class BaseCameraDraggerContext:
 
     def drag_event(self) -> None:
         '''Drag Event'''
-        x: float
-        y: float
-        z: float
-        x, y, z = cmds.draggerContext(
+        pos: tuple[float, float, float] = cmds.draggerContext(
             self.__tool_name, query=True, dragPoint=True
         )  # type: ignore
-
         mods: int = cmds.getModifiers()
-        is_shift: bool = (mods & 1) > 0
-        is_ctrl: bool = (mods & 4) > 0
-        self.execute_drag(x, y, z, is_shift, is_ctrl)
+        self.execute_drag(
+            (self.__start_x, self.__start_y, self.__start_z),
+            pos,
+            (mods & 1) > 0,
+            (mods & 4) > 0,
+        )
         cmds.refresh()
 
     def setup_drag(self) -> None:
@@ -323,9 +310,8 @@ class BaseCameraDraggerContext:
 
     def execute_drag(
         self,
-        x: float,
-        y: float,
-        z: float,
+        start_pos: tuple[float, float, float],
+        pos: tuple[float, float, float],
         is_shift: bool,
         is_ctrl: bool,
     ) -> None:
@@ -356,13 +342,14 @@ class FilmOffsetContext(BaseCameraDraggerContext):
             'FilmOffsetTool',
             'track',
             'a_move.png',
-            'Film Offset Tool: Drag in the viewport to adjust. (Shift: Fast / Ctrl: Fine)',
+            'Film Offset Tool: Drag in the viewport to adjust. (Shift: Lock Axis)',
             camera,
         )
         self.__start_offset_x: float = 0.0
         self.__start_offset_y: float = 0.0
         self.__horizontal_plug: str = ''
         self.__vertical_plug: str = ''
+        self.__lock_axis: str = ''
 
     def setup_drag(self) -> None:
         '''Setup Drag (override)'''
@@ -382,24 +369,38 @@ class FilmOffsetContext(BaseCameraDraggerContext):
         )
         self.__start_offset_y = cmds.getAttr(self.__vertical_plug)
 
+        self.__lock_axis = ''
+
     def execute_drag(
         self,
-        x: float,
-        y: float,
-        z: float,
+        start_pos: tuple[float, float, float],
+        pos: tuple[float, float, float],
         is_shift: bool,
         is_ctrl: bool,
     ) -> None:
         '''Execute Drag (override)'''
-        sensitivity: float = -0.0002
+        sensitivity: float = -0.002
+        delta_x: float = (pos[0] - start_pos[0]) * sensitivity
+        delta_y: float = (pos[1] - start_pos[1]) * sensitivity
         if is_shift:
-            sensitivity = sensitivity * 10.0
+            abs_x: float = abs(pos[0] - start_pos[0])
+            abs_y: float = abs(pos[1] - start_pos[1])
+            if not self.__lock_axis and (abs_x > 5 or abs_y > 5):
+                if abs_x > abs_y:
+                    self.__lock_axis = 'x'
 
-        elif is_ctrl:
-            sensitivity = sensitivity / 10.0
+                else:
+                    self.__lock_axis = 'y'
 
-        delta_x: float = (x - self.start_x()) * sensitivity
-        delta_y: float = (y - self.start_y()) * sensitivity
+            if self.__lock_axis == 'x':
+                delta_y = 0.0
+
+            elif self.__lock_axis == 'y':
+                delta_x = 0.0
+
+        else:
+            self.__lock_axis = ''
+
         cmds.setAttr(self.__horizontal_plug, self.__start_offset_x + delta_x)
         cmds.setAttr(self.__vertical_plug, self.__start_offset_y + delta_y)
 
@@ -413,7 +414,7 @@ class PostScaleContext(BaseCameraDraggerContext):
             'PostScaleTool',
             'dolly',
             'a_zoom.png',
-            'Post Scale Tool: Drag in the viewport to adjust. (Shift: Fast / Ctrl: Fine)',
+            'Post Scale Tool: Drag in the viewport to adjust.',
             camera,
         )
         self.__start_post_scale: float = 1.0
@@ -431,21 +432,15 @@ class PostScaleContext(BaseCameraDraggerContext):
 
     def execute_drag(
         self,
-        x: float,
-        y: float,
-        z: float,
+        start_pos: tuple[float, float, float],
+        pos: tuple[float, float, float],
         is_shift: bool,
         is_ctrl: bool,
     ) -> None:
         '''Execute Drag (override)'''
-        sensitivity: float = 0.0002
-        if is_shift:
-            sensitivity = sensitivity * 10.0
-        elif is_ctrl:
-            sensitivity = sensitivity / 10.0
-
+        sensitivity: float = 0.002
         delta: float = (
-            (x - self.start_x()) + (y - self.start_y())
+            (pos[0] - start_pos[0]) + (pos[1] - start_pos[1])
         ) * sensitivity
         new_scale: float = max(0.001, self.__start_post_scale + delta)
         cmds.setAttr(self.__scale_plug, new_scale)
