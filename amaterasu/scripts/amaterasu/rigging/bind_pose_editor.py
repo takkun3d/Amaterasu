@@ -1,6 +1,6 @@
 # ==============================================================================
 #
-# Bind Pose Manager
+# Bind Pose Editor
 #
 # ==============================================================================
 from __future__ import annotations
@@ -38,7 +38,7 @@ from ..lib import parser, widgets
 # Variables
 #
 # ==============================================================================
-__product__: str = 'Bind Pose Manager'
+__product__: str = 'Bind Pose Editor'
 __version__: str = '1.00'
 __doc__ = 'This tool manages bind poses by easily adding, removing, and merging members.'
 __copyright__ = (
