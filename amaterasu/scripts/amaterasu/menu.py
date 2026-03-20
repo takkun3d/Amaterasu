@@ -518,6 +518,11 @@ def create_main_menu() -> None:
                 'amaterasu.rigging.skin_weight_editor',
                 is_window_only=True,
             )
+            m.add_item(
+                'Bind Pose Editor',
+                'amaterasu.rigging.bind_pose_editor',
+                is_window_only=True,
+            )
 
             m.add_divider('Controllers')
             m.add_item(
