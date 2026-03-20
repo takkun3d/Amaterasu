@@ -6,8 +6,18 @@
 #
 # ==============================================================================
 from __future__ import annotations
-from typing import Any
+from typing import TYPE_CHECKING, Any
+from functools import partial
+
+try:
+    from PySide2.QtWidgets import QAction
+
+except ImportError:
+    if not TYPE_CHECKING:
+        from PySide6.QtGui import QAction
+
 from maya import cmds, mel
+from .lib import parser, widgets
 
 # ==============================================================================
 #
@@ -20,6 +30,7 @@ MAIN_MENU_LABEL: str = 'Amaterasu'
 CB_MENU_NAME: str = 'AmaterasuChannelBoxMenu'
 CB_MENU_LABEL: str = 'A'
 SHELF_ICON: str = 'a_shelf.png'
+MAX_HISTORY: int = 10
 
 
 # ==============================================================================
@@ -27,10 +38,16 @@ SHELF_ICON: str = 'a_shelf.png'
 # Classes
 #
 # ==============================================================================
+class Settings(parser.ToolSettings):
+    '''Settings'''
+
+    recent_tools: parser.Variant[list[dict[str, str]]] = parser.Variant([])
+
+
 class Menu:
     '''This class creates menu in with statements.'''
 
-    def __init__(self, object_name: str, **kwargs: Any) -> None:
+    def __init__(self, object_name: str = '', **kwargs: Any) -> None:
         '''Get arguments for menu.'''
         self.__object_name: str = object_name
         self.__kwargs: dict[str, Any] = kwargs
@@ -43,7 +60,10 @@ class Menu:
             if cmds.menu(self.__object_name, exists=True):
                 cmds.deleteUI(self.__object_name)
 
-        cmds.menu(self.__object_name, **self.__kwargs)
+            cmds.menu(self.__object_name, **self.__kwargs)
+        else:
+            cmds.menu(**self.__kwargs)
+
         return self
 
     def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
@@ -54,6 +74,24 @@ class Menu:
     def create_python_command(module_path: str, func_name: str) -> str:
         '''Create a python command to run the tool.'''
         return f'import {module_path}\n{module_path}.{func_name}'
+
+    @staticmethod
+    def add_history(label: str, module_path: str, func_name: str) -> None:
+        '''Add history'''
+        settings: Settings = Settings.instance(__name__, True)
+        history: list[dict[str, str]] = settings.recent_tools.value()
+        history = [
+            item
+            for item in history
+            if not (item['module'] == module_path and item['func'] == func_name)
+        ]
+
+        history.insert(
+            0, {'label': label, 'module': module_path, 'func': func_name}
+        )
+        history = history[:MAX_HISTORY]
+        settings.recent_tools.set_value(history)
+        settings.write()
 
     def add_item(
         self,
@@ -70,19 +108,35 @@ class Menu:
             label += '...'
 
         command: str = self.create_python_command(module, main_func)
-        cmds.menuItem(
-            label=label, command=command, sourceType='python', **kwargs
-        )
+        menu_item: str = cmds.menuItem(
+            label=label,
+            command=command,
+            sourceType='python',
+            **kwargs,
+        )  # type: ignore
+
+        action: QAction = widgets.maya_menu_item_to_qt(menu_item)
+        if action:
+            action.triggered.connect(
+                partial(Menu.add_history, label, module, main_func)
+            )
+
         if option_func:
-            command = self.create_python_command(module, option_func)
             base_label: str = label[:-3] if label.endswith('...') else label
             option_label: str = f'{base_label} Option'
-            cmds.menuItem(
+            command = self.create_python_command(module, option_func)
+            menu_item = cmds.menuItem(
                 label=option_label,
                 command=command,
                 sourceType='python',
                 optionBox=True,
-            )
+            )  # type: ignore
+
+            action = widgets.maya_menu_item_to_qt(menu_item)
+            if action:
+                action.triggered.connect(
+                    partial(Menu.add_history, option_label, module, main_func)
+                )
 
     def add_divider(self, label: str | None = None) -> None:
         '''Add a divider.'''
@@ -97,6 +151,7 @@ class SubMenu(Menu):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         '''Get arguments for menuItem.'''
+        super().__init__(*args, **kwargs)
         self.__args: tuple[Any, ...] = args
         self.__kwargs: dict[str, Any] = kwargs
         if 'tearOff' not in self.__kwargs:
@@ -119,6 +174,27 @@ class SubMenu(Menu):
 # Functions
 #
 # ==============================================================================
+def build_history_menu(menu_name: str) -> None:
+    '''Build history menu'''
+    cmds.menu(menu_name, edit=True, deleteAllItems=True)
+
+    settings: Settings = Settings.instance(__name__, True)
+    history: list[dict[str, str]] = settings.recent_tools.value()
+
+    if not history:
+        cmds.menuItem(label='No Recent Tools', enable=False, parent=menu_name)
+        return
+
+    for item in history:
+        label: str = item['label']
+        module_path: str = item['module']
+        func_name: str = item['func']
+        command: str = f'import {module_path}\n{module_path}.{func_name}'
+        cmds.menuItem(
+            label=label, command=command, sourceType='python', parent=menu_name
+        )
+
+
 def create_main_menu() -> None:
     '''Create an Amaterasu menu in main window.'''
     cmds.setParent(mel.eval('$gMainWindow=$gMainWindow'))
@@ -664,6 +740,18 @@ def create_main_menu() -> None:
 
         mm.add_divider()
 
+        with SubMenu(
+            'AmaterasuRecentToolsMenu',
+            label='Recent Tools',
+            postMenuCommand=(
+                'import amaterasu.menu\n'
+                'amaterasu.menu.build_history_menu("AmaterasuRecentToolsMenu")'
+            ),
+        ) as m:
+            pass
+
+        mm.add_divider()
+
         with SubMenu(label='Web Site') as m:
             m.add_divider('Amaterasu')
             m.add_item('Home', 'amaterasu', main_func='show_home()')
@@ -674,8 +762,6 @@ def create_main_menu() -> None:
             m.add_item(
                 'Digital Craft Nodes', 'amaterasu', main_func='show_dcn()'
             )
-
-        mm.add_divider()
 
         mm.add_item('About', 'amaterasu', main_func='show_about()')
 
