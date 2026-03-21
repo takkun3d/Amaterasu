@@ -171,20 +171,24 @@ class ToastWidget(QWidget):
         self.__fade_out_anim.setEndValue(0.0)
         self.__fade_out_anim.finished.connect(self.close)
 
+        self.__target_y: int | None = None
         self.__anim_move = QPropertyAnimation(self, QByteArray(b'pos'))
         self.__anim_move.setDuration(300)
+        self.__anim_move.setEasingCurve(QEasingCurve.OutExpo)
 
         QTimer.singleShot(self.display_time, self.__fade_out_anim.start)
 
-    def offset(self) -> None:
+    def offset(self, shift_amount: int) -> None:
         '''Offset Toast Widget'''
-        offset: int = self.height() + self.spacing
-        current_pos: QPoint = self.pos()
-        target_pos: QPoint = QPoint(current_pos.x(), current_pos.y() + offset)
+        if self.__target_y is None:
+            self.__target_y = self.y()
 
-        self.__anim_move.setStartValue(current_pos)
-        self.__anim_move.setEndValue(target_pos)
-        self.__anim_move.setEasingCurve(QEasingCurve.OutExpo)
+        self.__target_y += shift_amount + self.spacing
+        if self.__anim_move.state() == QPropertyAnimation.Running:
+            self.__anim_move.stop()
+
+        self.__anim_move.setStartValue(self.pos())
+        self.__anim_move.setEndValue(QPoint(self.x(), self.__target_y))
         self.__anim_move.start()
 
 
@@ -224,7 +228,7 @@ class ToastLogHandler(parser.Singleton, logging.Handler):
         toast.show()
 
         for t in self.__toasts:
-            t.offset()
+            t.offset(toast.height())
 
         self.__toasts.append(toast)
 
