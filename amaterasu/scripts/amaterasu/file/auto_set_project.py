@@ -5,10 +5,9 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import Any
-import logging
 import pathlib
 from maya import cmds, mel
-
+from ..lib import logger
 
 # ==============================================================================
 #
@@ -21,7 +20,7 @@ __doc__ = 'The project is automatically set when secene is opened in Maya.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 
 # ==============================================================================
