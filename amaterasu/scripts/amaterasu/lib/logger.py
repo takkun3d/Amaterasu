@@ -80,15 +80,27 @@ class ToastWidget(QWidget):
             color: {text_color};
         }}
         '''
+    label_text: str = '''
+        <style>
+            .header{{
+                font-size: 10px;
+            }}
+            .body{{
+                font-size: 12px;
+            }}
+        </style>
+        <div class="header">{title} : {level}</div>
+        <div class="body">{message}</div>
+        '''
     display_time: int = 3000
     opacity: float = 0.9
     spacing: int = 3
 
     def __init__(
         self,
-        message: str,
-        level: str,
         title: str,
+        level: str,
+        message: str,
         parent: QWidget | None = None,
     ) -> None:
         '''Initialize Widget'''
@@ -96,6 +108,10 @@ class ToastWidget(QWidget):
             parent = widgets.maya_window_to_qt()
 
         super().__init__(parent)
+
+        label_color: str = self.label_color.get(level, self.label_color['INFO'])
+        text_color: str = self.text_color.get(level, self.text_color['INFO'])
+
         self.setWindowFlags(
             Qt.FramelessWindowHint
             | Qt.WindowStaysOnTopHint
@@ -109,18 +125,28 @@ class ToastWidget(QWidget):
         layout: QVBoxLayout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        label_color: str = self.label_color.get(level, self.label_color['INFO'])
-        text_color: str = self.text_color.get(level, self.text_color['INFO'])
-
-        self.label: QLabel = QLabel(f'{title} : {level}\n{message}')
-        self.label.setFixedWidth(300)
-        self.label.setWordWrap(True)
-        self.label.setStyleSheet(
-            self.label_style.format(
-                label_color=label_color, text_color=text_color
+        self.__label: QLabel = QLabel(self)
+        self.__label.setText(
+            self.label_text.format(
+                label_color=label_color,
+                text_color=text_color,
+                title=title,
+                level=level,
+                message=message,
             )
         )
-        layout.addWidget(self.label)
+        self.__label.setStyleSheet(
+            self.label_style.format(
+                label_color=label_color,
+                text_color=text_color,
+                title=title,
+                level=level,
+                message=message,
+            )
+        )
+        self.__label.setFixedWidth(300)
+        self.__label.setWordWrap(True)
+        layout.addWidget(self.__label)
         self.adjustSize()
 
         geom: QRect = parent.geometry()
@@ -180,16 +206,16 @@ class ToastLogHandler(logging.Handler):
 
     def emit(self, record: logging.LogRecord) -> None:
         '''Emit signal (override)'''
-        msg: str = self.format(record)
+        message: str = self.format(record)
         self.__emitter.log_recieved.emit(
-            record.levelname,
             record.name,
-            msg,
+            record.levelname,
+            message,
         )
 
-    def show_toast(self, level: str, title: str, msg: str) -> None:
+    def show_toast(self, title: str, level: str, message: str) -> None:
         '''Show toast widget'''
-        toast: ToastWidget = ToastWidget(msg, level, title)
+        toast: ToastWidget = ToastWidget(title, level, message)
         toast.destroyed.connect(
             lambda *args, t=toast: (
                 self.__toasts.remove(t) if t in self.__toasts else None
