@@ -8,6 +8,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 import logging
+from logging import Logger  # for type hint
 
 try:
     from PySide2.QtCore import (
@@ -207,9 +208,9 @@ class ToastLogHandler(logging.Handler):
 # Functions
 #
 # ==============================================================================
-def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
+def get_logger(name: str, level: int = logging.INFO) -> Logger:
     '''Returns toast logger'''
-    logger: logging.Logger = logging.getLogger(name)
+    logger: Logger = logging.getLogger(name)
     logger.setLevel(level)
 
     has_toast: bool = any(
