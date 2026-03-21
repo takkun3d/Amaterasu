@@ -1,0 +1,252 @@
+{
+  "MAIN_MENU": [
+    {
+      "label": "File",
+      "items": [
+        {"divider": "IO"},
+        {"label": "Auto Set Project", "module": "amaterasu.file.auto_set_project", "is_window_only": true},
+        {"label": "Open Project Directory", "module": "amaterasu.file.open_work_directory"},
+        {"divider": "Reference"},
+        {"label": "Replace Reference", "module": "amaterasu.file.replace_reference", "is_window_only": true},
+        {"label": "Rename Reference from Filename", "module": "amaterasu.file.rename_reference"},
+        {"label": "Rename Namespace from Filename", "module": "amaterasu.file.rename_namespace"},
+        {"divider": "Utility"},
+        {"label": "Remove Unknown Nodes", "module": "amaterasu.file.remove_unknown_nodes"},
+        {"label": "Remove Unknown Plugins", "module": "amaterasu.file.remove_unknown_plugins"},
+        {"label": "Remove Node Editor Info", "module": "amaterasu.file.remove_node_editor_info"}
+      ]
+    },
+    {
+      "label": "Edit",
+      "items": [
+        {"divider": "Shape"},
+        {"label": "Combine Shapes", "module": "amaterasu.edit.combine_shapes"},
+        {"label": "Separate Shapes", "module": "amaterasu.edit.separate_shapes"},
+        {"label": "Replace Shapes", "module": "amaterasu.edit.replace_shapes"},
+        {"divider": "Outliner"},
+        {"label": "Sort Nodes", "module": "amaterasu.edit.sort_nodes", "option_func": "option()"}
+      ]
+    },
+    {
+      "label": "Select",
+      "items": [
+        {"divider": "Polygons"},
+        {"label": "Select Hard Edges", "module": "amaterasu.select.hard_edges"},
+        {"label": "Select Hard Edges Shell", "module": "amaterasu.select.hard_edges_shell"},
+        {"label": "Select Each Nth Edges", "module": "amaterasu.select.each_nth_edges", "option_func": "option()"},
+        {"label": "Select Crease Edges", "module": "amaterasu.select.crease_edges"},
+        {"label": "Select Inverted UV", "module": "amaterasu.select.inverted_uv"},
+        {"divider": "Node"},
+        {"label": "Select Animated Nodes", "module": "amaterasu.select.animated_nodes"},
+        {"label": "Select Displayed Nodes", "module": "amaterasu.select.displayed_nodes"},
+        {"label": "Select Stacked Nodes", "module": "amaterasu.select.stacked_nodes", "option_func": "option()"}
+      ]
+    },
+    {
+      "label": "Modify",
+      "items": [
+        {"divider": "Transform"},
+        {"label": "Lock & Hide Transform", "module": "amaterasu.modify.lock_hide_transform", "main_func": "main(True)"},
+        {"label": "Unlock & Show Transform", "module": "amaterasu.modify.lock_hide_transform", "main_func": "main(False)"},
+        {"label": "Unfreeze Transformations", "module": "amaterasu.modify.unfreeze_transformations", "is_window_only": true},
+        {"divider": "Naming"},
+        {"label": "Renamer", "module": "amaterasu.modify.renamer", "is_window_only": true},
+        {"divider": "Attribute"},
+        {"label": "Add Attribute", "module": "amaterasu.modify.add_attribute", "option_func": "option()"},
+        {"label": "Reset Value", "module": "amaterasu.modify.reset_value"},
+        {"label": "Random Value", "module": "amaterasu.modify.random_value", "option_func": "option()"},
+        {"label": "Stocker", "module": "amaterasu.modify.stocker", "is_window_only": true},
+        {"label": "Refresh", "module": "amaterasu.modify.refresh"},
+        {"divider": "User Defined Attribute"},
+        {"label": "Attribute Reorder", "module": "amaterasu.modify.attribute_reorder", "is_window_only": true},
+        {"label": "Transfer User Defined Attr", "module": "amaterasu.modify.transfer_user_defined_attr", "is_window_only": true},
+        {"divider": "Connection"},
+        {"label": "Show Node History", "module": "amaterasu.modify.history_visibility", "main_func": "show()"},
+        {"label": "Hide Node History", "module": "amaterasu.modify.history_visibility", "main_func": "hide()"},
+        {"divider": "Utility"},
+        {"label": "Lock Node", "module": "amaterasu.modify.lock_node", "main_func": "lock()"},
+        {"label": "Unlock Node", "module": "amaterasu.modify.lock_node", "main_func": "unlock()"}
+      ]
+    },
+    {
+      "label": "Display",
+      "items": [
+        {"divider": "Colors"},
+        {"label": "Outliner Color", "module": "amaterasu.display.outliner_color", "is_window_only": true},
+        {"label": "Drawing Color", "module": "amaterasu.display.drawing_color", "is_window_only": true},
+        {"divider": "Viewport"},
+        {"label": "Perspective Guide", "module": "amaterasu.display.perspective_guide", "option_func": "option()"},
+        {"label": "XRay Geometry", "module": "amaterasu.display.xray_geometry", "is_window_only": true},
+        {"label": "Local Axis", "module": "amaterasu.display.local_axis", "is_window_only": true}
+      ]
+    },
+    {
+      "label": "Window",
+      "items": [
+        {"divider": "Manager"},
+        {"label": "Sets Manager", "module": "amaterasu.window.sets_manager", "is_window_only": true},
+        {"label": "Instance Manager", "module": "amaterasu.window.instance_manager", "is_window_only": true},
+        {"label": "File Manager", "module": "amaterasu.window.file_manager", "is_window_only": true},
+        {"divider": "UI Element"},
+        {"label": "Shelf Stocker", "module": "amaterasu.window.shelf_stocker", "is_window_only": true}
+      ]
+    },
+    {"divider": true},
+    {
+      "label": "Modeling",
+      "items": [
+        {"divider": "Edge"},
+        {"label": "Apply Crease Edge", "module": "amaterasu.modeling.apply_crease_edge", "option_func": "option()"},
+        {"label": "Recovery Edge Type", "module": "amaterasu.modeling.recovery_edge_type"},
+        {"divider": "Face"},
+        {"label": "Duplicate Face", "module": "amaterasu.modeling.duplicate_face"},
+        {"label": "Extract Face", "module": "amaterasu.modeling.extract_face"},
+        {"label": "Extract Face Each Material", "module": "amaterasu.modeling.extract_face_each_material"},
+        {"label": "Flatten Faces", "module": "amaterasu.modeling.flatten_faces"},
+        {"divider": "Mirror"},
+        {"label": "Remove Half", "module": "amaterasu.modeling.remove_half", "option_func": "option()"},
+        {"label": "Mirror Geometry", "module": "amaterasu.modeling.mirror_geometry", "option_func": "option()"},
+        {"label": "Mirror Polygon", "module": "amaterasu.modeling.mirror_polygon", "option_func": "option()"},
+        {"label": "Symmetry", "module": "amaterasu.modeling.symmetry", "is_window_only": true},
+        {"divider": "Combine"},
+        {"label": "Combine", "module": "amaterasu.modeling.combine", "option_func": "option()"},
+        {"label": "Separate", "module": "amaterasu.modeling.separate", "option_func": "option()"},
+        {"divider": "UV"},
+        {"label": "Camera Projection", "module": "amaterasu.modeling.camera_projection"},
+        {"label": "UV Linker", "module": "amaterasu.modeling.uv_linker", "is_window_only": true},
+        {"divider": "Utility"},
+        {"label": "Expand Mesh From UV", "module": "amaterasu.modeling.expand_mesh_from_uv"},
+        {"label": "Smooth Mesh Preview", "module": "amaterasu.modeling.smooth_mesh_preview", "option_func": "option()"},
+        {"label": "Poly Cleaner", "module": "amaterasu.modeling.poly_cleaner", "option_func": "option()"}
+      ]
+    },
+    {
+      "label": "Animation",
+      "items": [
+        {"divider": "Create"},
+        {"label": "Create Camera Rig", "module": "amaterasu.animation.camera_rig"},
+        {"label": "Create Motion Trail Curve[plug-ins]", "module": "amaterasu.animation.create_motion_trail_curve", "enable": false},
+        {"label": "Create Motion Curve", "module": "amaterasu.animation.create_motion_curve", "option_func": "option()"},
+        {"divider": "Camera"},
+        {"label": "Shift Lens", "module": "amaterasu.animation.shift_lens", "is_window_only": true},
+        {"label": "Dolly Zoom", "module": "amaterasu.animation.dolly_zoom", "is_window_only": true},
+        {"label": "Perspective Inspector", "module": "amaterasu.animation.perspective_inspector", "is_window_only": true},
+        {"label": "Rotoscope", "module": "amaterasu.animation.rotoscope", "is_window_only": true},
+        {"divider": "Keyframe"},
+        {"label": "Insert Keyframe", "module": "amaterasu.animation.insert_keyframe", "option_func": "option()"},
+        {"label": "Round Off Time", "module": "amaterasu.animation.round_off_time", "option_func": "option()"},
+        {"label": "Cycle Keyframe", "module": "amaterasu.animation.cycle_keyframe", "option_func": "option()"},
+        {"label": "Offset Keyframe", "module": "amaterasu.animation.offset_keyframe", "is_window_only": true},
+        {"label": "Between Keyframe", "module": "amaterasu.animation.between_keyframe", "is_window_only": true},
+        {"divider": "Animation"},
+        {"label": "Copy Animation", "module": "amaterasu.animation.copy_animation", "option_func": "option()"},
+        {"label": "Delete Unused Animation", "module": "amaterasu.animation.delete_unused_animation", "option_func": "option()"},
+        {"label": "Motion Denoiser", "module": "amaterasu.animation.motion_denoiser", "option_func": "option()"},
+        {"label": "Time Warp", "module": "amaterasu.animation.time_warp", "is_window_only": true},
+        {"divider": "Utility"},
+        {"label": "Playblast", "module": "amaterasu.animation.playblast", "is_window_only": true},
+        {"label": "Anim Library", "module": "amaterasu.animation.anim_library", "is_window_only": true}
+      ]
+    },
+    {
+      "label": "Rigging",
+      "items": [
+        {"divider": "Skeleton & Skin"},
+        {"label": "Joint Editor", "module": "amaterasu.rigging.joint_editor", "is_window_only": true},
+        {"label": "Skin Weight Editor", "module": "amaterasu.rigging.skin_weight_editor", "is_window_only": true},
+        {"label": "Bind Pose Editor", "module": "amaterasu.rigging.bind_pose_editor", "is_window_only": true},
+        {"divider": "Controllers"},
+        {"label": "Create Controller", "module": "amaterasu.rigging.create_controller", "is_window_only": true},
+        {"label": "Insert Space", "module": "amaterasu.rigging.insert_space"},
+        {"label": "Pivot Shifter", "module": "amaterasu.rigging.pivot_shifter", "is_window_only": true},
+        {"label": "Curve Rivet", "module": "amaterasu.rigging.curve_rivet", "option_func": "option()"},
+        {"label": "Curve Linker", "module": "amaterasu.rigging.curve_linker"},
+        {"divider": "Deformation"},
+        {"label": "Soft Tweak", "module": "amaterasu.rigging.soft_tweak", "is_window_only": true},
+        {"label": "Cluster Tweak", "module": "amaterasu.rigging.cluster_tweak", "is_window_only": true},
+        {"divider": "Constraint"},
+        {"label": "Matrix Constraint", "module": "amaterasu.rigging.matrix_constraint", "is_window_only": true},
+        {"label": "Aim Matrix Constraint", "module": "amaterasu.rigging.aim_matrix_constraint", "is_window_only": true},
+        {"label": "Geometry Constraint", "module": "amaterasu.rigging.geometry_constraint"},
+        {"label": "Bend Constraint", "module": "amaterasu.rigging.bend_constraint", "option_func": "option()"},
+        {"label": "Roll Constraint", "module": "amaterasu.rigging.roll_constraint", "option_func": "option()"},
+        {"divider": "Utilities"},
+        {"label": "Decompose Rotate", "module": "amaterasu.rigging.decompose_rotate"},
+        {"label": "Animation To Driven Key", "module": "amaterasu.rigging.convert_animation_to_driven_key", "is_window_only": true}
+      ]
+    },
+    {
+      "label": "Rendering",
+      "items": [
+        {"divider": "Look Dev"},
+        {"label": "Reload Texture", "module": "amaterasu.rendering.reload_texture"},
+        {"label": "Generate All UDIM Preview", "module": "amaterasu.rendering.generate_all_udim_preview"},
+        {"label": "Matcap", "module": "amaterasu.rendering.matcap", "is_window_only": true},
+        {"label": "Material Library", "module": "amaterasu.rendering.material_library", "is_window_only": true},
+        {"divider": "Render Setup"},
+        {"label": "Make Overrides", "module": "amaterasu.rendering.make_overrides", "is_window_only": true},
+        {"label": "Register Geometry", "module": "amaterasu.rendering.register_geometry", "is_window_only": true},
+        {"divider": "Camera"},
+        {"label": "Overscan", "module": "amaterasu.rendering.overscan", "is_window_only": true},
+        {"label": "Bake Film Offset", "module": "amaterasu.rendering.bake_film_offset", "is_window_only": true},
+        {"divider": "Toon"},
+        {"label": "PfxToon Manager", "module": "amaterasu.rendering.pfx_toon_manager", "is_window_only": true},
+        {"divider": "Maya Software"},
+        {"label": "Disable anti-aliasing", "module": "amaterasu.rendering.disable_anti_aliasing"},
+        {"divider": "Arnold"},
+        {"label": "Setup Noice", "module": "amaterasu.rendering.setup_noice"},
+        {"label": "Noice Manager", "module": "amaterasu.rendering.noice_manager"}
+      ]
+    },
+    {
+      "label": "Development",
+      "items": [
+        {"divider": "Python"},
+        {"label": "Package Installer", "module": "amaterasu.development.package_installer", "is_window_only": true}
+      ]
+    },
+    {"divider": true},
+    {
+      "label": "Recent Tools",
+      "name": "AmaterasuRecentToolsMenu",
+      "postMenuCommand": "import amaterasu.menu\namaterasu.menu.build_history_menu('AmaterasuRecentToolsMenu')",
+      "items": []
+    },
+    {"divider": true},
+    {
+      "label": "Web Site",
+      "items": [
+        {"divider": "Amaterasu"},
+        {"label": "Home", "module": "amaterasu", "main_func": "show_home()"},
+        {"label": "Patch Note", "module": "amaterasu", "main_func": "show_patch_note()"},
+        {"label": "Manual", "module": "amaterasu", "main_func": "show_manual()"},
+        {"divider": "Other"},
+        {"label": "Digital Craft Nodes", "module": "amaterasu", "main_func": "show_dcn()"}
+      ]
+    },
+    {"label": "About", "module": "amaterasu", "main_func": "show_about()"}
+  ],
+  "CHANNEL_BOX_MENU": [
+    {"divider": "Transform"},
+    {"label": "Lock && Hide Transform", "module": "amaterasu.modify.lock_hide_transform", "main_func": "main(True)"},
+    {"label": "Unlock && Show Transform", "module": "amaterasu.modify.lock_hide_transform", "main_func": "main(False)"},
+    {"label": "Unfreeze Transformations", "module": "amaterasu.modify.unfreeze_transformations", "is_window_only": true},
+    {"divider": "Attribute"},
+    {"label": "Add Attribute", "module": "amaterasu.modify.add_attribute", "option_func": "option()"},
+    {"label": "Reset Value", "module": "amaterasu.modify.reset_value"},
+    {"label": "Random Value", "module": "amaterasu.modify.random_value", "option_func": "option()"},
+    {"label": "Stocker", "module": "amaterasu.modify.stocker", "is_window_only": true},
+    {"label": "Refresh", "module": "amaterasu.modify.refresh"},
+    {"divider": "User Defined Attribute"},
+    {"label": "Attribute Reorder", "module": "amaterasu.modify.attribute_reorder", "is_window_only": true},
+    {"label": "Transfer User Defined Attr", "module": "amaterasu.modify.transfer_user_defined_attr", "is_window_only": true},
+    {"divider": "Keyframe"},
+    {"label": "Insert Keyframe", "module": "amaterasu.animation.insert_keyframe", "option_func": "option()"},
+    {"label": "Round Off Time", "module": "amaterasu.animation.round_off_time", "option_func": "option()"},
+    {"label": "Cycle Keyframe", "module": "amaterasu.animation.cycle_keyframe", "option_func": "option()"},
+    {"label": "Offset Keyframe", "module": "amaterasu.animation.offset_keyframe", "is_window_only": true},
+    {"divider": "Animation"},
+    {"label": "Copy Animation", "module": "amaterasu.animation.copy_animation", "option_func": "option()"},
+    {"label": "Delete Unused Animation", "module": "amaterasu.animation.delete_unused_animation", "option_func": "option()"}
+  ]
+}
