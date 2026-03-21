@@ -39,7 +39,7 @@ except ImportError:
         )
         from PySide6.QtWidgets import QWidget, QLabel, QVBoxLayout
 
-from . import widgets
+from . import widgets, parser
 
 
 # ==============================================================================
@@ -194,7 +194,7 @@ class ToastSignalEmitter(QObject):
     log_recieved: Signal = Signal(str, str, str)
 
 
-class ToastLogHandler(logging.Handler):
+class ToastLogHandler(parser.Singleton, logging.Handler):
     '''Toast Log Handler'''
 
     def __init__(self) -> None:
