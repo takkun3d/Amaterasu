@@ -5,7 +5,6 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
-import logging
 import re
 
 try:
@@ -17,7 +16,6 @@ try:
         QLineEdit,
         QSpinBox,
         QPushButton,
-        QLabel,
         QGridLayout,
         QTreeView,
         QTabWidget,
@@ -33,7 +31,6 @@ except ImportError:
             QLineEdit,
             QSpinBox,
             QPushButton,
-            QLabel,
             QGridLayout,
             QTreeView,
             QTabWidget,
@@ -42,7 +39,7 @@ from maya import cmds
 from maya.api import OpenMaya
 from maya.app.renderSetup.model import utils
 from maya.app.renderSetup.views import viewCmds
-from ..lib import parser, widgets
+from ..lib import logger, parser, widgets
 
 
 # ==============================================================================
@@ -56,7 +53,7 @@ __doc__ = 'A tool to rename selected nodes at once.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 RENDER_SETUP_NODES: tuple[str, ...] = (
     'renderSetupLayer',

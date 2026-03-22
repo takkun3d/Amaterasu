@@ -4,10 +4,7 @@
 #
 # ==============================================================================
 from __future__ import annotations
-from typing import TYPE_CHECKING
-import logging
-from typing import Any
-from distutils.util import strtobool
+from typing import TYPE_CHECKING, Any
 
 try:
     from PySide2.QtCore import Qt, Slot, QObject
@@ -20,7 +17,7 @@ except ImportError:
         from PySide6.QtGui import QValidator, QIntValidator, QDoubleValidator
         from PySide6.QtWidgets import QWidget, QCheckBox, QLineEdit
 from maya import cmds
-from ..lib import parser, widgets
+from ..lib import logger, parser, widgets
 
 
 # ==============================================================================
@@ -34,7 +31,7 @@ __doc__ = 'Add attribute to selected nodes.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 MTOA_SHAPE_LIST: tuple[str, str, str] = ('mesh', 'nurbsSurface', 'nurbsCurve')
 MTOA_ATTR_TAG: str = 'mtoa_constant_'
@@ -312,6 +309,19 @@ def __value_flags(
             value_option['defaultValue'] = float(default_value)
 
     return value_option
+
+
+def strtobool(val: str) -> bool:
+    '''Convert str to bool'''
+    val = val.lower()
+    if val in ('y', 'yes', 't', 'true', 'on', '1'):
+        return True
+
+    elif val in ('n', 'no', 'f', 'false', 'off', '0'):
+        return False
+
+    else:
+        raise ValueError('invalid truth value %r' % val)
 
 
 def add_vector_attr(
