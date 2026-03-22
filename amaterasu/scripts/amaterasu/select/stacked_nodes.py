@@ -5,7 +5,6 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING
-import logging
 import itertools
 
 try:
@@ -17,7 +16,7 @@ except ImportError:
         from PySide6.QtCore import Qt
         from PySide6.QtWidgets import QWidget
 from maya import cmds
-from ..lib import parser, widgets
+from ..lib import logger, parser, widgets
 
 # ==============================================================================
 #
@@ -30,7 +29,7 @@ __doc__ = 'Select stacked nodes.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 
 # ==============================================================================
@@ -114,7 +113,7 @@ def option(unique_id: str = '') -> None:
     window.show()
 
 
-def apply(targets: list[str], seek: int = 1) -> None:
+def apply(targets: list[str], seek: int = 1) -> bool:
     '''Select stacked nodes.'''
 
     # Create data from selected nodes or Transforms in the scene.
@@ -154,9 +153,9 @@ def apply(targets: list[str], seek: int = 1) -> None:
 
     if selection_list:
         cmds.select(*selection_list)
-        _logger.info('Done.')
-    else:
-        _logger.info('There were no stacked nodes in this scene.')
+        return True
+
+    return False
 
 
 def main() -> None:
@@ -166,4 +165,9 @@ def main() -> None:
         selection = cmds.ls(transforms=True)
 
     settings: Settings = Settings.instance(__name__, True)
-    apply(selection, settings.mode.value())
+    result: bool = apply(selection, settings.mode.value())
+    if result:
+        _logger.info('Done.')
+
+    else:
+        _logger.info('There were no stacked nodes in this scene.')

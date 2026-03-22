@@ -4,9 +4,8 @@
 #
 # ==============================================================================
 from __future__ import annotations
-import logging
 from maya import cmds, mel
-from ..lib import utility
+from ..lib import logger, utility
 
 # ==============================================================================
 #
@@ -19,7 +18,7 @@ __doc__ = 'Select crease edge from selected node/component.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 
 # ==============================================================================
@@ -38,7 +37,7 @@ def main() -> None:
     '''Do it.'''
     selection: list[str] = cmds.ls(selection=True, type='transform')
     if not selection:
-        logging.error('Select polygon to converted selection.')
+        _logger.error('Select polygon to converted selection.')
         return
 
     result: list[str] = []
@@ -60,5 +59,6 @@ def main() -> None:
         mel.eval('SelectEdgeMask')
         cmds.select(*result, replace=True)
         _logger.info('Done.')
+
     else:
-        _logger.info('Does not exists crease edges.')
+        _logger.warning('Does not exists crease edges.')
