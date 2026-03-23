@@ -5,7 +5,6 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING
-import logging
 
 try:
     from PySide2.QtCore import Qt, Slot
@@ -28,7 +27,7 @@ except ImportError:
             QComboBox,
         )
 from maya import cmds, mel
-from ..lib import parser, utility, widgets
+from ..lib import logger, parser, utility, widgets
 
 
 # ==============================================================================
@@ -42,7 +41,7 @@ __doc__ = 'Copy animation to specific nodes from selected nodes.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 MIRROR_CHANNELS: tuple[str, str, str] = ('translate', 'rotate', 'scale')
 MIRROR_AXIS: tuple[str, str, str] = ('X', 'Y', 'Z')

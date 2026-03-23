@@ -5,7 +5,6 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
-import logging
 import math
 import cmath
 
@@ -47,7 +46,7 @@ except ImportError:
     HAS_NUMPY = False
 
 from maya import cmds
-from ..lib import parser, widgets
+from ..lib import logger, parser, widgets
 from ..development import package_installer
 
 
@@ -64,7 +63,7 @@ __doc__ = (
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 
 # ==============================================================================
