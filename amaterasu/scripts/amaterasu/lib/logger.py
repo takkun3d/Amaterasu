@@ -22,6 +22,7 @@ try:
         QEasingCurve,
         QTimer,
     )
+    from PySide2.QtGui import QMouseEvent
     from PySide2.QtWidgets import QWidget, QLabel, QVBoxLayout
 
 except ImportError:
@@ -37,8 +38,10 @@ except ImportError:
             QEasingCurve,
             QTimer,
         )
+        from PySide6.QtGui import QMouseEvent
         from PySide6.QtWidgets import QWidget, QLabel, QVBoxLayout
 
+from maya import mel
 from . import widgets, parser
 
 
@@ -116,11 +119,12 @@ class ToastWidget(QWidget):
             Qt.FramelessWindowHint
             | Qt.WindowStaysOnTopHint
             | Qt.Tool
-            | Qt.WindowTransparentForInput
+            # | Qt.WindowTransparentForInput
         )
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_DeleteOnClose)
-        self.setAttribute(Qt.WA_TransparentForMouseEvents)
+        # self.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.setCursor(Qt.PointingHandCursor)
 
         layout: QVBoxLayout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -177,6 +181,14 @@ class ToastWidget(QWidget):
         self.__anim_move.setEasingCurve(QEasingCurve.OutExpo)
 
         QTimer.singleShot(self.display_time, self.__fade_out_anim.start)
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        '''mousePressEvent (override)'''
+        if event.button() == Qt.LeftButton:
+            mel.eval('ScriptEditor;')
+            self.__fade_out_anim.start()
+
+        super().mousePressEvent(event)
 
     def offset(self, shift_amount: int) -> None:
         '''Offset Toast Widget'''
