@@ -5,7 +5,6 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
-import logging
 import os
 from functools import partial
 
@@ -61,9 +60,8 @@ except ImportError:
         PYSIDE_VERSION = 6
 
 from maya import OpenMayaUI, cmds, mel
+from ..lib import logger, parser, widgets
 from . import shift_lens, dolly_zoom, camera_rig
-from ..lib import parser, widgets
-
 
 # ==============================================================================
 #
@@ -76,7 +74,7 @@ __doc__ = 'This tool is usefull operation for the layout and the animation.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 
 # ==============================================================================

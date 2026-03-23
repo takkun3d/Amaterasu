@@ -5,7 +5,6 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING
-import logging
 
 try:
     from PySide2.QtCore import Qt
@@ -16,7 +15,7 @@ except ImportError:
         from PySide6.QtCore import Qt
         from PySide6.QtWidgets import QWidget
 from maya import cmds
-from ..lib import parser, widgets
+from ..lib import logger, parser, widgets
 from ..modify import history_visibility
 
 # ==============================================================================
@@ -30,7 +29,7 @@ __doc__ = 'Constrains the rotation of an object, using only the roll component.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 PLUGIN_NAME: str = 'quatNodes.mll'
 VECTOR: list[tuple[float, float, float]] = [

@@ -5,7 +5,6 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING
-import logging
 
 try:
     from PySide2.QtCore import Qt, QSize, QItemSelectionModel
@@ -44,11 +43,10 @@ except ImportError:
             QLabel,
         )
 from maya import cmds
-from ..lib import parser, widgets
+from ..lib import logger, parser, widgets
 from ..edit import combine_shapes
 from ..modify import renamer
-from ..display import drawing_color
-from ..display import outliner_color
+from ..display import drawing_color, outliner_color
 
 
 # ==============================================================================
@@ -62,7 +60,7 @@ __doc__ = 'Create controller for rigging.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 
 # ==============================================================================

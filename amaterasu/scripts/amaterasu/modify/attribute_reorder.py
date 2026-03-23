@@ -5,8 +5,6 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING
-import logging
-from venv import logger
 
 try:
     from PySide2.QtCore import Qt, QItemSelectionModel
@@ -32,7 +30,7 @@ except ImportError:
             QMessageBox,
         )
 from maya import cmds
-from ..lib import parser, widgets
+from ..lib import logger, parser, widgets
 
 
 # ==============================================================================
@@ -46,7 +44,7 @@ __doc__ = 'Reorders the user-defined attributes on the selected node.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 
 # ==============================================================================
@@ -140,16 +138,16 @@ class MainWindow(widgets.ToolWidget):
 
         selection: list[str] = cmds.ls(selection=True)
         if not selection:
-            logging.error('Select a node to reorder attributes.')
+            _logger.error('Select a node to reorder attributes.')
             return
 
         if len(selection) > 1:
-            logging.error('Select a node to reorder attributes.')
+            _logger.error('Select a node to reorder attributes.')
             return
 
         attributes: list[str] = cmds.listAttr(selection[0], userDefined=True)
         if not attributes:
-            logging.error('The selected node has no user-defined attributes.')
+            _logger.error('The selected node has no user-defined attributes.')
             return
 
         self.__node.setText(selection[0])
@@ -199,7 +197,7 @@ def apply(node: str = '', attr_orders: list[str] | None = None) -> bool:
         cmds.undo()
 
     cmds.flushUndo()
-    logger.info('Done.')
+    _logger.info('Done.')
     return True
 
 

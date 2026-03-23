@@ -4,9 +4,8 @@
 #
 # ==============================================================================
 from __future__ import annotations
-import logging
 from maya import OpenMaya
-
+from ..lib import logger
 
 # ==============================================================================
 #
@@ -19,7 +18,7 @@ __doc__ = 'Select inverted uv.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 
 # ==============================================================================
@@ -51,6 +50,7 @@ def main() -> None:
         component: OpenMaya.MObject = OpenMaya.MObject()
         select_iter.getDagPath(dag_path, component)
 
+        # TODO: Check if it's a mesh
         fn_mesh: OpenMaya.MFnMesh = OpenMaya.MFnMesh(dag_path)
         poly_iter: OpenMaya.MItMeshPolygon = OpenMaya.MItMeshPolygon(
             dag_path, component

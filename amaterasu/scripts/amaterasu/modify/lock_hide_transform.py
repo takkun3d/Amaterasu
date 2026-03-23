@@ -4,9 +4,9 @@
 #
 # ==============================================================================
 from __future__ import annotations
-import logging
 import itertools
 from maya import cmds
+from ..lib import logger
 
 # ==============================================================================
 #
@@ -19,7 +19,7 @@ __doc__ = 'Lock and hide transform attributes.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 TRANS_TAGS: tuple[str, str, str] = ('t', 'r', 's')
 AXIS_TAGS: tuple[str, str, str] = ('x', 'y', 'z')

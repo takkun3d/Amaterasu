@@ -5,7 +5,6 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
-import logging
 import os
 import json
 
@@ -38,7 +37,7 @@ except ImportError:
             QFileDialog,
         )
 from maya import cmds, mel
-from ..lib import parser, utility, widgets
+from ..lib import logger, parser, utility, widgets
 
 
 # ==============================================================================
@@ -52,7 +51,7 @@ __doc__ = 'This tool helps to edit skin weights.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 ICON_SIZE: QSize = QSize(24, 24)
 
 

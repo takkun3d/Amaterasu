@@ -5,7 +5,6 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
-import logging
 import json
 import itertools
 
@@ -66,7 +65,7 @@ except ImportError:
             QLabel,
         )
 from maya import cmds, mel
-from ..lib import parser, widgets, utility
+from ..lib import logger, parser, widgets, utility
 
 
 # ==============================================================================
@@ -80,7 +79,7 @@ __doc__ = 'This tool stocks the values of attributes and can be copy and paste.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 MIME_TYPE: str = 'application/x-amaterasu-stocker-data'
 

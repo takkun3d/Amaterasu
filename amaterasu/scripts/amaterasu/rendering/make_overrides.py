@@ -5,7 +5,6 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
-import logging
 
 try:
     from PySide2.QtCore import Qt, Signal, QSize
@@ -49,7 +48,7 @@ from maya.app.renderSetup.model import selector
 from maya.app.renderSetup.model.selector import SimpleSelector
 from maya.app.renderSetup.model import override
 from maya.app.renderSetup.model.override import AbsUniqueOverride
-from ..lib import parser, widgets
+from ..lib import logger, parser, widgets
 
 
 # ==============================================================================
@@ -63,7 +62,7 @@ __doc__ = 'Create overrides on the selected layers.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 
 # ==============================================================================

@@ -4,8 +4,8 @@
 #
 # ==============================================================================
 from __future__ import annotations
-import logging
 from maya import cmds
+from ..lib import logger
 from ..display import drawing_color
 from ..modify import history_visibility
 
@@ -20,7 +20,7 @@ __doc__ = 'Decomposes the rotation of selected objects into separate X, Y, Z Eul
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 OP_CROSS_PRODUCT: int = 2
 OP_GREATER_THAN: int = 2

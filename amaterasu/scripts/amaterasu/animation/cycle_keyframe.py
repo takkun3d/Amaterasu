@@ -5,7 +5,6 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
-import logging
 
 try:
     from PySide2.QtCore import Qt
@@ -16,7 +15,7 @@ except ImportError:
         from PySide6.QtCore import Qt
         from PySide6.QtWidgets import QWidget, QCheckBox, QComboBox
 from maya import cmds
-from ..lib import parser, utility, widgets
+from ..lib import logger, parser, utility, widgets
 
 
 # ==============================================================================
@@ -30,7 +29,7 @@ __doc__ = 'Change an animation of selected node to a cycle.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 
 # ==============================================================================
