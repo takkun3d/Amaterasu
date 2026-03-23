@@ -5,7 +5,6 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING
-import logging
 
 try:
     from PySide2.QtCore import (
@@ -82,7 +81,7 @@ except ImportError:
             QAction,
         )
 from maya import cmds
-from ..lib import parser, widgets
+from ..lib import logger, parser, widgets
 
 
 # ==============================================================================
@@ -96,7 +95,7 @@ __doc__ = 'Manages multiple pfxToon nodes and controls geometry assignments.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 DEFAULT_NAME: str = 'outline'
 LINE_COLOR: tuple[float, float, float] = (0.0472, 0.0472, 0.0472)

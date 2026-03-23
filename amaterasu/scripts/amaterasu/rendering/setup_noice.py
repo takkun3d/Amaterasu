@@ -5,7 +5,6 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING
-import logging
 
 try:
     from PySide2.QtWidgets import QMessageBox
@@ -17,7 +16,7 @@ except ImportError:
 from maya import cmds
 from mtoa import core, aovs
 from mtoa.ui import aoveditor
-from ..lib import widgets
+from ..lib import logger, widgets
 
 
 # ==============================================================================
@@ -31,7 +30,7 @@ __doc__ = 'Sets up Arnold render settings for Noice denoising.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 PLUGIN_NAME: str = 'mtoa'
 IGNORE_VARIANCE_AOVS: list[str] = [
