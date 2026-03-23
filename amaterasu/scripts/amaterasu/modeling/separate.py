@@ -16,7 +16,7 @@ except ImportError:
         from PySide6.QtCore import Qt
         from PySide6.QtWidgets import QWidget, QCheckBox
 from maya import cmds
-from ..lib import parser, widgets, utility
+from ..lib import logger, parser, widgets, utility
 
 
 # ==============================================================================
@@ -30,7 +30,7 @@ __doc__ = 'Separate polygons from selected it.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 SMOOTH_MESH_ATTRS: list[str] = [
     'displaySmoothMesh',

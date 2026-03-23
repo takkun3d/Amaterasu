@@ -6,7 +6,7 @@
 from __future__ import annotations
 import logging
 from maya import cmds
-
+from ..lib import logger
 
 # ==============================================================================
 #
@@ -19,7 +19,7 @@ __doc__ = 'Creates UV for the selected object based on the current camera view a
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 
 # ==============================================================================
