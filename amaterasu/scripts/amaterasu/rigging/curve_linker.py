@@ -4,8 +4,8 @@
 #
 # ==============================================================================
 from __future__ import annotations
-import logging
 from maya import cmds
+from ..lib import logger
 from ..modify import history_visibility
 
 # ==============================================================================
@@ -19,7 +19,7 @@ __doc__ = 'Create a CV curve that follows a controller.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 
 # ==============================================================================

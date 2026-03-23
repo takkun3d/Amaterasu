@@ -5,7 +5,6 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING
-import logging
 
 try:
     from PySide2.QtCore import Qt, Slot
@@ -17,7 +16,7 @@ except ImportError:
         from PySide6.QtWidgets import QWidget, QSpinBox, QComboBox, QCheckBox
 from maya import cmds
 from maya.api import OpenMaya
-from ..lib import parser, widgets
+from ..lib import logger, parser, widgets
 from ..modify import history_visibility
 
 # ==============================================================================
@@ -31,7 +30,7 @@ __doc__ = 'Generates objects along curves that strictly follow surface deformati
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 WORLD_DAG_PATH: str = '|'
 

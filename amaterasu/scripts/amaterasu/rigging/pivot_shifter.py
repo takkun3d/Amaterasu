@@ -5,7 +5,6 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING
-import logging
 import itertools
 
 try:
@@ -28,7 +27,7 @@ except ImportError:
         )
 
 from maya import cmds
-from ..lib import parser, widgets
+from ..lib import logger, parser, widgets
 from . import create_controller
 from ..modify import history_visibility
 
@@ -43,7 +42,7 @@ __doc__ = 'Creates a controller based on a guide locator to drive the target obj
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 PLUGIN_NAME: str = 'quatNodes.mll'
 WORLD_DAG_PATH: str = '|'
