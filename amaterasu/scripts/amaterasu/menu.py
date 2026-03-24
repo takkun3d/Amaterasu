@@ -220,7 +220,7 @@ class MenuBuilder(parser.Singleton):
         '''Initialize'''
         self.__json_path: str = json_path
         self.__menu_data: dict[str, Any] | None = None
-        self.__event_filter: MayaContextMenuFilter | None
+        self.__event_filter: MayaContextMenuFilter | None = None
 
     def load_data(self) -> dict[str, Any]:
         '''Returns json data'''
