@@ -7,16 +7,25 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
+from types import ModuleType
 import os
 import json
+import importlib
 from functools import partial
 
 try:
-    from PySide2.QtWidgets import QAction
+    from PySide2.QtCore import QObject, Qt, QEvent, QRect, QPoint
+    from PySide2.QtWidgets import QMainWindow, QMenuBar, QMenu, QAction
+
+    PYSIDE_VERSION: int = 2
 
 except ImportError:
     if not TYPE_CHECKING:
+        from PySide6.QtCore import QObject, Qt, QEvent, QRect, QPoint
         from PySide6.QtGui import QAction
+        from PySide6.QtWidgets import QMainWindow, QMenuBar, QMenu
+
+        PYSIDE_VERSION = 6
 
 from maya import cmds, mel
 from .lib import parser, widgets
@@ -173,6 +182,37 @@ class SubMenu(Menu):
         return self
 
 
+class MayaContextMenuFilter(QObject):
+    '''Maya Context Menu Filter'''
+
+    def __init__(
+        self,
+        target_menu_name: str,
+        menu_builder: MenuBuilder,
+        parent: QObject | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.__target_menu_name: str = target_menu_name
+        self.__menu_builder: MenuBuilder = menu_builder
+
+    def eventFilter(self, menu_bar: QMenuBar, event: QEvent) -> bool:
+        '''eventFilter (override)'''
+        if (
+            event.type() == QEvent.MouseButtonPress
+            and event.button() == Qt.RightButton
+        ):
+            action: QAction = menu_bar.actionAt(event.pos())
+            if (
+                action
+                and action.menu()
+                and action.menu().objectName() == self.__target_menu_name
+            ):
+                self.__menu_builder.build_history_qmenu(menu_bar, action)
+                return True
+
+        return super().eventFilter(menu_bar, event)
+
+
 class MenuBuilder(parser.Singleton):
     '''Menu Builder'''
 
@@ -180,6 +220,7 @@ class MenuBuilder(parser.Singleton):
         '''Initialize'''
         self.__json_path: str = json_path
         self.__menu_data: dict[str, Any] | None = None
+        self.__event_filter: MayaContextMenuFilter | None
 
     def load_data(self) -> dict[str, Any]:
         '''Returns json data'''
@@ -231,6 +272,11 @@ class MenuBuilder(parser.Singleton):
         ) as mm:
             self.build_items(mm, data)
 
+            maya_window: QMainWindow = widgets.maya_window_to_qt()
+            menu_bar: QMenuBar = maya_window.menuBar()
+            self.__event_filter = MayaContextMenuFilter(MAIN_MENU_NAME, self)
+            menu_bar.installEventFilter(self.__event_filter)
+
     def build_channelbox_menu(self) -> None:
         '''Build Channel Box Menu'''
         channel_box: str = mel.eval('$gChannelBoxForm=$gChannelBoxForm')
@@ -256,16 +302,50 @@ class MenuBuilder(parser.Singleton):
             return
 
         for item in history:
-            label: str = item['label']
-            module_path: str = item['module']
-            func_name: str = item['func']
-            command: str = f'import {module_path}\n{module_path}.{func_name}'
+            command: str = Menu.create_python_command(
+                item['module'], item['func']
+            )
             cmds.menuItem(
-                label=label,
+                label=item['label'],
                 command=command,
                 sourceType='python',
                 parent=menu_name,
             )
+
+    def build_history_qmenu(self, parent: QMenuBar, action: QAction) -> None:
+        '''Build recent tool QMenu'''
+        settings: Settings = Settings.instance(__name__, True)
+        history: list[dict[str, str]] = settings.recent_tools.value()
+
+        recent_tool_menu: QMenu = QMenu(parent)
+        if not history:
+            _action: QAction = recent_tool_menu.addAction('No Recent Tools')
+            _action.setEnabled(False)
+
+        else:
+            for item in history:
+                _action = recent_tool_menu.addAction(item['label'])
+                _action.triggered.connect(
+                    partial(
+                        self.execute_recent_tool,
+                        item['module'],
+                        item['func'],
+                    )
+                )
+
+        rect: QRect = parent.actionGeometry(action)
+        pos: QPoint = parent.mapToGlobal(rect.bottomLeft())
+        if PYSIDE_VERSION == 2:
+            recent_tool_menu.exec_(pos)
+
+        else:
+            recent_tool_menu.exec(pos)
+
+    @widgets.undo
+    def execute_recent_tool(self, module_path: str, func_name: str) -> None:
+        '''Excute Recent Tool'''
+        module: ModuleType = importlib.import_module(module_path)
+        eval(func_name, module.__dict__)
 
 
 # ==============================================================================
