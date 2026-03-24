@@ -317,7 +317,10 @@ class MenuBuilder(parser.Singleton):
         settings: Settings = Settings.instance(__name__, True)
         history: list[dict[str, str]] = settings.recent_tools.value()
 
-        recent_tool_menu: QMenu = QMenu(parent)
+        recent_tool_menu: QMenu = QMenu(
+            f'{MAIN_MENU_LABEL} Recent Tools', parent
+        )
+        recent_tool_menu.setTearOffEnabled(True)
         if not history:
             _action: QAction = recent_tool_menu.addAction('No Recent Tools')
             _action.setEnabled(False)
