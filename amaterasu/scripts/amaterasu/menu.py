@@ -139,7 +139,7 @@ class Menu:
 
             action = widgets.maya_menu_item_to_qt(menu_item)
             action.triggered.connect(
-                partial(settings.add_history, option_label, module, main_func)
+                partial(settings.add_history, option_label, module, option_func)
             )
 
     def add_divider(self, label: str | None = None) -> None:
