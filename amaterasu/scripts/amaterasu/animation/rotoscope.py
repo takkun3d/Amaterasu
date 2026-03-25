@@ -16,6 +16,7 @@ try:
         QDragEnterEvent,
         QDragMoveEvent,
         QDropEvent,
+        QWheelEvent,
     )
     from PySide2.QtWidgets import (
         QWidget,
@@ -42,6 +43,7 @@ except ImportError:
             QDragEnterEvent,
             QDragMoveEvent,
             QDropEvent,
+            QWheelEvent,
         )
         from PySide6.QtWidgets import (
             QWidget,
@@ -525,6 +527,7 @@ class ImagePlaneListWidget(QListWidget):
 
     order_changed: Signal = Signal()
     files_dropped: Signal = Signal(list)
+    wheel_scrolled: Signal = Signal(int)
 
     def __init__(
         self,
@@ -569,6 +572,14 @@ class ImagePlaneListWidget(QListWidget):
         else:
             super().dropEvent(event)
             QTimer.singleShot(0, self.order_changed.emit)
+
+    def wheelEvent(self, event: QWheelEvent) -> None:
+        '''wheelEvent [override]'''
+        delta: int = event.angleDelta().y()
+        step: int = 5 if delta > 0 else -5
+        self.wheel_scrolled.emit(step)
+        event.accept()
+        # super().wheelEvent(event)
 
 
 class UndoableSlider(QSlider):
@@ -1194,6 +1205,7 @@ class ImagePlaneManager(QWidget):
         self.__image_list.order_changed.connect(self.rebuild_after_drop)
         self.__image_list.files_dropped.connect(self.create_image_planes)
         self.__image_list.itemDoubleClicked.connect(self.show_attribute_editor)
+        self.__image_list.wheel_scrolled.connect(self.on_wheel_scrolled)
         main_layout.addWidget(self.__image_list)
 
     def set_camera(self, camera: str) -> None:
@@ -1229,6 +1241,13 @@ class ImagePlaneManager(QWidget):
             self.__slider.blockSignals(False)
         else:
             self.__slider.setEnabled(False)
+
+    @widgets.undo
+    def on_wheel_scrolled(self, step: int) -> None:
+        '''Change opacity from mouse wheel'''
+        if self.__slider.isEnabled():
+            new_value: int = max(0, min(100, self.__slider.value() + step))
+            self.__slider.setValue(new_value)
 
     @widgets.undo
     def rebuild_after_drop(self) -> None:
