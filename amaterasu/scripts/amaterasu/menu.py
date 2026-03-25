@@ -305,11 +305,20 @@ class MenuBuilder(parser.Singleton):
             command: str = Menu.create_python_command(
                 item['module'], item['func']
             )
-            cmds.menuItem(
+            menu_item: str = cmds.menuItem(
                 label=item['label'],
                 command=command,
                 sourceType='python',
                 parent=menu_name,
+            )  # type: ignore
+            action: QAction = widgets.maya_menu_item_to_qt(menu_item)
+            action.triggered.connect(
+                partial(
+                    settings.add_history,
+                    item['label'],
+                    item['module'],
+                    item['func'],
+                )
             )
 
     def build_history_qmenu(self, parent: QMenuBar, action: QAction) -> None:
@@ -331,6 +340,14 @@ class MenuBuilder(parser.Singleton):
                 _action.triggered.connect(
                     partial(
                         self.execute_recent_tool,
+                        item['module'],
+                        item['func'],
+                    )
+                )
+                _action.triggered.connect(
+                    partial(
+                        settings.add_history,
+                        item['label'],
                         item['module'],
                         item['func'],
                     )
