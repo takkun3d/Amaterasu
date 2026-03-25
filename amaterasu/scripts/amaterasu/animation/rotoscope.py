@@ -451,6 +451,7 @@ class LayerItemWidget(QWidget):
 
     visibility_toggled: Signal = Signal(str, bool)
     name_changed = Signal(str, str)
+    update_requested: Signal = Signal()
 
     def __init__(self, node: str, parent: QWidget | None = None) -> None:
         '''Initialize widget.'''
@@ -478,6 +479,11 @@ class LayerItemWidget(QWidget):
 
     def on_visible_clicked(self) -> None:
         '''Clicked visible button'''
+        if not cmds.objExists(self.__node):
+            _logger.error('Does not exists image plane: %s', self.__node)
+            self.update_requested.emit()
+            return None
+
         visible: bool = cmds.getAttr(f'{self.__node}.visibility')
         if cmds.getAttr(f'{self.__node}.displayMode') != 3:
             visible = False
@@ -855,7 +861,8 @@ class CameraInfoManager(QWidget):
     def reset_value(self, widget: str, value: float) -> None:
         '''Reset widget value'''
         plug: str = cmds.attrFieldSliderGrp(widget, query=True, attribute=True)  # type: ignore
-        cmds.setAttr(plug, value)
+        if plug:
+            cmds.setAttr(plug, value)
 
     def update_controllers(self) -> None:
         '''Update controllers'''
@@ -905,6 +912,7 @@ class CameraManager(QWidget):
     '''Camera Manager'''
 
     camera_changed: Signal = Signal(str)
+    update_requested: Signal = Signal()
 
     def __init__(
         self,
@@ -977,6 +985,11 @@ class CameraManager(QWidget):
         '''Switched camera on list view.'''
         current_camera: str = self.current_camera()
         if current_camera:
+            if not cmds.objExists(current_camera):
+                _logger.error('Does not exists camera: %s', current_camera)
+                self.update_requested.emit()
+                return
+
             self.camera_changed.emit(current_camera)
 
     def update_cameras(self, current_camera: str = '') -> None:
@@ -1143,6 +1156,8 @@ class CameraManager(QWidget):
 class ImagePlaneManager(QWidget):
     '''Image Plane Manager'''
 
+    update_requested: Signal = Signal()
+
     def __init__(
         self,
         parent: QWidget | None = None,
@@ -1227,18 +1242,29 @@ class ImagePlaneManager(QWidget):
         '''Change opacity slider'''
         nodes: list[str] = self.current_items()
         for node in nodes:
+            if not cmds.objExists(node):
+                _logger.error('Does not exists image plane: %s', node)
+                self.update_image_planes()
+                return
+
             cmds.setAttr(f'{node}.alphaGain', value / 100.0)
 
     def on_selection_changed(self) -> None:
         '''Change image plane'''
         items: list[QListWidgetItem] = self.__image_list.selectedItems()
         if items:
-            self.__slider.setEnabled(True)
             node: str = items[0].data(Qt.UserRole)
+            if not cmds.objExists(node):
+                _logger.error('Does not exists image plane: %s', node)
+                self.update_image_planes()
+                return
+
             alpha: float = cmds.getAttr(f'{node}.alphaGain')
+            self.__slider.setEnabled(True)
             self.__slider.blockSignals(True)
             self.__slider.setValue(int(alpha * 100))
             self.__slider.blockSignals(False)
+
         else:
             self.__slider.setEnabled(False)
 
@@ -1257,13 +1283,21 @@ class ImagePlaneManager(QWidget):
             item: QListWidgetItem = self.__image_list.item(i)
             nodes.append(item.data(Qt.UserRole))
 
+        if not cmds.objExists(self.camera()):
+            self.update_image_planes()
+            return
+
         base_depth: float = cmds.getAttr(f'{self.camera()}.nearClipPlane')
         for i, node in enumerate(nodes):
+            if not cmds.objExists(node):
+                _logger.error('Does not exists image plane: %s', node)
+                self.update_image_planes()
+                return
+
             cmds.setAttr(
                 f'{node}.depth',
                 base_depth + (i + 1) * base_depth / 10.0,
             )
-
         self.update_image_planes()
 
     @widgets.undo
@@ -1303,7 +1337,13 @@ class ImagePlaneManager(QWidget):
 
         target_cam: str = self.camera()
         image_planes: list[str] = []
+
         if target_cam:
+            if not cmds.objExists(self.camera()):
+                _logger.error('Does not exists camera: %s', self.camera())
+                self.update_requested.emit()
+                return
+
             cam_shapes: list[str] = (
                 cmds.listRelatives(target_cam, shapes=True, type='camera') or []
             )
@@ -1326,6 +1366,7 @@ class ImagePlaneManager(QWidget):
             row_widget = LayerItemWidget(node)
             row_widget.visibility_toggled.connect(self.on_visibility_toggled)
             row_widget.name_changed.connect(self.on_layer_name_changed)
+            row_widget.update_requested.connect(self.update_image_planes)
             self.__image_list.setItemWidget(item, row_widget)
 
             if image_plane in selected_nodes:
@@ -1338,6 +1379,10 @@ class ImagePlaneManager(QWidget):
         width: float = cmds.optionVar(query='freeImageWidth')  # type: ignore
         height: float = cmds.optionVar(query='freeImageHeight')  # type: ignore
         maintain_ratio: bool = cmds.optionVar(query='freeImageMR')  # type: ignore
+
+        if not cmds.objExists(self.camera()):
+            self.update_image_planes()
+            return
 
         image_plane: list[str] = cmds.imagePlane(
             camera=camera,
@@ -1554,7 +1599,9 @@ class MainWindow(widgets.BaseToolWidget):
             self.__image_plane_mgr.set_camera
         )
         self.__camera_mgr.camera_changed.connect(self.set_camera)
+        self.__camera_mgr.update_requested.connect(self.update_ui)
         self.__subtool_mgr.update_requested.connect(self.update_ui)
+        self.__image_plane_mgr.update_requested.connect(self.update_ui)
 
         # ----------------------------------------------------------------------
         # Move PySide Widget to Maya's UI
