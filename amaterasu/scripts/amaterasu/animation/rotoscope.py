@@ -17,6 +17,7 @@ try:
         QDragMoveEvent,
         QDropEvent,
         QWheelEvent,
+        QKeySequence,
     )
     from PySide2.QtWidgets import (
         QWidget,
@@ -30,6 +31,7 @@ try:
         QSlider,
         QLineEdit,
         QFileDialog,
+        QShortcut,
     )
 
     PYSIDE_VERSION: int = 2
@@ -44,6 +46,7 @@ except ImportError:
             QDragMoveEvent,
             QDropEvent,
             QWheelEvent,
+            QKeySequence,
         )
         from PySide6.QtWidgets import (
             QWidget,
@@ -57,6 +60,7 @@ except ImportError:
             QSlider,
             QLineEdit,
             QFileDialog,
+            QShortcut,
         )
 
         PYSIDE_VERSION = 6
@@ -78,6 +82,20 @@ __copyright__ = (
 )
 _logger: logger.Logger = logger.get_logger(__product__)
 
+DEFAULT_MAIN_PANEL_SIZE: list[tuple[int, int, int]] = [
+    (1, 80, 100),
+    (2, 20, 100),
+]
+DEFAULT_LEFT_PANEL_SIZE: list[tuple[int, int, int]] = [
+    (1, 100, 99),
+    (2, 100, 1),
+]
+DEFAULT_RIGHT_PANEL_SIZE: list[tuple[int, int, int]] = [
+    (1, 100, 1),
+    (2, 100, 29),
+    (3, 100, 70),
+]
+
 
 # ==============================================================================
 #
@@ -89,13 +107,13 @@ class Settings(parser.ToolSettings):
 
     window_geo: parser.Variant[str] = parser.Variant('')
     main_panel: parser.Variant[list[tuple[int, int, int]]] = parser.Variant(
-        [(1, 80, 100), (2, 20, 100)]
+        DEFAULT_MAIN_PANEL_SIZE
     )
     left_panel: parser.Variant[list[tuple[int, int, int]]] = parser.Variant(
-        [(1, 100, 99), (2, 100, 1)]
+        DEFAULT_LEFT_PANEL_SIZE
     )
     right_panel: parser.Variant[list[tuple[int, int, int]]] = parser.Variant(
-        [(1, 100, 1), (2, 100, 29), (3, 100, 70)]
+        DEFAULT_RIGHT_PANEL_SIZE
     )
 
     camera: parser.Variant[str] = parser.Variant('persp')
@@ -1547,6 +1565,17 @@ class MainWindow(widgets.BaseToolWidget):
         self.__camera_mgr: CameraManager = CameraManager(self)
         self.__image_plane_mgr: ImagePlaneManager = ImagePlaneManager(self)
 
+        # Bind the shortcut to a visible child widget instead of 'self'.
+        # The MainWindow loses focus after being docked into Maya's UI.
+        self.__toggle_shortcut: QShortcut = QShortcut(
+            QKeySequence('Ctrl+Space'),
+            self.__subtool_mgr,
+        )
+        self.__toggle_shortcut.setContext(Qt.WindowShortcut)
+        self.__main_panel_size: list[tuple[int, int, int]] = []
+        self.__left_panel_size: list[tuple[int, int, int]] = []
+        self.__is_toggle: bool = False
+
     # Override
     def show(self) -> None:
         '''Show'''
@@ -1602,6 +1631,7 @@ class MainWindow(widgets.BaseToolWidget):
         self.__camera_mgr.update_requested.connect(self.update_ui)
         self.__subtool_mgr.update_requested.connect(self.update_ui)
         self.__image_plane_mgr.update_requested.connect(self.update_ui)
+        self.__toggle_shortcut.activated.connect(self.toggle_ui_visibility)
 
         # ----------------------------------------------------------------------
         # Move PySide Widget to Maya's UI
@@ -1640,22 +1670,27 @@ class MainWindow(widgets.BaseToolWidget):
     # Override
     def save_settings(self) -> None:
         '''Save ui settings to file.'''
-
-        def convert_panel_size(panel: str) -> list[tuple[int, int, int]]:
-            '''Convert panel size'''
-            data: list[int] = cmds.paneLayout(panel, query=True, paneSize=True)  # type: ignore
-            return [
-                (index, data[i], data[i + 1])
-                for index, i in enumerate(range(0, len(data), 2), 1)
-            ]
-
         settings: Settings = Settings.instance(__name__, True)
         settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
-        settings.main_panel.set_value(convert_panel_size(self.__main_panel))
-        settings.left_panel.set_value(convert_panel_size(self.__left_panel))
-        settings.right_panel.set_value(convert_panel_size(self.__right_panel))
+        settings.main_panel.set_value(
+            self.convert_panel_size(self.__main_panel)
+        )
+        settings.left_panel.set_value(
+            self.convert_panel_size(self.__left_panel)
+        )
+        settings.right_panel.set_value(
+            self.convert_panel_size(self.__right_panel)
+        )
         settings.read_from_model_panel(self.__model_panel_name)
         settings.write()
+
+    def convert_panel_size(self, panel: str) -> list[tuple[int, int, int]]:
+        '''Convert panel size'''
+        data: list[int] = cmds.paneLayout(panel, query=True, paneSize=True)  # type: ignore
+        return [
+            (index, data[i], data[i + 1])
+            for index, i in enumerate(range(0, len(data), 2), 1)
+        ]
 
     def set_camera(self, camera: str) -> None:
         '''Switched camera'''
@@ -1671,6 +1706,41 @@ class MainWindow(widgets.BaseToolWidget):
             self.__model_panel_name, query=True, camera=True
         )  # type: ignore
         return camera
+
+    def toggle_ui_visibility(self) -> None:
+        '''Toggle UI Visibility'''
+        if not self.__is_toggle:
+            self.__main_panel_size = self.convert_panel_size(self.__main_panel)
+            self.__left_panel_size = self.convert_panel_size(self.__left_panel)
+            cmds.paneLayout(
+                self.__main_panel,
+                edit=True,
+                paneSize=[(1, 100, 100), (2, 0, 100)],
+            )
+
+            cmds.paneLayout(
+                self.__left_panel,
+                edit=True,
+                paneSize=[(1, 100, 100), (2, 100, 0)],
+            )
+
+        else:
+            # Prevent saving width as 0 when the UI is collapsed.
+            if self.__main_panel_size[1][1] == 0:
+                self.__main_panel_size = DEFAULT_MAIN_PANEL_SIZE
+
+            if self.__left_panel_size[1][2] == 0:
+                self.__left_panel_size = DEFAULT_LEFT_PANEL_SIZE
+
+            cmds.paneLayout(
+                self.__main_panel, edit=True, paneSize=self.__main_panel_size
+            )
+
+            cmds.paneLayout(
+                self.__left_panel, edit=True, paneSize=self.__left_panel_size
+            )
+
+        self.__is_toggle = not self.__is_toggle
 
     def update_ui(self) -> None:
         '''Update ui'''
