@@ -47,6 +47,7 @@ except ImportError:
             QDropEvent,
             QWheelEvent,
             QKeySequence,
+            QShortcut,
         )
         from PySide6.QtWidgets import (
             QWidget,
@@ -60,7 +61,6 @@ except ImportError:
             QSlider,
             QLineEdit,
             QFileDialog,
-            QShortcut,
         )
 
         PYSIDE_VERSION = 6
@@ -1726,10 +1726,10 @@ class MainWindow(widgets.BaseToolWidget):
 
         else:
             # Prevent saving width as 0 when the UI is collapsed.
-            if self.__main_panel_size[1][1] == 0:
+            if not self.__main_panel_size or self.__main_panel_size[1][1] == 0:
                 self.__main_panel_size = DEFAULT_MAIN_PANEL_SIZE
 
-            if self.__left_panel_size[1][2] == 0:
+            if not self.__left_panel_size or self.__left_panel_size[1][2] == 0:
                 self.__left_panel_size = DEFAULT_LEFT_PANEL_SIZE
 
             cmds.paneLayout(
