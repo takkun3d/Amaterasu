@@ -5,7 +5,6 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
-import logging
 import os
 import time
 import re
@@ -99,7 +98,7 @@ except ImportError:
             QFileIconProvider,
         )
 from maya import cmds, mel
-from ..lib import parser, widgets, utility
+from ..lib import logger, parser, widgets, utility
 
 # ==============================================================================
 #
@@ -112,7 +111,7 @@ __doc__ = 'Manage external files.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 FOLDER_ICON: str = 'view/a_folder.png'
 BAD_ICON: str = 'view/a_close.png'

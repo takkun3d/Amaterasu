@@ -4,10 +4,9 @@
 #
 # ==============================================================================
 from __future__ import annotations
-import logging
 import math
 from maya import cmds
-from ..lib import utility
+from ..lib import logger, utility
 
 
 # ==============================================================================
@@ -21,7 +20,7 @@ __doc__ = 'Duplicate face from selected face.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 
 # ==============================================================================

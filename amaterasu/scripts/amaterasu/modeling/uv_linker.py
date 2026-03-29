@@ -5,7 +5,6 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING
-import logging
 
 try:
     from PySide2.QtCore import Qt, Signal, QItemSelectionModel, QModelIndex
@@ -34,7 +33,7 @@ except ImportError:
             QPushButton,
         )
 from maya import cmds
-from ..lib import parser, widgets
+from ..lib import logger, parser, widgets
 
 
 # ==============================================================================
@@ -48,7 +47,7 @@ __doc__ = 'Connect uv links from multiple specified nodes.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 
 # ==============================================================================

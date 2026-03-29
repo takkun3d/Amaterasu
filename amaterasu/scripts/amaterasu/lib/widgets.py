@@ -2059,29 +2059,57 @@ class BaseToolWidget(QWidget):
         else:
             module_name: str = self.__module__
             class_name: str = self.__class__.__name__
-            uuid4: str = str(uuid.uuid4())
+            uuid4: str = uuid.uuid4().hex
             self.setObjectName(f'{module_name}_{class_name}_{uuid4}')
+
+        self.__workspace_name: str = f'{self.objectName()}WorkspaceControl'
+        self.__workspace_ptr: int | None = None
 
     # override
     def show(self) -> None:
         '''show[override]'''
-        workspace: str = f'{self.objectName()}WorkspaceControl'
+        self.initialize_workspace()
+
+        parent_ptr: int | None = self.workspace_pointer()
+        self_ptr: int = int(OpenMayaUI.MQtUtil.findControl(self.objectName()))
+        OpenMayaUI.MQtUtil.addWidgetToMayaLayout(self_ptr, parent_ptr)
+        QWidget.setVisible(self, True)
+
+    # override
+    def close(self) -> bool:
+        '''close[override]'''
+        parent: QObject = self.parent()
+        if parent:
+            workspace: str = parent.objectName()
+            if cmds.workspaceControl(workspace, query=True, exists=True):
+                cmds.deleteUI(workspace)
+                if workspace in WORKSPACE_WIDGETS:
+                    del WORKSPACE_WIDGETS[workspace]
+                return True
+
+        return QWidget.close(self)
+
+    def workspace_name(self) -> str:
+        '''Returns workspace name'''
+        return self.__workspace_name
+
+    def workspace_pointer(self) -> int | None:
+        '''Returns workspace pointer'''
+        return self.__workspace_ptr
+
+    def workspace_window(self) -> str | None:
+        '''Returns workspace window name'''
+        ptr: int | None = self.workspace_pointer()
+        if ptr is None:
+            return None
+
+        return OpenMayaUI.MQtUtil.fullName(self.workspace_pointer())
+
+    def initialize_workspace(self) -> bool:
+        '''Initialize workspace in Maya'''
+        result: bool = False
+        workspace: str = self.workspace_name()
         if not cmds.workspaceControl(workspace, query=True, exists=True):
-            entry_func: str = 'main'
-            module: types.ModuleType | None = sys.modules.get(self.__module__)
-            if module and hasattr(module, 'option'):
-                entry_func = 'option'
-
-            ui_script: str = (
-                f'import {self.__module__};'
-                f'{self.__module__}.{entry_func}(\'{self.objectName()}\')'
-            )
-
-            close_callback: str = (
-                f'import {__name__};'
-                f'{__name__}.BaseToolWidget.close_workspace(\'{workspace}\')'
-            )
-
             workspace = cmds.workspaceControl(
                 workspace,
                 label=self.windowTitle(),
@@ -2098,29 +2126,37 @@ class BaseToolWidget(QWidget):
             cmds.workspaceControl(
                 workspace,
                 edit=True,
-                uiScript=ui_script,
-                closeCommand=close_callback,
+                uiScript=self.ui_script_command(),
+                closeCommand=self.close_command(),
             )
+            self.__workspace_name = workspace
+            result = True
 
-        parent_ptr: int = int(OpenMayaUI.MQtUtil.getCurrentParent())
-        self_ptr: int = int(OpenMayaUI.MQtUtil.findControl(self.objectName()))
-        OpenMayaUI.MQtUtil.addWidgetToMayaLayout(self_ptr, parent_ptr)
-        QWidget.setVisible(self, True)
-        WORKSPACE_WIDGETS[workspace] = self
+        self.__workspace_ptr = int(OpenMayaUI.MQtUtil.getCurrentParent())
+        WORKSPACE_WIDGETS[self.workspace_name()] = self
+        return result
 
-    # override
-    def close(self) -> bool:
-        '''close[override]'''
-        parent: QObject = self.parent()
-        if parent:
-            workspace: str = parent.objectName()
-            if cmds.workspaceControl(workspace, query=True, exists=True):
-                cmds.deleteUI(workspace)
-                if workspace in WORKSPACE_WIDGETS:
-                    del WORKSPACE_WIDGETS[workspace]
-                return True
+    def ui_script_command(self) -> str:
+        '''Returns ui script command for cmds.workspaceControl'''
+        entry_func: str = 'main'
+        module: types.ModuleType | None = sys.modules.get(self.__module__)
+        if module and hasattr(module, 'option'):
+            entry_func = 'option'
 
-        return QWidget.close(self)
+        command: str = (
+            f'import {self.__module__};'
+            f'{self.__module__}.{entry_func}(\'{self.objectName()}\')'
+        )
+        return command
+
+    def close_command(self) -> str:
+        '''Return close command for cmds.workspaceControl'''
+        entry_func: str = 'BaseToolWidget.close_workspace'
+        command: str = (
+            f'import {__name__};'
+            f'{__name__}.{entry_func}(\'{self.workspace_name()}\')'
+        )
+        return command
 
     @staticmethod
     def close_workspace(workspace: str) -> None:

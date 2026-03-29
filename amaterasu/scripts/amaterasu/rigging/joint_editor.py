@@ -5,7 +5,6 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
-import logging
 from functools import partial
 from itertools import product
 
@@ -34,7 +33,7 @@ except ImportError:
             QPushButton,
         )
 from maya import cmds
-from ..lib import parser, utility, widgets
+from ..lib import logger, parser, utility, widgets
 
 
 # ==============================================================================
@@ -48,7 +47,7 @@ __doc__ = 'his tool helps to edit joint.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 ICON_SIZE: QSize = QSize(24, 24)
 

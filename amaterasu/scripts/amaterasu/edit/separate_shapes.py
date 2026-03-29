@@ -5,8 +5,8 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import Any
-import logging
 from maya import cmds
+from ..lib import logger
 
 
 # ==============================================================================
@@ -20,7 +20,7 @@ __doc__ = 'Separate Shapes from selection.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 
 # ==============================================================================
@@ -37,16 +37,19 @@ _logger: logging.Logger = logging.getLogger(__product__)
 # ==============================================================================
 def apply(source_nodes: list[str]) -> bool:
     '''Separate shapes.'''
+    result: list[bool] = []
     for source_node in source_nodes:
         shapes: list[str] | None = cmds.listRelatives(
             source_node, shapes=True, path=True
         )
         if not shapes:
             _logger.warning('Does not exists shape : %s', source_node)
+            result.append(False)
             continue
 
         if len(source_node) <= 1:
             _logger.warning('There is only one shape : %s', source_node)
+            result.append(False)
             continue
 
         parent_nodes: list[str] | None = cmds.listRelatives(
@@ -67,7 +70,9 @@ def apply(source_nodes: list[str]) -> bool:
             cmds.parent(shape, transform, addObject=True, shape=True)
             cmds.parent(shape, removeObject=True, shape=True)
 
-    return True
+        result.append(True)
+
+    return all(result)
 
 
 def main() -> None:
@@ -77,5 +82,6 @@ def main() -> None:
         _logger.error('Select objects to separate shapes.')
         return
 
-    apply(selection)
-    _logger.info('Done.')
+    result: bool = apply(selection)
+    if result:
+        _logger.info('Done.')

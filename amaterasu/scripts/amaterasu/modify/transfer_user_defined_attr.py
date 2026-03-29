@@ -5,7 +5,6 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
-import logging
 import json
 
 try:
@@ -59,7 +58,7 @@ except ImportError:
             QVBoxLayout,
         )
 from maya import cmds
-from ..lib import parser, widgets
+from ..lib import logger, parser, widgets
 
 # ==============================================================================
 #
@@ -72,7 +71,7 @@ __doc__ = 'This tool transfer user defined attribute from specific nodes.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 MIME_TYPE: str = 'application/x-amaterasu-tuda-data'
 

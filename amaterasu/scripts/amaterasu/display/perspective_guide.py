@@ -5,7 +5,6 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING
-import logging
 from itertools import product
 
 try:
@@ -22,7 +21,7 @@ except ImportError:
             QDoubleSpinBox,
         )
 from maya import cmds
-from ..lib import parser, widgets
+from ..lib import logger, parser, widgets
 from ..edit import combine_shapes
 from ..modify import lock_hide_transform
 from ..modify import history_visibility
@@ -40,7 +39,7 @@ __doc__ = 'Generates perspective grids and an eye level guide for the selected c
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 EL_COLOR: tuple[float, float, float] = (0.2, 0.7, 1.0)
 VP_COLOR: tuple[float, float, float] = (0.65, 0.2, 1.0)

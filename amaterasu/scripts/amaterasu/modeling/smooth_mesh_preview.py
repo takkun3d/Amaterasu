@@ -5,7 +5,6 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING
-import logging
 import dataclasses
 
 try:
@@ -17,7 +16,7 @@ except ImportError:
         from PySide6.QtCore import Qt, Slot
         from PySide6.QtWidgets import QWidget, QComboBox, QCheckBox, QSpinBox
 from maya import cmds
-from ..lib import parser, widgets
+from ..lib import logger, parser, widgets
 
 
 # ==============================================================================
@@ -31,7 +30,7 @@ __doc__ = 'Set parameter of smooth mesh preview to selected it.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 
 # ==============================================================================

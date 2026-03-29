@@ -4,9 +4,9 @@
 #
 # ==============================================================================
 from __future__ import annotations
-import logging
 import os
 from maya import cmds
+from ..lib import logger
 import amaterasu
 
 # ==============================================================================
@@ -15,12 +15,12 @@ import amaterasu
 #
 # ==============================================================================
 __product__: str = 'Camera Rig'
-__version__: str = '1.30'
+__version__: str = '1.31'
 __doc__ = 'Camera rig.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 
 # ==============================================================================
@@ -35,12 +35,12 @@ _logger: logging.Logger = logging.getLogger(__product__)
 # Functions
 #
 # ==============================================================================
-def main() -> None:
+def main() -> str:
     '''Import camera rig data.'''
 
     # TODO: Create camera rig by script.
-    cmds.file(
-        os.path.join(amaterasu.RESOURCE_PATH, 'rig', 'camera_rig_v03.ma'),
+    new_nodes: list[str] = cmds.file(
+        os.path.join(amaterasu.RESOURCE_PATH, 'rig', 'camera_rig.ma'),
         i=True,
         type='mayaAscii',
         ignoreVersion=True,
@@ -48,4 +48,10 @@ def main() -> None:
         renamingPrefix='CameraRig',
         options='v=0;',
         preserveReferences=True,
+        returnNewNodes=True,
+    )  # type: ignore
+    new_cam_shapes: list[str] = cmds.ls(*new_nodes, type='camera')
+    new_cam: list[str] = cmds.listRelatives(
+        new_cam_shapes[0], parent=True, fullPath=True
     )
+    return new_cam[0]

@@ -34,7 +34,7 @@ from . import menu
 #
 # ==============================================================================
 __product__: str = 'Amaterasu'
-__version__: int = 20260301
+__version__: int = 20260329
 __doc__ = '''
 Amaterasu is a toolset for Autodesk Maya.
 Amaterasu provides a set of convenient tools to your contents creation process.

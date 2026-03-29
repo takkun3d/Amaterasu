@@ -5,7 +5,6 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
-import logging
 import os
 import json
 import datetime
@@ -52,7 +51,7 @@ except ImportError:
         )
 
 from maya import cmds
-from ..lib import parser, utility, widgets
+from ..lib import logger, parser, utility, widgets
 import amaterasu
 
 # ==============================================================================
@@ -66,7 +65,7 @@ __doc__ = 'This tool manage poses and animation.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
 )
-_logger: logging.Logger = logging.getLogger(__product__)
+_logger: logger.Logger = logger.get_logger(__product__)
 
 ROOT_DIR: str = os.path.join(amaterasu.USER_DATA_DIR, 'anim_library')
 ICON_SIZE_RANGE: tuple[int, int] = (64, 256)
