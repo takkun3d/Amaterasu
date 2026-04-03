@@ -5,6 +5,7 @@
 # ==============================================================================
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
+import re
 
 try:
     from PySide2.QtCore import Qt, QSize
@@ -72,6 +73,7 @@ class MainWindow(widgets.ToolWidget):
         super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
         self.resize(400, 200)
+        self.__current_geometries: list[str] = []
 
         main_layout: QVBoxLayout = QVBoxLayout(self.option_widget())
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -135,12 +137,12 @@ class MainWindow(widgets.ToolWidget):
         self.__table.clear()
 
         selection: list[str] = cmds.ls(selection=True, type='transform')
-        if not selection:
-            return
+        if selection:
+            self.__current_geometries = selection
 
         all_uvsets: set[str] = set()
         mesh_data: dict[str, Any] = {}
-        for node in selection:
+        for node in self.__current_geometries:
             shapes: list[str] = (
                 cmds.listRelatives(
                     node, shapes=True, type='mesh', noIntermediate=True
@@ -160,19 +162,60 @@ class MainWindow(widgets.ToolWidget):
             current_uv_sets: list[str] = cmds.polyUVSet(
                 shape, query=True, currentUVSet=True
             )  # type: ignore
-            current_uv_set: str = current_uv_sets[0] if current_uv_sets else ''
+            current: str = current_uv_sets[0] if current_uv_sets else ''
+
+            has_error: bool = False
+            if not uv_sets:  # Does not exists uv sets
+                has_error = True
+
+            elif 'map1' not in uv_sets:  # Does not exists map1
+                has_error = True
+
+            elif uv_sets[0] != 'map1':  # Map1 is not at index 0
+                has_error = True
+
+            uv_info: dict[str, int] = {}
+            for uv_name, index in zip(uv_sets, uv_indices):
+                try:
+                    num_uvs: int = cmds.getAttr(
+                        f'{shape}.uvSet[{index}].uvSetPoints', size=True
+                    )
+                    uv_info[uv_name] = 1 if num_uvs else 0
+
+                except ValueError:
+                    uv_info[uv_name] = 0
+
+                # Invalid uvset name.
+                if not uv_name or not re.match(r'^[a-zA-Z0-9_]+$', uv_name):
+                    has_error = True
+                    break
 
             all_uvsets.update(uv_sets)
-            mesh_data[node] = {'current': current_uv_set}
+            mesh_data[node] = {
+                'uv_info': uv_info,
+                'current': current,
+                'has_error': has_error,
+            }
 
         geometrys: list[str] = [geo for geo in mesh_data]
         self.__table.setRowCount(len(geometrys) + 1)
 
         unique_uvsets: list[str] = sorted(list(all_uvsets))
+        if 'map1' in unique_uvsets:
+            unique_uvsets.remove('map1')
+            unique_uvsets.insert(0, 'map1')
+
         self.__table.setColumnCount(len(unique_uvsets) + 1)
 
-        for row, geo in enumerate(geometrys):
-            item: QTableWidgetItem = QTableWidgetItem(geo)
+        for row, geometry in enumerate(geometrys):
+            current = mesh_data[geometry]['current']
+            uv_info = mesh_data[geometry]['uv_info']
+            has_error = mesh_data[geometry]['has_error']
+
+            item: QTableWidgetItem = QTableWidgetItem(geometry)
+            item.setData(Qt.UserRole, has_error)
+            if has_error:
+                item.setText(f'[!] {geometry}')
             self.__table.setVerticalHeaderItem(row, item)
 
             for col, uvset in enumerate(unique_uvsets):
@@ -181,6 +224,13 @@ class MainWindow(widgets.ToolWidget):
 
                 item = QTableWidgetItem()
                 item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+                if uvset in uv_info:
+                    item.setData(Qt.UserRole, uv_info[uvset])
+                    item.setText(f'{uv_info[uvset]}')
+                else:
+                    item.setData(Qt.UserRole, -1)
+                    item.setText('-1')
+
                 self.__table.setItem(row, col, item)
 
         item = QTableWidgetItem('+')
