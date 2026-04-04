@@ -7,6 +7,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 import re
 
+from PySide2.QtWidgets import QTableWidgetItem
+
 try:
     from PySide2.QtCore import Qt, QSize
     from PySide2.QtWidgets import (
@@ -84,6 +86,7 @@ class MainWindow(widgets.ToolWidget):
 
         self.__filter: QLineEdit = QLineEdit(self)
         self.__filter.setPlaceholderText('Search ...')
+        self.__filter.textChanged.connect(self.set_filter)
         header_layout.addWidget(self.__filter)
 
         button: widgets.IconButton = widgets.IconButton(self)
@@ -103,6 +106,7 @@ class MainWindow(widgets.ToolWidget):
         header_v: QHeaderView = self.__table.verticalHeader()
 
         main_layout.addWidget(self.__table)
+        self.update_ui()
 
     # override
     def load_settings(self) -> None:
@@ -130,6 +134,18 @@ class MainWindow(widgets.ToolWidget):
         widgets.AboutDialog.info(
             self, __product__, __version__, __copyright__, __doc__
         )
+
+    def set_filter(self, text: str) -> None:
+        '''Set filter to table'''
+        text = text.lower()
+        for row in range(self.__table.rowCount()):
+            if row == self.__table.rowCount() - 1:
+                self.__table.setRowHidden(row, False)
+                continue
+
+            header_item: QTableWidgetItem = self.__table.verticalHeaderItem(row)
+            geometry: str = header_item.text().lower()
+            self.__table.setRowHidden(row, text not in geometry)
 
     def update_ui(self) -> None:
         '''Update UI'''
@@ -239,6 +255,7 @@ class MainWindow(widgets.ToolWidget):
         item = QTableWidgetItem('+')
         self.__table.setHorizontalHeaderItem(len(unique_uvsets), item)
 
+        self.set_filter(self.__filter.text())
         self.__table.blockSignals(False)
 
 
