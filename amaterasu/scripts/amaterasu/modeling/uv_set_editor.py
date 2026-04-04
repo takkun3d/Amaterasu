@@ -8,7 +8,15 @@ from typing import TYPE_CHECKING, Any
 import re
 
 try:
-    from PySide2.QtCore import Qt, QSize
+    from PySide2.QtCore import (
+        QObject,
+        Qt,
+        QSize,
+        QRect,
+        QModelIndex,
+        QAbstractItemModel,
+    )
+    from PySide2.QtGui import QIcon, QPainter, QColor
     from PySide2.QtWidgets import (
         QWidget,
         QVBoxLayout,
@@ -17,11 +25,22 @@ try:
         QTableWidget,
         QHeaderView,
         QTableWidgetItem,
+        QStyledItemDelegate,
+        QStyleOptionViewItem,
+        QStyle,
     )
 
 except ImportError:
     if not TYPE_CHECKING:
-        from PySide6.QtCore import Qt, QSize
+        from PySide6.QtCore import (
+            QObject,
+            Qt,
+            QSize,
+            QRect,
+            QModelIndex,
+            QAbstractItemModel,
+        )
+        from PySide6.QtGui import QIcon, QPainter, QColor
         from PySide6.QtWidgets import (
             QWidget,
             QVBoxLayout,
@@ -30,6 +49,9 @@ except ImportError:
             QTableWidget,
             QHeaderView,
             QTableWidgetItem,
+            QStyledItemDelegate,
+            QStyleOptionViewItem,
+            QStyle,
         )
 from maya import cmds, mel
 from ..lib import logger, parser, widgets
@@ -58,6 +80,85 @@ class Settings(parser.ToolSettings):
     '''Settings for tool.'''
 
     window_geo: parser.Variant[str] = parser.Variant('')
+
+
+class UvSetDelegate(QStyledItemDelegate):
+    '''UV Set Delegate'''
+
+    icon: QIcon = widgets.icon_from_file_name('a_uv_set.png')
+    empty_icon: QIcon = widgets.icon_from_file_name('a_empty_uv_set.png')
+
+    def __init__(self, parent: QObject | None = None) -> None:
+        '''Initialize'''
+        super().__init__(parent)
+
+    def paint(
+        self,
+        painter: QPainter,
+        option: QStyleOptionViewItem,
+        index: QModelIndex,
+    ) -> None:
+        '''paint (override)'''
+        data: list[bool | int] = index.data(Qt.UserRole)
+        if not data:
+            super().paint(painter, option, index)
+            return
+
+        is_current: bool = data[0]
+        status: int = data[1]
+
+        painter.save()
+        if option.state & QStyle.State_Selected:
+            painter.fillRect(option.rect, option.palette.highlight())
+
+        if is_current:
+            painter.fillRect(option.rect, QColor(100, 166, 82))
+
+        if status == 1:
+            self.icon.paint(painter, option.rect, Qt.AlignCenter)
+
+        elif status == 0:
+            self.empty_icon.paint(painter, option.rect, Qt.AlignCenter)
+
+        painter.restore()
+
+
+class UvSetObjectHeader(QHeaderView):
+    '''Uv Set Object Header'''
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        '''Initialize'''
+        super().__init__(Qt.Vertical, parent)
+
+    def paintSection(
+        self, painter: QPainter, rect: QRect, logicalIndex: int
+    ) -> None:
+        '''paintSection (override)'''
+        model: QAbstractItemModel = self.model()
+        if not model:
+            super().paintSection(painter, rect, logicalIndex)
+            return
+
+        if self.orientation() == Qt.Horizontal:
+            super().paintSection(painter, rect, logicalIndex)
+            return
+
+        has_error: bool = model.headerData(
+            logicalIndex, Qt.Vertical, Qt.UserRole
+        )
+        if not has_error:
+            super().paintSection(painter, rect, logicalIndex)
+            return
+
+        painter.save()
+        painter.fillRect(rect, QColor(255, 100, 100))
+        painter.setPen(QColor(45, 45, 45))
+        painter.drawText(
+            rect.adjusted(4, 0, -4, 0),
+            Qt.AlignLeft | Qt.AlignVCenter,
+            model.headerData(logicalIndex, self.orientation(), Qt.DisplayRole),
+        )
+        painter.restore()
 
 
 class MainWindow(widgets.ToolWidget):
@@ -104,7 +205,11 @@ class MainWindow(widgets.ToolWidget):
         header_h.setSectionResizeMode(QHeaderView.Interactive)
         header_h.setDefaultSectionSize(80)
 
-        header_v: QHeaderView = self.__table.verticalHeader()
+        header_v: UvSetObjectHeader = UvSetObjectHeader(self.__table)
+        self.__table.setVerticalHeader(header_v)
+
+        self.__delegate: UvSetDelegate = UvSetDelegate(self.__table)
+        self.__table.setItemDelegate(self.__delegate)
 
         self.load_from_selection()
 
@@ -173,7 +278,7 @@ class MainWindow(widgets.ToolWidget):
         row: int = item.row()
         geometry: str = self.__table.verticalHeaderItem(row).text()
         uv_name: str = self.__table.horizontalHeaderItem(item.column()).text()
-        data: list[bool, int] = item.data(Qt.UserRole)
+        data: list[bool | int] = item.data(Qt.UserRole)
         is_current: bool = data[0]
         status: int = data[1]
 
@@ -202,7 +307,6 @@ class MainWindow(widgets.ToolWidget):
             data = _item.data(Qt.UserRole)
             data[0] = uv_name == _uv_name
             _item.setData(Qt.UserRole, data)
-            _item.setText(f'{data[0]}, {data[1]}')
 
     def load_from_selection(self) -> None:
         '''Load from selection'''
@@ -291,8 +395,6 @@ class MainWindow(widgets.ToolWidget):
 
             item: QTableWidgetItem = QTableWidgetItem(geometry)
             item.setData(Qt.UserRole, has_error)
-            if has_error:
-                item.setText(f'[!] {geometry}')
             self.__table.setVerticalHeaderItem(row, item)
 
             for col, uvset in enumerate(unique_uvsets):
@@ -304,10 +406,8 @@ class MainWindow(widgets.ToolWidget):
                 item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
                 if uvset in uv_info:
                     item.setData(Qt.UserRole, [is_current, uv_info[uvset]])
-                    item.setText(f'{is_current}, {uv_info[uvset]}')
                 else:
                     item.setData(Qt.UserRole, [False, -1])
-                    item.setText('False, -1')
 
                 self.__table.setItem(row, col, item)
 
