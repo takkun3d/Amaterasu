@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 import re
 from functools import partial
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import IntEnum
 
 try:
@@ -489,7 +489,7 @@ class MainWindow(widgets.ToolWidget):
                 _item.column()
             ).text()
             data = _item.data(Qt.UserRole)
-            data.is_current = uv_name == _uv_name
+            data = replace(data, is_current=(uv_name == _uv_name))
             _item.setData(Qt.UserRole, data)
 
     @widgets.undo
@@ -869,7 +869,7 @@ class MainWindow(widgets.ToolWidget):
             geometry: str = self.__table.verticalHeaderItem(row).text()
             uv_set: str = self.__table.horizontalHeaderItem(col).text()
 
-            data.is_copied = True
+            data = replace(data, is_copied=True)
             item.setData(Qt.UserRole, data)
 
             # Row and column are relative positions.
@@ -959,7 +959,7 @@ class MainWindow(widgets.ToolWidget):
                 if not data:
                     continue
 
-                data.is_copied = False
+                data = replace(data, is_copied=False)
                 item.setData(Qt.UserRole, data)
 
     def remove_geometry(self, rows: list[int]) -> None:
