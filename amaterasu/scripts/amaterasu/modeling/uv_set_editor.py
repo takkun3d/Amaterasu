@@ -7,8 +7,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 import re
 
-from PySide2.QtWidgets import QTableWidgetItem
-
 try:
     from PySide2.QtCore import Qt, QSize
     from PySide2.QtWidgets import (
@@ -33,7 +31,7 @@ except ImportError:
             QHeaderView,
             QTableWidgetItem,
         )
-from maya import cmds
+from maya import cmds, mel
 from ..lib import logger, parser, widgets
 
 
@@ -91,13 +89,16 @@ class MainWindow(widgets.ToolWidget):
 
         button: widgets.IconButton = widgets.IconButton(self)
         button.set_icon(widgets.icon_from_file_name('a_update.png'))
-        button.clicked.connect(self.update_ui)
+        button.clicked.connect(self.load_from_selection)
         header_layout.addWidget(button)
 
         self.__table: QTableWidget = QTableWidget(self)
         self.__table.setSelectionBehavior(QTableWidget.SelectItems)
         self.__table.setSelectionMode(QTableWidget.ExtendedSelection)
         self.__table.setIconSize(QSize(24, 24))
+        self.__table.itemSelectionChanged.connect(self.selection_changed)
+        self.__table.itemDoubleClicked.connect(self.double_clicked)
+        main_layout.addWidget(self.__table)
 
         header_h: QHeaderView = self.__table.horizontalHeader()
         header_h.setSectionResizeMode(QHeaderView.Interactive)
@@ -105,8 +106,7 @@ class MainWindow(widgets.ToolWidget):
 
         header_v: QHeaderView = self.__table.verticalHeader()
 
-        main_layout.addWidget(self.__table)
-        self.update_ui()
+        self.load_from_selection()
 
     # override
     def load_settings(self) -> None:
@@ -147,14 +147,75 @@ class MainWindow(widgets.ToolWidget):
             geometry: str = header_item.text().lower()
             self.__table.setRowHidden(row, text not in geometry)
 
+    @widgets.undo
+    def selection_changed(self) -> None:
+        '''Selection changed at table'''
+        selected_items: list[QTableWidgetItem] = self.__table.selectedItems()
+        if not selected_items:
+            return
+
+        geometries: list[str] = []
+        processed_rows: set[int] = set()
+        for item in selected_items:
+            row: int = item.row()
+            if row in processed_rows:
+                continue
+
+            processed_rows.add(row)
+            geometries.append(self.__table.verticalHeaderItem(row).text())
+
+        if geometries:
+            cmds.select(*geometries)
+
+    @widgets.undo
+    def double_clicked(self, item: QTableWidgetItem) -> None:
+        '''Double clicked item at table'''
+        row: int = item.row()
+        geometry: str = self.__table.verticalHeaderItem(row).text()
+        uv_name: str = self.__table.horizontalHeaderItem(item.column()).text()
+        data: list[bool, int] = item.data(Qt.UserRole)
+        is_current: bool = data[0]
+        status: int = data[1]
+
+        if not cmds.objExists(geometry):
+            _logger.error('Does not exists %s,', geometry)
+            return
+
+        if status == -1:
+            _logger.error(
+                'Cannot open: %s does not exist on %s', uv_name, geometry
+            )
+            return
+
+        elif status == 0:
+            _logger.warning('%s is empty uv on %s.', uv_name, geometry)
+
+        cmds.select(geometry)
+        cmds.polyUVSet(geometry, currentUVSet=True, uvSet=uv_name)
+        mel.eval('TextureViewWindow;')
+
+        for col in range(self.__table.columnCount() - 1):
+            _item: QTableWidgetItem = self.__table.item(row, col)
+            _uv_name: str = self.__table.horizontalHeaderItem(
+                _item.column()
+            ).text()
+            data = _item.data(Qt.UserRole)
+            data[0] = uv_name == _uv_name
+            _item.setData(Qt.UserRole, data)
+            _item.setText(f'{data[0]}, {data[1]}')
+
+    def load_from_selection(self) -> None:
+        '''Load from selection'''
+        selection: list[str] = cmds.ls(selection=True, type='transform')
+        if selection:
+            self.__current_geometries = selection
+
+        self.update_ui()
+
     def update_ui(self) -> None:
         '''Update UI'''
         self.__table.blockSignals(True)
         self.__table.clear()
-
-        selection: list[str] = cmds.ls(selection=True, type='transform')
-        if selection:
-            self.__current_geometries = selection
 
         all_uvsets: set[str] = set()
         mesh_data: dict[str, Any] = {}
@@ -213,8 +274,8 @@ class MainWindow(widgets.ToolWidget):
                 'has_error': has_error,
             }
 
-        geometrys: list[str] = [geo for geo in mesh_data]
-        self.__table.setRowCount(len(geometrys) + 1)
+        geometries: list[str] = [geo for geo in mesh_data]
+        self.__table.setRowCount(len(geometries) + 1)
 
         unique_uvsets: list[str] = sorted(list(all_uvsets))
         if 'map1' in unique_uvsets:
@@ -223,7 +284,7 @@ class MainWindow(widgets.ToolWidget):
 
         self.__table.setColumnCount(len(unique_uvsets) + 1)
 
-        for row, geometry in enumerate(geometrys):
+        for row, geometry in enumerate(geometries):
             current = mesh_data[geometry]['current']
             uv_info = mesh_data[geometry]['uv_info']
             has_error = mesh_data[geometry]['has_error']
@@ -235,22 +296,30 @@ class MainWindow(widgets.ToolWidget):
             self.__table.setVerticalHeaderItem(row, item)
 
             for col, uvset in enumerate(unique_uvsets):
+                is_current: bool = uvset == current
                 item = QTableWidgetItem(uvset)
                 self.__table.setHorizontalHeaderItem(col, item)
 
                 item = QTableWidgetItem()
                 item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
                 if uvset in uv_info:
-                    item.setData(Qt.UserRole, uv_info[uvset])
-                    item.setText(f'{uv_info[uvset]}')
+                    item.setData(Qt.UserRole, [is_current, uv_info[uvset]])
+                    item.setText(f'{is_current}, {uv_info[uvset]}')
                 else:
-                    item.setData(Qt.UserRole, -1)
-                    item.setText('-1')
+                    item.setData(Qt.UserRole, [False, -1])
+                    item.setText('False, -1')
 
                 self.__table.setItem(row, col, item)
 
+        for row in range(self.__table.rowCount()):
+            for col in range(self.__table.columnCount()):
+                if row == len(geometries) or col == len(unique_uvsets):
+                    item = QTableWidgetItem('')
+                    item.setFlags(Qt.NoItemFlags)
+                    self.__table.setItem(row, col, item)
+
         item = QTableWidgetItem('+')
-        self.__table.setVerticalHeaderItem(len(geometrys), item)
+        self.__table.setVerticalHeaderItem(len(geometries), item)
 
         item = QTableWidgetItem('+')
         self.__table.setHorizontalHeaderItem(len(unique_uvsets), item)
