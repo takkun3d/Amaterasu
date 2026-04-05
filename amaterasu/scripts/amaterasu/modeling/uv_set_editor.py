@@ -217,50 +217,24 @@ class UvSetObjectHeader(QHeaderView):
         painter.restore()
 
 
-class MainWindow(widgets.ToolWidget):
-    '''Tool main window'''
+class UvSetTableWidget(QTableWidget):
+    '''UV Set Table Widget'''
 
-    def __init__(
-        self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-        unique_id: str = '',
-    ) -> None:
-        '''Initialize widget.'''
-        super().__init__(parent, flag, unique_id)
-        self.setWindowTitle(__product__)
-        self.resize(400, 200)
+    def __init__(self, parent: QWidget | None = None) -> None:
+        '''Initialize'''
+        super().__init__(parent)
         self.__current_geometries: list[str] = []
         self.__copied_cells_data: list[tuple[int, int, str, str]] = []
 
-        main_layout: QVBoxLayout = QVBoxLayout(self.option_widget())
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(2)
+        self.setSelectionBehavior(QTableWidget.SelectItems)
+        self.setSelectionMode(QTableWidget.ExtendedSelection)
+        self.setIconSize(QSize(24, 24))
+        self.itemSelectionChanged.connect(self.selection_changed)
+        self.itemDoubleClicked.connect(self.show_uv_editor)
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
 
-        header_layout: QHBoxLayout = QHBoxLayout(self)
-        main_layout.addLayout(header_layout)
-
-        self.__filter: QLineEdit = QLineEdit(self)
-        self.__filter.setPlaceholderText('Search ...')
-        self.__filter.textChanged.connect(self.set_filter)
-        header_layout.addWidget(self.__filter)
-
-        button: widgets.IconButton = widgets.IconButton(self)
-        button.set_icon(widgets.icon_from_file_name('a_update.png'))
-        button.clicked.connect(self.load_from_selection)
-        header_layout.addWidget(button)
-
-        self.__table: QTableWidget = QTableWidget(self)
-        self.__table.setSelectionBehavior(QTableWidget.SelectItems)
-        self.__table.setSelectionMode(QTableWidget.ExtendedSelection)
-        self.__table.setIconSize(QSize(24, 24))
-        self.__table.itemSelectionChanged.connect(self.selection_changed)
-        self.__table.itemDoubleClicked.connect(self.show_uv_editor)
-        self.__table.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.__table.customContextMenuRequested.connect(self.show_context_menu)
-        main_layout.addWidget(self.__table)
-
-        header_h: QHeaderView = self.__table.horizontalHeader()
+        header_h: QHeaderView = self.horizontalHeader()
         header_h.setSectionResizeMode(QHeaderView.Interactive)
         header_h.setDefaultSectionSize(80)
         header_h.sectionClicked.connect(self.create_uv_set)
@@ -272,60 +246,31 @@ class MainWindow(widgets.ToolWidget):
         header_v.sectionClicked.connect(self.add_geometry)
         header_v.setContextMenuPolicy(Qt.CustomContextMenu)
         header_v.customContextMenuRequested.connect(self.geometry_context_menu)
-        self.__table.setVerticalHeader(header_v)
+        self.setVerticalHeader(header_v)
 
-        self.__delegate: UvSetDelegate = UvSetDelegate(self.__table)
-        self.__table.setItemDelegate(self.__delegate)
-
-        self.load_from_selection()
-
-    # override
-    def load_settings(self) -> None:
-        '''Load ui settings from file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
-
-    # override
-    def save_settings(self) -> None:
-        '''Save ui settings to file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
-        settings.write()
-
-    # override
-    def reset_settings(self) -> None:
-        '''Reset ui settings.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
-
-    # override
-    def about(self) -> None:
-        '''Show a about dialog.[override]'''
-        widgets.AboutDialog.info(
-            self, __product__, __version__, __copyright__, __doc__
-        )
+        self.__delegate: UvSetDelegate = UvSetDelegate(self)
+        self.setItemDelegate(self.__delegate)
 
     def set_filter(self, text: str) -> None:
         '''Set filter to table'''
         text = text.lower()
-        for row in range(self.__table.rowCount()):
-            if row == self.__table.rowCount() - 1:
-                self.__table.setRowHidden(row, False)
+        for row in range(self.rowCount()):
+            if row == self.rowCount() - 1:
+                self.setRowHidden(row, False)
                 continue
 
-            header_item: QTableWidgetItem = self.__table.verticalHeaderItem(row)
+            header_item: QTableWidgetItem = self.verticalHeaderItem(row)
             geometry: str = header_item.text().lower()
-            self.__table.setRowHidden(row, text not in geometry)
+            self.setRowHidden(row, text not in geometry)
 
     def uv_set_context_menu(self, pos: QPoint) -> None:
         '''Show uv set context menu'''
-        col: int = self.__table.horizontalHeader().logicalIndexAt(pos)
-        if col < 0 or col == self.__table.columnCount() - 1:
+        col: int = self.horizontalHeader().logicalIndexAt(pos)
+        if col < 0 or col == self.columnCount() - 1:
             return
 
-        uv_name: str = self.__table.horizontalHeaderItem(col).text()
-        menu = QMenu(self.__table)
+        uv_name: str = self.horizontalHeaderItem(col).text()
+        menu = QMenu(self)
 
         action: QAction = menu.addAction(f'Set "{uv_name}" as Current')
         action.triggered.connect(partial(self.set_current_uv_set, col))
@@ -338,22 +283,22 @@ class MainWindow(widgets.ToolWidget):
             action.triggered.connect(partial(self.delete_uv_set, col))
 
         if hasattr(menu, 'exec'):
-            menu.exec(self.__table.horizontalHeader().mapToGlobal(pos))
+            menu.exec(self.horizontalHeader().mapToGlobal(pos))
         else:
-            menu.exec_(self.__table.horizontalHeader().mapToGlobal(pos))
+            menu.exec_(self.horizontalHeader().mapToGlobal(pos))
 
     def geometry_context_menu(self, pos: QPoint) -> None:
         '''Show geometry context menu'''
-        row: int = self.__table.verticalHeader().logicalIndexAt(pos)
-        if row < 0 or row == self.__table.rowCount() - 1:
+        row: int = self.verticalHeader().logicalIndexAt(pos)
+        if row < 0 or row == self.rowCount() - 1:
             return
 
-        geometry: str = self.__table.verticalHeaderItem(row).text()
+        geometry: str = self.verticalHeaderItem(row).text()
         selected_rows: list[int] = list(
-            set(item.row() for item in self.__table.selectedItems())
+            set(item.row() for item in self.selectedItems())
         )
 
-        menu = QMenu(self.__table)
+        menu = QMenu(self)
 
         action: QAction = menu.addAction(f'Remove "{geometry}"')
         action.triggered.connect(partial(self.remove_geometry, [row]))
@@ -385,23 +330,23 @@ class MainWindow(widgets.ToolWidget):
             action.triggered.connect(partial(self.fix_errors, [row]))
 
         if hasattr(menu, 'exec'):
-            menu.exec(self.__table.verticalHeader().mapToGlobal(pos))
+            menu.exec(self.verticalHeader().mapToGlobal(pos))
         else:
-            menu.exec_(self.__table.verticalHeader().mapToGlobal(pos))
+            menu.exec_(self.verticalHeader().mapToGlobal(pos))
 
     def show_context_menu(self, pos: QPoint) -> None:
         '''Show context menu'''
-        item: QTableWidgetItem = self.__table.itemAt(pos)
+        item: QTableWidgetItem = self.itemAt(pos)
         if not item:
             return
 
-        if item.row() == self.__table.rowCount() - 1:
+        if item.row() == self.rowCount() - 1:
             return
 
-        if item.column() == self.__table.columnCount() - 1:
+        if item.column() == self.columnCount() - 1:
             return
 
-        menu = QMenu(self.__table)
+        menu = QMenu(self)
 
         action: QAction = menu.addAction('Set Current UVSet')
         action.triggered.connect(self.set_current_uv_set_from_cells)
@@ -429,14 +374,14 @@ class MainWindow(widgets.ToolWidget):
         action.triggered.connect(self.fix_errors)
 
         if hasattr(menu, 'exec'):
-            menu.exec(self.__table.viewport().mapToGlobal(pos))
+            menu.exec(self.viewport().mapToGlobal(pos))
         else:
-            menu.exec_(self.__table.viewport().mapToGlobal(pos))
+            menu.exec_(self.viewport().mapToGlobal(pos))
 
     @widgets.undo
     def selection_changed(self) -> None:
         '''Selection changed at table'''
-        selected_items: list[QTableWidgetItem] = self.__table.selectedItems()
+        selected_items: list[QTableWidgetItem] = self.selectedItems()
         if not selected_items:
             return
 
@@ -448,7 +393,7 @@ class MainWindow(widgets.ToolWidget):
                 continue
 
             processed_rows.add(row)
-            geometries.append(self.__table.verticalHeaderItem(row).text())
+            geometries.append(self.verticalHeaderItem(row).text())
 
         if geometries:
             cmds.select(*geometries)
@@ -457,8 +402,8 @@ class MainWindow(widgets.ToolWidget):
     def show_uv_editor(self, item: QTableWidgetItem) -> None:
         '''Double clicked item at table'''
         row: int = item.row()
-        geometry: str = self.__table.verticalHeaderItem(row).text()
-        uv_name: str = self.__table.horizontalHeaderItem(item.column()).text()
+        geometry: str = self.verticalHeaderItem(row).text()
+        uv_name: str = self.horizontalHeaderItem(item.column()).text()
         data: UvCellData = item.data(Qt.UserRole)
 
         if not cmds.objExists(geometry):
@@ -483,11 +428,9 @@ class MainWindow(widgets.ToolWidget):
         else:
             mel.eval('TextureViewWindow;')
 
-        for col in range(self.__table.columnCount() - 1):
-            _item: QTableWidgetItem = self.__table.item(row, col)
-            _uv_name: str = self.__table.horizontalHeaderItem(
-                _item.column()
-            ).text()
+        for col in range(self.columnCount() - 1):
+            _item: QTableWidgetItem = self.item(row, col)
+            _uv_name: str = self.horizontalHeaderItem(_item.column()).text()
             data = _item.data(Qt.UserRole)
             data = replace(data, is_current=(uv_name == _uv_name))
             _item.setData(Qt.UserRole, data)
@@ -495,7 +438,7 @@ class MainWindow(widgets.ToolWidget):
     @widgets.undo
     def create_uv_set(self, col: int) -> None:
         '''Create uv set'''
-        if col != self.__table.columnCount() - 1:
+        if col != self.columnCount() - 1:
             return
 
         new_name: str
@@ -525,7 +468,7 @@ class MainWindow(widgets.ToolWidget):
     @widgets.undo
     def duplicate_uv_set(self) -> None:
         '''Create uv set (Copy into new UV Set)'''
-        selected_items: list[QTableWidgetItem] = self.__table.selectedItems()
+        selected_items: list[QTableWidgetItem] = self.selectedItems()
         if not selected_items:
             return
 
@@ -544,10 +487,8 @@ class MainWindow(widgets.ToolWidget):
             if item.data(Qt.UserRole) == "-":
                 continue
 
-            geometry: str = self.__table.verticalHeaderItem(item.row()).text()
-            src_uv: str = self.__table.horizontalHeaderItem(
-                item.column()
-            ).text()
+            geometry: str = self.verticalHeaderItem(item.row()).text()
+            src_uv: str = self.horizontalHeaderItem(item.column()).text()
 
             if not cmds.objExists(geometry):
                 _logger.error('Does not exists %s', geometry)
@@ -566,10 +507,10 @@ class MainWindow(widgets.ToolWidget):
     @widgets.undo
     def rename_uv_set(self, col: int) -> None:
         '''Rename uv set'''
-        if col == self.__table.columnCount() - 1:
+        if col == self.columnCount() - 1:
             return
 
-        old_name: str = self.__table.horizontalHeaderItem(col).text()
+        old_name: str = self.horizontalHeaderItem(col).text()
         if old_name == 'map1':
             _logger.error('Cannot rename map1')
             return
@@ -601,10 +542,10 @@ class MainWindow(widgets.ToolWidget):
     @widgets.undo
     def delete_uv_set(self, col: int) -> None:
         '''Delete uv set'''
-        if col == self.__table.columnCount() - 1:
+        if col == self.columnCount() - 1:
             return
 
-        uv_set: str = self.__table.horizontalHeaderItem(col).text()
+        uv_set: str = self.horizontalHeaderItem(col).text()
         if uv_set == 'map1':
             _logger.error('Cannot delete map1')
             return
@@ -625,7 +566,7 @@ class MainWindow(widgets.ToolWidget):
     @widgets.undo
     def delete_uv_set_from_selection(self) -> None:
         '''Delete uv set from selection'''
-        selected_items: list[QTableWidgetItem] = self.__table.selectedItems()
+        selected_items: list[QTableWidgetItem] = self.selectedItems()
         if not selected_items:
             return
 
@@ -634,10 +575,8 @@ class MainWindow(widgets.ToolWidget):
             if data.status == UvStatus.NONE:
                 continue
 
-            geometry: str = self.__table.verticalHeaderItem(item.row()).text()
-            uv_set: str = self.__table.horizontalHeaderItem(
-                item.column()
-            ).text()
+            geometry: str = self.verticalHeaderItem(item.row()).text()
+            uv_set: str = self.horizontalHeaderItem(item.column()).text()
             if not cmds.objExists(geometry):
                 _logger.error('Does not exists %s', geometry)
                 continue
@@ -649,10 +588,10 @@ class MainWindow(widgets.ToolWidget):
     @widgets.undo
     def set_current_uv_set(self, col: int) -> None:
         '''Set current uv set from header'''
-        if col == self.__table.columnCount() - 1:
+        if col == self.columnCount() - 1:
             return
 
-        uv_name: str = self.__table.horizontalHeaderItem(col).text()
+        uv_name: str = self.horizontalHeaderItem(col).text()
         changed: bool = False
         for geometry in self.__current_geometries:
             if not cmds.objExists(geometry):
@@ -673,17 +612,15 @@ class MainWindow(widgets.ToolWidget):
     def set_current_uv_set_from_cells(self) -> None:
         '''Set current uv set from cells'''
         selected_items: list[QTableWidgetItem] = [
-            i for i in self.__table.selectedItems()
+            i for i in self.selectedItems()
         ]
         if not selected_items:
             return
 
         changed = False
         for item in selected_items:
-            geo: str = self.__table.verticalHeaderItem(item.row()).text()
-            uv_name: str = self.__table.horizontalHeaderItem(
-                item.column()
-            ).text()
+            geo: str = self.verticalHeaderItem(item.row()).text()
+            uv_name: str = self.horizontalHeaderItem(item.column()).text()
             data: UvCellData = item.data(Qt.UserRole)
             if data.status == UvStatus.NONE:
                 _logger.warning('%s does not exist on %s', uv_name, geo)
@@ -705,10 +642,10 @@ class MainWindow(widgets.ToolWidget):
         selected_items: list[QTableWidgetItem] = []
         if rows:
             for row in rows:
-                for col in range(self.__table.columnCount() - 1):
-                    selected_items.append(self.__table.item(row, col))
+                for col in range(self.columnCount() - 1):
+                    selected_items.append(self.item(row, col))
         else:
-            selected_items = self.__table.selectedItems()
+            selected_items = self.selectedItems()
 
         if not selected_items:
             return
@@ -719,10 +656,8 @@ class MainWindow(widgets.ToolWidget):
             if data.status != UvStatus.EMPTY:
                 continue
 
-            geometry: str = self.__table.verticalHeaderItem(item.row()).text()
-            uv_set: str = self.__table.horizontalHeaderItem(
-                item.column()
-            ).text()
+            geometry: str = self.verticalHeaderItem(item.row()).text()
+            uv_set: str = self.horizontalHeaderItem(item.column()).text()
 
             cmds.polyUVSet(geometry, delete=True, uvSet=uv_set)
             deleted = True
@@ -738,17 +673,17 @@ class MainWindow(widgets.ToolWidget):
         selected_items: list[QTableWidgetItem] = []
         if rows:
             for row in rows:
-                for col in range(self.__table.columnCount() - 1):
-                    selected_items.append(self.__table.item(row, col))
+                for col in range(self.columnCount() - 1):
+                    selected_items.append(self.item(row, col))
         else:
-            selected_items = self.__table.selectedItems()
+            selected_items = self.selectedItems()
 
         if not selected_items:
             return
 
         geometries: list[str] = list(
             set(
-                self.__table.verticalHeaderItem(item.row()).text()
+                self.verticalHeaderItem(item.row()).text()
                 for item in selected_items
             )
         )
@@ -826,7 +761,7 @@ class MainWindow(widgets.ToolWidget):
 
     def add_geometry(self, row: int) -> None:
         '''Add geometry to table'''
-        if row != self.__table.rowCount() - 1:
+        if row != self.rowCount() - 1:
             return
 
         selection: list[str] = cmds.ls(selection=True, type='transform')
@@ -852,7 +787,7 @@ class MainWindow(widgets.ToolWidget):
         '''Copy'''
         self.clear_copy_data()
 
-        selected_items: list[QTableWidgetItem] = self.__table.selectedItems()
+        selected_items: list[QTableWidgetItem] = self.selectedItems()
         if not selected_items:
             self.__delegate.set_copied_cells([])
             return
@@ -866,8 +801,8 @@ class MainWindow(widgets.ToolWidget):
 
             row: int = item.row()
             col: int = item.column()
-            geometry: str = self.__table.verticalHeaderItem(row).text()
-            uv_set: str = self.__table.horizontalHeaderItem(col).text()
+            geometry: str = self.verticalHeaderItem(row).text()
+            uv_set: str = self.horizontalHeaderItem(col).text()
 
             data = replace(data, is_copied=True)
             item.setData(Qt.UserRole, data)
@@ -884,7 +819,7 @@ class MainWindow(widgets.ToolWidget):
         if not self.__copied_cells_data:
             return
 
-        selected_items: list[QTableWidgetItem] = self.__table.selectedItems()
+        selected_items: list[QTableWidgetItem] = self.selectedItems()
         if not selected_items:
             return
 
@@ -896,17 +831,13 @@ class MainWindow(widgets.ToolWidget):
             dst_col: int = paste_col + rel_col
 
             if (
-                dst_row >= self.__table.rowCount() - 1
-                or dst_col >= self.__table.columnCount() - 1
+                dst_row >= self.rowCount() - 1
+                or dst_col >= self.columnCount() - 1
             ):
                 continue
 
-            dst_geo_item: QTableWidgetItem = self.__table.verticalHeaderItem(
-                dst_row
-            )
-            dst_uv_item: QTableWidgetItem = self.__table.horizontalHeaderItem(
-                dst_col
-            )
+            dst_geo_item: QTableWidgetItem = self.verticalHeaderItem(dst_row)
+            dst_uv_item: QTableWidgetItem = self.horizontalHeaderItem(dst_col)
             if not dst_geo_item or not dst_uv_item:
                 continue
 
@@ -927,9 +858,7 @@ class MainWindow(widgets.ToolWidget):
             if not cmds.objExists(dst_geo):
                 continue
 
-            target_cell_item: QTableWidgetItem = self.__table.item(
-                dst_row, dst_col
-            )
+            target_cell_item: QTableWidgetItem = self.item(dst_row, dst_col)
             data: UvCellData = target_cell_item.data(Qt.UserRole)
             if target_cell_item and data.status == UvStatus.NONE:
                 exist_uv: list[str] = (
@@ -949,9 +878,9 @@ class MainWindow(widgets.ToolWidget):
         '''Clear copy data'''
         self.__copied_cells_data = []
         self.__delegate.stop_animation()
-        for row in range(self.__table.rowCount() - 1):
-            for col in range(self.__table.columnCount() - 1):
-                item: QTableWidgetItem = self.__table.item(row, col)
+        for row in range(self.rowCount() - 1):
+            for col in range(self.columnCount() - 1):
+                item: QTableWidgetItem = self.item(row, col)
                 if not item:
                     continue
 
@@ -966,7 +895,7 @@ class MainWindow(widgets.ToolWidget):
         '''Remove geometry from table'''
         removed = False
         for row in rows:
-            geometry: str = self.__table.verticalHeaderItem(row).text()
+            geometry: str = self.verticalHeaderItem(row).text()
             self.__current_geometries.remove(geometry)
             removed = True
 
@@ -983,13 +912,17 @@ class MainWindow(widgets.ToolWidget):
 
     def update_ui(self) -> None:
         '''Update UI'''
-        self.__table.blockSignals(True)
-        self.__table.clear()
+        self.blockSignals(True)
+        self.clear()
         self.clear_copy_data()
 
         all_uvsets: set[str] = set()
         mesh_data: dict[str, Any] = {}
         for node in self.__current_geometries:
+
+            if not cmds.objExists(node):
+                continue
+
             shapes: list[str] = (
                 cmds.listRelatives(
                     node, shapes=True, type='mesh', noIntermediate=True
@@ -1047,14 +980,14 @@ class MainWindow(widgets.ToolWidget):
             }
 
         geometries: list[str] = [geo for geo in mesh_data]
-        self.__table.setRowCount(len(geometries) + 1)
+        self.setRowCount(len(geometries) + 1)
 
         unique_uvsets: list[str] = sorted(list(all_uvsets))
         if 'map1' in unique_uvsets:
             unique_uvsets.remove('map1')
             unique_uvsets.insert(0, 'map1')
 
-        self.__table.setColumnCount(len(unique_uvsets) + 1)
+        self.setColumnCount(len(unique_uvsets) + 1)
 
         for row, geometry in enumerate(geometries):
             current = mesh_data[geometry]['current']
@@ -1063,12 +996,12 @@ class MainWindow(widgets.ToolWidget):
 
             item: QTableWidgetItem = QTableWidgetItem(geometry)
             item.setData(Qt.UserRole, has_error)
-            self.__table.setVerticalHeaderItem(row, item)
+            self.setVerticalHeaderItem(row, item)
 
             for col, uvset in enumerate(unique_uvsets):
                 is_current: bool = uvset == current
                 item = QTableWidgetItem(uvset)
-                self.__table.setHorizontalHeaderItem(col, item)
+                self.setHorizontalHeaderItem(col, item)
 
                 item = QTableWidgetItem()
                 item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
@@ -1080,23 +1013,88 @@ class MainWindow(widgets.ToolWidget):
                     cell_data = UvCellData(False, UvStatus.NONE, False)
 
                 item.setData(Qt.UserRole, cell_data)
-                self.__table.setItem(row, col, item)
+                self.setItem(row, col, item)
 
-        for row in range(self.__table.rowCount()):
-            for col in range(self.__table.columnCount()):
+        for row in range(self.rowCount()):
+            for col in range(self.columnCount()):
                 if row == len(geometries) or col == len(unique_uvsets):
                     item = QTableWidgetItem('')
                     item.setFlags(Qt.NoItemFlags)
-                    self.__table.setItem(row, col, item)
+                    self.setItem(row, col, item)
 
         item = QTableWidgetItem('+')
-        self.__table.setVerticalHeaderItem(len(geometries), item)
+        self.setVerticalHeaderItem(len(geometries), item)
 
         item = QTableWidgetItem('+')
-        self.__table.setHorizontalHeaderItem(len(unique_uvsets), item)
+        self.setHorizontalHeaderItem(len(unique_uvsets), item)
 
-        self.set_filter(self.__filter.text())
-        self.__table.blockSignals(False)
+        self.blockSignals(False)
+
+
+class MainWindow(widgets.ToolWidget):
+    '''Tool main window'''
+
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        flag: Qt.WindowFlags = Qt.WindowFlags(),
+        unique_id: str = '',
+    ) -> None:
+        '''Initialize widget.'''
+        super().__init__(parent, flag, unique_id)
+        self.setWindowTitle(__product__)
+        self.resize(400, 200)
+
+        main_layout: QVBoxLayout = QVBoxLayout(self.option_widget())
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(2)
+
+        header_layout: QHBoxLayout = QHBoxLayout(self)
+        main_layout.addLayout(header_layout)
+
+        self.__filter: QLineEdit = QLineEdit(self)
+        self.__filter.setPlaceholderText('Search ...')
+        header_layout.addWidget(self.__filter)
+
+        update_btn: widgets.IconButton = widgets.IconButton(self)
+        update_btn.set_icon(widgets.icon_from_file_name('a_update.png'))
+        header_layout.addWidget(update_btn)
+
+        self.__table: UvSetTableWidget = UvSetTableWidget(self)
+        self.__table.load_from_selection()
+        self.__table.set_filter(self.__filter.text())
+        main_layout.addWidget(self.__table)
+
+        # Event
+        self.__filter.textChanged.connect(self.__table.set_filter)
+        update_btn.clicked.connect(self.__table.load_from_selection)
+
+    # override
+    def load_settings(self) -> None:
+        '''Load ui settings from file.[override]'''
+        settings: Settings = Settings.instance(__name__, True)
+        self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
+
+    # override
+    def save_settings(self) -> None:
+        '''Save ui settings to file.[override]'''
+        settings: Settings = Settings.instance(__name__, True)
+        settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
+        settings.write()
+
+    # override
+    def reset_settings(self) -> None:
+        '''Reset ui settings.[override]'''
+        settings: Settings = Settings.instance(__name__, True)
+        settings.reset()
+        self.load_settings()
+
+    # override
+    def about(self) -> None:
+        '''Show a about dialog.[override]'''
+        widgets.AboutDialog.info(
+            self, __product__, __version__, __copyright__, __doc__
+        )
 
 
 # ==============================================================================
