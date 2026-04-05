@@ -20,7 +20,14 @@ try:
         QModelIndex,
         QAbstractItemModel,
     )
-    from PySide2.QtGui import QIcon, QPainter, QColor, QPen
+    from PySide2.QtGui import (
+        QIcon,
+        QPainter,
+        QColor,
+        QPen,
+        QKeyEvent,
+        QKeySequence,
+    )
     from PySide2.QtWidgets import (
         QWidget,
         QVBoxLayout,
@@ -48,7 +55,15 @@ except ImportError:
             QModelIndex,
             QAbstractItemModel,
         )
-        from PySide6.QtGui import QIcon, QPainter, QColor, QPen, QAction
+        from PySide6.QtGui import (
+            QIcon,
+            QPainter,
+            QColor,
+            QPen,
+            QAction,
+            QKeyEvent,
+            QKeySequence,
+        )
         from PySide6.QtWidgets import (
             QWidget,
             QVBoxLayout,
@@ -64,6 +79,7 @@ except ImportError:
             QMenu,
         )
 from maya import cmds, mel
+from maya.api import OpenMaya
 from ..lib import logger, parser, widgets
 
 
@@ -154,11 +170,11 @@ class UvSetDelegate(QStyledItemDelegate):
             return
 
         painter.save()
-        if option.state & QStyle.State_Selected:
-            painter.fillRect(option.rect, option.palette.highlight())
-
         if data.is_current:
             painter.fillRect(option.rect, QColor(100, 166, 82))
+
+        if option.state & QStyle.State_Selected:
+            painter.fillRect(option.rect, option.palette.highlight())
 
         if data.status == UvStatus.HAS_UV:
             self.icon.paint(painter, option.rect, Qt.AlignCenter)
@@ -250,6 +266,43 @@ class UvSetTableWidget(QTableWidget):
 
         self.__delegate: UvSetDelegate = UvSetDelegate(self)
         self.setItemDelegate(self.__delegate)
+
+        self.__copy_act = QAction('Copy UV Set', self)
+        self.__copy_act.setShortcut(QKeySequence('Ctrl+C'))
+        self.__copy_act.setShortcutContext(Qt.WidgetShortcut)
+        self.__copy_act.triggered.connect(self.copy)
+        self.addAction(self.__copy_act)
+
+        self.__paste_act = QAction('Paste UV Set', self)
+        self.__paste_act.setShortcut(QKeySequence('Ctrl+V'))
+        self.__paste_act.setShortcutContext(Qt.WidgetShortcut)
+        self.__paste_act.triggered.connect(self.paste)
+        self.addAction(self.__paste_act)
+
+        self.__duplicate_act = QAction('Duplicate UV Set ...', self)
+        self.__duplicate_act.setShortcut(QKeySequence('Ctrl+D'))
+        self.__duplicate_act.setShortcutContext(Qt.WidgetShortcut)
+        self.__duplicate_act.triggered.connect(self.duplicate_uv_set)
+        self.addAction(self.__duplicate_act)
+
+        self.__delete_act = QAction('Delete UV Set', self)
+        self.__delete_act.setShortcut(QKeySequence('Delete'))
+        self.__delete_act.setShortcutContext(Qt.WidgetShortcut)
+        self.__delete_act.triggered.connect(self.delete_uv_set_from_selection)
+        self.addAction(self.__delete_act)
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        '''keyPressEvent (override)'''
+        key: int = event.key()
+        if key == Qt.Key_Escape:
+            if self.__copied_cells_data:
+                self.clear_copy_data()
+                self.viewport().update()
+                _logger.info('Copy canceled.')
+            event.accept()
+            return
+
+        super().keyPressEvent(event)
 
     def set_filter(self, text: str) -> None:
         '''Set filter to table'''
@@ -353,17 +406,10 @@ class UvSetTableWidget(QTableWidget):
 
         menu.addSeparator()
 
-        action = menu.addAction('Copy UV Set')
-        action.triggered.connect(self.copy)
-
-        action = menu.addAction('Paste UV Set')
-        action.triggered.connect(self.paste)
-
-        action = menu.addAction('Duplicate UV Set ...')
-        action.triggered.connect(self.duplicate_uv_set)
-
-        action = menu.addAction('Delete UV Set')
-        action.triggered.connect(self.delete_uv_set_from_selection)
+        menu.addAction(self.__copy_act)
+        menu.addAction(self.__paste_act)
+        menu.addAction(self.__duplicate_act)
+        menu.addAction(self.__delete_act)
 
         menu.addSeparator()
 
@@ -431,8 +477,9 @@ class UvSetTableWidget(QTableWidget):
         for col in range(self.columnCount() - 1):
             _item: QTableWidgetItem = self.item(row, col)
             _uv_name: str = self.horizontalHeaderItem(_item.column()).text()
+            is_current: bool = uv_name == _uv_name
             data = _item.data(Qt.UserRole)
-            data = replace(data, is_current=(uv_name == _uv_name))
+            data = replace(data, is_current=is_current)
             _item.setData(Qt.UserRole, data)
 
     @widgets.undo
@@ -452,18 +499,13 @@ class UvSetTableWidget(QTableWidget):
         if not new_name or not ok:
             return
 
+        changed: bool = False
         for geometry in self.__current_geometries:
-            if not cmds.objExists(geometry):
-                _logger.error('Does not exists %s', geometry)
-                continue
+            if create_uv_set(geometry, new_name):
+                changed = True
 
-            exist_uv: list[str] = (
-                cmds.polyUVSet(geometry, query=True, allUVSets=True) or []
-            )
-            if new_name not in exist_uv:
-                cmds.polyUVSet(geometry, create=True, uvSet=new_name)
-
-        self.update_ui()
+        if changed:
+            self.update_ui()
 
     @widgets.undo
     def duplicate_uv_set(self) -> None:
@@ -483,26 +525,19 @@ class UvSetTableWidget(QTableWidget):
         if not new_name or not ok:
             return
 
+        changed: bool = False
         for item in selected_items:
-            if item.data(Qt.UserRole) == "-":
+            data: UvCellData = item.data(Qt.UserRole)
+            if data.status == UvStatus.NONE:
                 continue
 
             geometry: str = self.verticalHeaderItem(item.row()).text()
             src_uv: str = self.horizontalHeaderItem(item.column()).text()
+            if duplicate_uv_set(geometry, src_uv, new_name):
+                changed = True
 
-            if not cmds.objExists(geometry):
-                _logger.error('Does not exists %s', geometry)
-                continue
-
-            exist_uv: list[str] = (
-                cmds.polyUVSet(geometry, query=True, allUVSets=True) or []
-            )
-            if new_name not in exist_uv:
-                cmds.polyUVSet(
-                    geometry, copy=True, uvSet=src_uv, newUVSet=new_name
-                )
-
-        self.update_ui()
+        if changed:
+            self.update_ui()
 
     @widgets.undo
     def rename_uv_set(self, col: int) -> None:
@@ -524,20 +559,13 @@ class UvSetTableWidget(QTableWidget):
         if not new_name or not ok:
             return
 
+        changed: bool = False
         for geometry in self.__current_geometries:
-            if not cmds.objExists(geometry):
-                _logger.error('Does not exists %s', geometry)
-                continue
+            if rename_uv_set(geometry, old_name, new_name):
+                changed = True
 
-            exist_uv: list[str] = (
-                cmds.polyUVSet(geometry, query=True, allUVSets=True) or []
-            )
-            if old_name in exist_uv and new_name not in exist_uv:
-                cmds.polyUVSet(
-                    geometry, rename=True, uvSet=old_name, newUVSet=new_name
-                )
-
-        self.update_ui()
+        if changed:
+            self.update_ui()
 
     @widgets.undo
     def delete_uv_set(self, col: int) -> None:
@@ -546,22 +574,13 @@ class UvSetTableWidget(QTableWidget):
             return
 
         uv_set: str = self.horizontalHeaderItem(col).text()
-        if uv_set == 'map1':
-            _logger.error('Cannot delete map1')
-            return
-
+        changed: bool = False
         for geometry in self.__current_geometries:
-            if not cmds.objExists(geometry):
-                _logger.error('Does not exists %s', geometry)
-                continue
+            if delete_uv_set(geometry, uv_set):
+                changed = True
 
-            exist_uv: list[str] = (
-                cmds.polyUVSet(geometry, query=True, allUVSets=True) or []
-            )
-            if uv_set in exist_uv:
-                cmds.polyUVSet(geometry, delete=True, uvSet=uv_set)
-
-        self.update_ui()
+        if changed:
+            self.update_ui()
 
     @widgets.undo
     def delete_uv_set_from_selection(self) -> None:
@@ -570,6 +589,7 @@ class UvSetTableWidget(QTableWidget):
         if not selected_items:
             return
 
+        changed: bool = False
         for item in selected_items:
             data: UvCellData = item.data(Qt.UserRole)
             if data.status == UvStatus.NONE:
@@ -577,13 +597,11 @@ class UvSetTableWidget(QTableWidget):
 
             geometry: str = self.verticalHeaderItem(item.row()).text()
             uv_set: str = self.horizontalHeaderItem(item.column()).text()
-            if not cmds.objExists(geometry):
-                _logger.error('Does not exists %s', geometry)
-                continue
+            if delete_uv_set(geometry, uv_set):
+                changed = True
 
-            cmds.polyUVSet(geometry, delete=True, uvSet=uv_set)
-
-        self.update_ui()
+        if changed:
+            self.update_ui()
 
     @widgets.undo
     def set_current_uv_set(self, col: int) -> None:
@@ -594,15 +612,7 @@ class UvSetTableWidget(QTableWidget):
         uv_name: str = self.horizontalHeaderItem(col).text()
         changed: bool = False
         for geometry in self.__current_geometries:
-            if not cmds.objExists(geometry):
-                _logger.error('Does not exists %s', geometry)
-                continue
-
-            exist_uv: list[str] = (
-                cmds.polyUVSet(geometry, query=True, allUVSets=True) or []
-            )
-            if uv_name in exist_uv:
-                cmds.polyUVSet(geometry, currentUVSet=True, uvSet=uv_name)
+            if set_current_uv_set(geometry, uv_name):
                 changed = True
 
         if changed:
@@ -617,7 +627,7 @@ class UvSetTableWidget(QTableWidget):
         if not selected_items:
             return
 
-        changed = False
+        changed: bool = False
         for item in selected_items:
             geo: str = self.verticalHeaderItem(item.row()).text()
             uv_name: str = self.horizontalHeaderItem(item.column()).text()
@@ -626,12 +636,8 @@ class UvSetTableWidget(QTableWidget):
                 _logger.warning('%s does not exist on %s', uv_name, geo)
                 continue
 
-            if not cmds.objExists(geo):
-                _logger.error('Does not exists %s', geo)
-                continue
-
-            cmds.polyUVSet(geo, currentUVSet=True, uvSet=uv_name)
-            changed = True
+            if set_current_uv_set(geo, uv_name):
+                changed = True
 
         if changed:
             self.update_ui()
@@ -650,7 +656,7 @@ class UvSetTableWidget(QTableWidget):
         if not selected_items:
             return
 
-        deleted: bool = False
+        changed: bool = False
         for item in selected_items:
             data: UvCellData = item.data(Qt.UserRole)
             if data.status != UvStatus.EMPTY:
@@ -658,11 +664,10 @@ class UvSetTableWidget(QTableWidget):
 
             geometry: str = self.verticalHeaderItem(item.row()).text()
             uv_set: str = self.horizontalHeaderItem(item.column()).text()
+            if delete_uv_set(geometry, uv_set):
+                changed = True
 
-            cmds.polyUVSet(geometry, delete=True, uvSet=uv_set)
-            deleted = True
-
-        if deleted:
+        if changed:
             self.update_ui()
 
         _logger.info('Done.')
@@ -703,9 +708,7 @@ class UvSetTableWidget(QTableWidget):
                 continue
 
             shape: str = shapes[0]
-            uv_sets: list[str] = (
-                cmds.polyUVSet(shape, query=True, allUVSets=True) or []
-            )
+            uv_sets: list[str] = get_all_uv_sets(shape)
             if not uv_sets:
                 cmds.polyUVSet(geometry, create=True, uvSet='map1')
                 uv_sets = ['map1']
@@ -713,9 +716,7 @@ class UvSetTableWidget(QTableWidget):
                 _logger.info('%s created map1.', geometry)
 
             if 'map1' not in uv_sets:
-                cmds.polyUVSet(
-                    geometry, rename=True, uvSet=uv_sets[0], newUVSet='map1'
-                )
+                rename_uv_set(geometry, uv_sets[0], 'map1')
                 uv_sets[0] = 'map1'
                 fixed_count += 1
                 _logger.info('%s restored first uv set to map1.', geometry)
@@ -740,9 +741,7 @@ class UvSetTableWidget(QTableWidget):
 
                 if not uv or not re.match(r'^[a-zA-Z0-9_]+$', uv):
                     safe_name: str = f'uvSet{i}'
-                    cmds.polyUVSet(
-                        geometry, rename=True, uvSet=uv, newUVSet=safe_name
-                    )
+                    rename_uv_set(geometry, uv, safe_name)
                     uv_sets[i] = safe_name
                     fixed_count += 1
                     _logger.info(
@@ -814,6 +813,7 @@ class UvSetTableWidget(QTableWidget):
 
         self.__delegate.start_animation()
 
+    @widgets.undo
     def paste(self) -> None:
         '''Paste'''
         if not self.__copied_cells_data:
@@ -829,13 +829,6 @@ class UvSetTableWidget(QTableWidget):
         for rel_row, rel_col, src_geo, src_uv in self.__copied_cells_data:
             dst_row: int = paste_row + rel_row
             dst_col: int = paste_col + rel_col
-
-            if (
-                dst_row >= self.rowCount() - 1
-                or dst_col >= self.columnCount() - 1
-            ):
-                continue
-
             dst_geo_item: QTableWidgetItem = self.verticalHeaderItem(dst_row)
             dst_uv_item: QTableWidgetItem = self.horizontalHeaderItem(dst_col)
             if not dst_geo_item or not dst_uv_item:
@@ -843,32 +836,8 @@ class UvSetTableWidget(QTableWidget):
 
             dst_geo: str = dst_geo_item.text()
             dst_uv: str = dst_uv_item.text()
-
-            if src_geo != dst_geo:
-                _logger.warning(
-                    'Skipped: Cannot paste UV set to a different geometry : %s -> %s',
-                    src_geo,
-                    dst_geo,
-                )
-                continue
-
-            if src_uv == dst_uv:
-                continue
-
-            if not cmds.objExists(dst_geo):
-                continue
-
-            target_cell_item: QTableWidgetItem = self.item(dst_row, dst_col)
-            data: UvCellData = target_cell_item.data(Qt.UserRole)
-            if target_cell_item and data.status == UvStatus.NONE:
-                exist_uv: list[str] = (
-                    cmds.polyUVSet(dst_geo, query=True, allUVSets=True) or []
-                )
-                if dst_uv not in exist_uv:
-                    cmds.polyUVSet(dst_geo, create=True, uvSet=dst_uv)
-
-            cmds.polyCopyUV(dst_geo, uvSetNameInput=src_uv, uvSetName=dst_uv)
-            pasted = True
+            if copy_uv_set(src_geo, src_uv, dst_geo, dst_uv):
+                pasted = True
 
         if pasted:
             self.clear_copy_data()
@@ -933,17 +902,8 @@ class UvSetTableWidget(QTableWidget):
                 continue
 
             shape: str = shapes[0]
-            uv_sets: list[str] = (
-                cmds.polyUVSet(shape, query=True, allUVSets=True) or []
-            )  # type: ignore
-            uv_indices: list[int] = (
-                cmds.polyUVSet(shape, query=True, allUVSetsIndices=True) or []
-            )  # type: ignore
-            current_uv_sets: list[str] = cmds.polyUVSet(
-                shape, query=True, currentUVSet=True
-            )  # type: ignore
-            current: str = current_uv_sets[0] if current_uv_sets else ''
-
+            uv_sets: list[str] = get_all_uv_sets(shape)
+            current_uv_set: str = get_current_uv_set(shape)
             has_error: bool = False
             if not uv_sets:  # Does not exists uv sets
                 has_error = True
@@ -955,17 +915,11 @@ class UvSetTableWidget(QTableWidget):
                 has_error = True
 
             uv_info: dict[str, UvStatus] = {}
-            for uv_name, index in zip(uv_sets, uv_indices):
-                try:
-                    num_uvs: int = cmds.getAttr(
-                        f'{shape}.uvSet[{index}].uvSetPoints', size=True
-                    )
-                    uv_info[uv_name] = (
-                        UvStatus.HAS_UV if num_uvs else UvStatus.EMPTY
-                    )
-
-                except ValueError:
-                    uv_info[uv_name] = UvStatus.EMPTY
+            for uv_name in uv_sets:
+                num_uvs: int = get_uv_count(shape, uv_name)
+                uv_info[uv_name] = (
+                    UvStatus.HAS_UV if num_uvs > 0 else UvStatus.EMPTY
+                )
 
                 # Invalid uvset name.
                 if not uv_name or not re.match(r'^[a-zA-Z0-9_]+$', uv_name):
@@ -974,7 +928,7 @@ class UvSetTableWidget(QTableWidget):
 
             all_uvsets.update(uv_sets)
             mesh_data[node] = {
-                'current': current,
+                'current': current_uv_set,
                 'uv_info': uv_info,
                 'has_error': has_error,
             }
@@ -990,7 +944,7 @@ class UvSetTableWidget(QTableWidget):
         self.setColumnCount(len(unique_uvsets) + 1)
 
         for row, geometry in enumerate(geometries):
-            current = mesh_data[geometry]['current']
+            current_uv_set = mesh_data[geometry]['current']
             uv_info = mesh_data[geometry]['uv_info']
             has_error = mesh_data[geometry]['has_error']
 
@@ -999,7 +953,7 @@ class UvSetTableWidget(QTableWidget):
             self.setVerticalHeaderItem(row, item)
 
             for col, uvset in enumerate(unique_uvsets):
-                is_current: bool = uvset == current
+                is_current: bool = uvset == current_uv_set
                 item = QTableWidgetItem(uvset)
                 self.setHorizontalHeaderItem(col, item)
 
@@ -1102,6 +1056,133 @@ class MainWindow(widgets.ToolWidget):
 # Functions
 #
 # ==============================================================================
+def get_all_uv_sets(geometry: str) -> list[str]:
+    '''Returns all uv set from specific geometry'''
+    if not cmds.objExists(geometry):
+        return []
+
+    uv_sets: list[str] = cmds.polyUVSet(
+        geometry,
+        query=True,
+        allUVSets=True,
+    )  # type: ignore
+    if not uv_sets:
+        uv_sets = []
+
+    return uv_sets
+
+
+def get_current_uv_set(geometry: str) -> str:
+    '''Returns current uv set'''
+    current_uv_sets: list[str] = cmds.polyUVSet(
+        geometry,
+        query=True,
+        currentUVSet=True,
+    )  # type: ignore
+    return current_uv_sets[0] if current_uv_sets else ''
+
+
+def get_uv_count(shape: str, uv_name: str) -> int:
+    '''Return uv count on uv set'''
+    sel: OpenMaya.MSelectionList = OpenMaya.MSelectionList()
+    sel.add(shape)
+    dag_path: OpenMaya.MDagPath = sel.getDagPath(0)
+    fn_mesh: OpenMaya.MFnMesh = OpenMaya.MFnMesh(dag_path)
+
+    u_array: OpenMaya.MFloatArray
+    v_array: OpenMaya.MFloatArray
+    u_array, v_array = fn_mesh.getUVs(uv_name)
+    return max(len(u_array), len(v_array))
+
+
+def create_uv_set(geometry: str, uv_name: str) -> bool:
+    '''Create uv set'''
+    exist_uvs: list[str] = get_all_uv_sets(geometry)
+    if uv_name in exist_uvs:
+        return False
+
+    cmds.polyUVSet(geometry, create=True, uvSet=uv_name)
+    # cmds.bakePartialHistory(geometry, prePostDeformers=True)
+    return True
+
+
+def duplicate_uv_set(geometry: str, src_uv: str, dst_uv: str) -> bool:
+    '''Duplicate uv set'''
+    exist_uvs: list[str] = get_all_uv_sets(geometry)
+    if dst_uv in exist_uvs or src_uv not in exist_uvs:
+        return False
+
+    cmds.polyUVSet(geometry, copy=True, uvSet=src_uv, newUVSet=dst_uv)
+    # cmds.bakePartialHistory(geometry, prePostDeformers=True)
+    return True
+
+
+def delete_uv_set(geometry: str, uv_name: str) -> bool:
+    '''Delete uv set'''
+    if uv_name == 'map1':
+        _logger.error('Cannot delete map1')
+        return False
+
+    exist_uvs: list[str] = get_all_uv_sets(geometry)
+    if uv_name not in exist_uvs:
+        return False
+
+    cmds.polyUVSet(geometry, delete=True, uvSet=uv_name)
+    # cmds.bakePartialHistory(geometry, prePostDeformers=True)
+    return True
+
+
+def rename_uv_set(geometry: str, old_name: str, new_name: str) -> bool:
+    '''Rename uv set'''
+    if old_name == 'map1':
+        _logger.error('Cannot rename map1')
+        return False
+
+    exist_uvs: list[str] = get_all_uv_sets(geometry)
+    if old_name in exist_uvs and new_name not in exist_uvs:
+        cmds.polyUVSet(geometry, rename=True, uvSet=old_name, newUVSet=new_name)
+        # cmds.bakePartialHistory(geometry, prePostDeformers=True)
+        return True
+
+    return False
+
+
+def set_current_uv_set(geometry: str, uv_name: str) -> bool:
+    '''Set current uv set'''
+    exist_uvs: list[str] = get_all_uv_sets(geometry)
+    if uv_name in exist_uvs:
+        cmds.polyUVSet(geometry, currentUVSet=True, uvSet=uv_name)
+        # cmds.bakePartialHistory(geometry, prePostDeformers=True)
+        return True
+
+    return False
+
+
+def copy_uv_set(src_geo: str, src_uv: str, dst_geo: str, dst_uv: str) -> bool:
+    '''Copy uv set'''
+    if not cmds.objExists(dst_geo):
+        return False
+
+    if src_geo != dst_geo:
+        _logger.warning(
+            'Cannot paste UV set to a different geometry : %s -> %s',
+            src_geo,
+            dst_geo,
+        )
+        return False
+
+    if src_uv == dst_uv:
+        return False
+
+    exist_uvs: list[str] = get_all_uv_sets(dst_geo)
+    if dst_uv not in exist_uvs:
+        cmds.polyUVSet(dst_geo, create=True, uvSet=dst_uv)
+
+    cmds.polyCopyUV(dst_geo, uvSetNameInput=src_uv, uvSetName=dst_uv)
+    # cmds.bakePartialHistory(dst_geo, prePostDeformers=True)
+    return True
+
+
 def main(unique_id: str = '') -> None:
     '''Show window.'''
     window: MainWindow = MainWindow(unique_id=unique_id)
