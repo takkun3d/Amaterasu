@@ -1316,7 +1316,8 @@ class ImagePlaneManager(QWidget):
                 f'{node}.depth',
                 base_depth + (i + 1) * base_depth / 10.0,
             )
-        self.update_image_planes()
+
+        # self.update_image_planes()
 
     @widgets.undo
     def on_visibility_toggled(self, trigger_node: str, new_vis: bool) -> None:
@@ -1490,6 +1491,7 @@ class ImagePlaneManager(QWidget):
                 )
                 cmds.setAttr(f'{image_plane[1]}.sizeY', camera_y)
 
+        self.update_image_planes()
         self.rebuild_after_drop()
 
     @widgets.undo
