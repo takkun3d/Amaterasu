@@ -17,6 +17,7 @@ try:
         QDragMoveEvent,
         QDropEvent,
         QWheelEvent,
+        QMouseEvent,
         QKeySequence,
     )
     from PySide2.QtWidgets import (
@@ -46,6 +47,7 @@ except ImportError:
             QDragMoveEvent,
             QDropEvent,
             QWheelEvent,
+            QMouseEvent,
             QKeySequence,
             QShortcut,
         )
@@ -75,7 +77,7 @@ from . import shift_lens, dolly_zoom, camera_rig
 #
 # ==============================================================================
 __product__: str = 'Rotoscope'
-__version__: str = '1.60'
+__version__: str = '1.61'
 __doc__ = 'This tool is usefull operation for the layout and the animation.'
 __copyright__ = (
     'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
@@ -470,6 +472,7 @@ class LayerItemWidget(QWidget):
     visibility_toggled: Signal = Signal(str, bool)
     name_changed = Signal(str, str)
     update_requested: Signal = Signal()
+    request_attribute_editor = Signal(str)
 
     def __init__(self, node: str, parent: QWidget | None = None) -> None:
         '''Initialize widget.'''
@@ -492,8 +495,21 @@ class LayerItemWidget(QWidget):
 
         self.__name = QLineEdit(self.__node)
         self.__name.setFrame(False)
+        self.__name.setReadOnly(True)
+        self.__name.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self.__name.setStyleSheet('background: transparent;')
         self.__name.editingFinished.connect(self.rename_node)
         self.__main_layout.addWidget(self.__name)
+
+    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
+        '''mouseDoubleClickEvent (override)'''
+        if self.__name.geometry().contains(event.pos()):
+            self.start_editing()
+            event.accept()
+
+        else:
+            self.request_attribute_editor.emit(self.__node)
+            event.accept()
 
     def on_visible_clicked(self) -> None:
         '''Clicked visible button'''
@@ -531,8 +547,22 @@ class LayerItemWidget(QWidget):
                 )
             )
 
+    def start_editing(self) -> None:
+        '''Start edit mode'''
+        self.__name.setAttribute(Qt.WA_TransparentForMouseEvents, False)
+        self.__name.setReadOnly(False)
+        self.__name.setFrame(True)
+        self.__name.setStyleSheet('')
+        self.__name.setFocus()
+        self.__name.selectAll()
+
     def rename_node(self) -> None:
         '''Rename image plane name'''
+        self.__name.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self.__name.setReadOnly(True)
+        self.__name.setFrame(False)
+        self.__name.setStyleSheet('background: transparent;')
+
         new_name: str = self.__name.text()
         if new_name and new_name != self.__node:
             try:
@@ -544,6 +574,9 @@ class LayerItemWidget(QWidget):
 
             except RuntimeError:
                 self.__name.setText(self.__node)
+
+        else:
+            self.__name.setText(self.__node)
 
 
 class ImagePlaneListWidget(QListWidget):
@@ -1237,7 +1270,7 @@ class ImagePlaneManager(QWidget):
         )
         self.__image_list.order_changed.connect(self.rebuild_after_drop)
         self.__image_list.files_dropped.connect(self.create_image_planes)
-        self.__image_list.itemDoubleClicked.connect(self.show_attribute_editor)
+        # self.__image_list.itemDoubleClicked.connect(self.show_attribute_editor)
         self.__image_list.wheel_scrolled.connect(self.on_wheel_scrolled)
         main_layout.addWidget(self.__image_list)
 
@@ -1386,6 +1419,9 @@ class ImagePlaneManager(QWidget):
             row_widget.visibility_toggled.connect(self.on_visibility_toggled)
             row_widget.name_changed.connect(self.on_layer_name_changed)
             row_widget.update_requested.connect(self.update_image_planes)
+            row_widget.request_attribute_editor.connect(
+                self.show_attribute_editor
+            )
             self.__image_list.setItemWidget(item, row_widget)
 
             if image_plane in selected_nodes:
@@ -1529,16 +1565,9 @@ class ImagePlaneManager(QWidget):
         cmds.delete(*delete_nodes)
         self.update_image_planes()
 
-    def show_attribute_editor(
-        self,
-        item: QListWidgetItem | None = None,
-    ) -> None:
+    def show_attribute_editor(self, node: str) -> None:
         '''Show Attribute Editor'''
-        nodes: list[str] = self.current_items()
-        if item:
-            nodes = [item.data(Qt.UserRole)]
-
-        cmds.select(*nodes)
+        cmds.select(node)
         mel.eval('ShowAttributeEditorOrChannelBox;')
 
 
