@@ -113,6 +113,7 @@
         {"label": "Separate", "module": "amaterasu.modeling.separate", "option_func": "option()"},
         {"divider": "UV"},
         {"label": "Camera Projection", "module": "amaterasu.modeling.camera_projection"},
+        {"label": "UV Set Editor", "module": "amaterasu.modeling.uv_set_editor", "is_window_only": true},
         {"label": "UV Linker", "module": "amaterasu.modeling.uv_linker", "is_window_only": true},
         {"divider": "Utility"},
         {"label": "Expand Mesh From UV", "module": "amaterasu.modeling.expand_mesh_from_uv"},
