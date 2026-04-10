@@ -1274,6 +1274,16 @@ class ImagePlaneManager(QWidget):
         self.__image_list.wheel_scrolled.connect(self.on_wheel_scrolled)
         main_layout.addWidget(self.__image_list)
 
+        shortcut: QShortcut = QShortcut(
+            QKeySequence('Delete'), self.__image_list
+        )
+        shortcut.setContext(Qt.WidgetShortcut)
+        shortcut.activated.connect(self.delete_image_planes)
+
+        shortcut = QShortcut(QKeySequence('Ctrl+A'), self.__image_list)
+        shortcut.setContext(Qt.WidgetShortcut)
+        shortcut.activated.connect(self.show_attribute_editor)
+
     def set_camera(self, camera: str) -> None:
         '''Set camera'''
         self.__camera = camera
@@ -1565,9 +1575,17 @@ class ImagePlaneManager(QWidget):
         cmds.delete(*delete_nodes)
         self.update_image_planes()
 
-    def show_attribute_editor(self, node: str) -> None:
+    def show_attribute_editor(self, node: str = '') -> None:
         '''Show Attribute Editor'''
-        cmds.select(node)
+        nodes: list[str] = [node]
+        if node == '':
+            items: list[QListWidgetItem] = self.__image_list.selectedItems()
+            if not items:
+                return
+
+            nodes = [item.data(Qt.UserRole) for item in items]
+
+        cmds.select(*nodes)
         mel.eval('ShowAttributeEditorOrChannelBox;')
 
 
