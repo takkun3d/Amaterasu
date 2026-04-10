@@ -9,7 +9,7 @@ import os
 from functools import partial
 
 try:
-    from PySide2.QtCore import Qt, Signal, QTimer, QSize
+    from PySide2.QtCore import Qt, Signal, QTimer, QSize, QPoint
     from PySide2.QtGui import (
         QPixmap,
         QCloseEvent,
@@ -33,13 +33,15 @@ try:
         QLineEdit,
         QFileDialog,
         QShortcut,
+        QMenu,
+        QAction,
     )
 
     PYSIDE_VERSION: int = 2
 
 except ImportError:
     if not TYPE_CHECKING:
-        from PySide6.QtCore import Qt, Signal, QTimer, QSize
+        from PySide6.QtCore import Qt, Signal, QTimer, QSize, QPoint
         from PySide6.QtGui import (
             QPixmap,
             QCloseEvent,
@@ -50,6 +52,7 @@ except ImportError:
             QMouseEvent,
             QKeySequence,
             QShortcut,
+            QAction,
         )
         from PySide6.QtWidgets import (
             QWidget,
@@ -63,12 +66,13 @@ except ImportError:
             QSlider,
             QLineEdit,
             QFileDialog,
+            QMenu,
         )
 
         PYSIDE_VERSION = 6
 
 from maya import OpenMayaUI, cmds, mel
-from ..lib import logger, parser, widgets
+from ..lib import logger, parser, widgets, utility
 from . import shift_lens, dolly_zoom, camera_rig
 
 # ==============================================================================
@@ -1272,17 +1276,72 @@ class ImagePlaneManager(QWidget):
         self.__image_list.files_dropped.connect(self.create_image_planes)
         # self.__image_list.itemDoubleClicked.connect(self.show_attribute_editor)
         self.__image_list.wheel_scrolled.connect(self.on_wheel_scrolled)
+        self.__image_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.__image_list.customContextMenuRequested.connect(
+            self.show_context_menu
+        )
         main_layout.addWidget(self.__image_list)
 
-        shortcut: QShortcut = QShortcut(
-            QKeySequence('Delete'), self.__image_list
-        )
-        shortcut.setContext(Qt.WidgetShortcut)
-        shortcut.activated.connect(self.delete_image_planes)
+        self.__delete_act = QAction('Delete', self)
+        self.__delete_act.setShortcut(QKeySequence('Delete'))
+        self.__delete_act.setShortcutContext(Qt.WidgetShortcut)
+        self.__delete_act.triggered.connect(self.delete_image_planes)
+        self.__image_list.addAction(self.__delete_act)
 
-        shortcut = QShortcut(QKeySequence('Ctrl+A'), self.__image_list)
-        shortcut.setContext(Qt.WidgetShortcut)
-        shortcut.activated.connect(self.show_attribute_editor)
+        self.__ae_act = QAction('Attribute Editor ...', self)
+        self.__ae_act.setShortcut(QKeySequence('Ctrl+A'))
+        self.__ae_act.setShortcutContext(Qt.WidgetShortcut)
+        self.__ae_act.triggered.connect(self.show_attribute_editor)
+        self.__image_list.addAction(self.__ae_act)
+
+    def show_context_menu(self, pos: QPoint) -> None:
+        '''Show context menu for list items'''
+        items: list[QListWidgetItem] = self.__image_list.selectedItems()
+        if not items:
+            return
+
+        nodes: list[str] = []
+        for item in items:
+            widget: LayerItemWidget = self.__image_list.itemWidget(item)
+            if widget:
+                nodes.append(item.data(Qt.UserRole))
+
+        if not nodes:
+            return
+
+        node: str = nodes[0]
+        current_state: bool = cmds.getAttr(f'{node}.useFrameExtension')
+
+        menu = QMenu(self)
+
+        action: QAction = QAction('Use Image Sequence', self)
+        action.setCheckable(True)
+        action.setChecked(current_state)
+        action.toggled.connect(self.set_use_image_sequence)
+        menu.addAction(action)
+
+        action = QAction('Reload Image', self)
+        action.triggered.connect(self.reload_image_planes)
+        menu.addAction(action)
+
+        menu.addSeparator()
+
+        action = QAction('Create Image Plane ...', self)
+        action.triggered.connect(self.import_images)
+        menu.addAction(action)
+        menu.addAction(self.__delete_act)
+
+        menu.addSeparator()
+
+        action = QAction('Reveal in Explorer', self)
+        action.triggered.connect(self.open_file_location)
+        menu.addAction(action)
+        menu.addAction(self.__ae_act)
+
+        if hasattr(menu, 'exec_'):
+            menu.exec_(self.__image_list.mapToGlobal(pos))
+        else:
+            menu.exec(self.__image_list.mapToGlobal(pos))
 
     def set_camera(self, camera: str) -> None:
         '''Set camera'''
@@ -1578,7 +1637,7 @@ class ImagePlaneManager(QWidget):
     def show_attribute_editor(self, node: str = '') -> None:
         '''Show Attribute Editor'''
         nodes: list[str] = [node]
-        if node == '':
+        if not node:
             items: list[QListWidgetItem] = self.__image_list.selectedItems()
             if not items:
                 return
@@ -1587,6 +1646,52 @@ class ImagePlaneManager(QWidget):
 
         cmds.select(*nodes)
         mel.eval('ShowAttributeEditorOrChannelBox;')
+
+    @widgets.undo
+    def set_use_image_sequence(self, state: bool) -> None:
+        '''Toggle useFrameExtension for selected image planes'''
+        items: list[QListWidgetItem] = self.__image_list.selectedItems()
+        if not items:
+            return
+
+        nodes: list[str] = [item.data(Qt.UserRole) for item in items]
+        for node in nodes:
+            cmds.setAttr(f'{node}.useFrameExtension', state)
+
+    def reload_image_planes(self) -> None:
+        '''Force reload image files from disk'''
+        items: list[QListWidgetItem] = self.__image_list.selectedItems()
+        if not items:
+            return
+
+        nodes: list[str] = [item.data(Qt.UserRole) for item in items]
+        for node in nodes:
+            path: str = cmds.getAttr(f'{node}.imageName')
+            cmds.setAttr(f'{node}.imageName', path, type='string')
+
+    def open_file_location(self) -> None:
+        '''Open the directory containing the image plane file'''
+        items: list[QListWidgetItem] = self.__image_list.selectedItems()
+        if not items:
+            return
+
+        nodes: list[str] = [item.data(Qt.UserRole) for item in items]
+        for node in nodes:
+            file_path: str = cmds.getAttr(f'{node}.imageName')
+            if not file_path:
+                continue
+
+            dir_path: str = os.path.dirname(file_path)
+            if not os.path.exists(dir_path):
+                _logger.error('Directory does not exist: %s', dir_path)
+                continue
+
+            result: int = utility.open_directory(dir_path)
+            if result == -2:
+                _logger.error('Not supported os.')
+
+            elif result == -1:
+                _logger.error('Does not exists path : %s', dir_path)
 
 
 class MainWindow(widgets.BaseToolWidget):
