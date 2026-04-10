@@ -1809,8 +1809,14 @@ def find_target_plug(
         return start_plug
 
     plugs_to_check: list[str] = list(connections)
+    visited_plugs: set[str] = set()
     while plugs_to_check:
         current_plug: str = plugs_to_check.pop(0)
+        if current_plug in visited_plugs:
+            continue
+
+        visited_plugs.add(current_plug)
+
         node_name: str = current_plug.split('.')[0]
         if target_name in node_name:
             return f'{node_name}.{target_attr}'
