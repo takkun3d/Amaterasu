@@ -2078,14 +2078,21 @@ class BaseToolWidget(QWidget):
     # override
     def close(self) -> bool:
         '''close[override]'''
+        workspace: str
         parent: QObject = self.parent()
         if parent:
-            workspace: str = parent.objectName()
-            if cmds.workspaceControl(workspace, query=True, exists=True):
-                cmds.deleteUI(workspace)
-                if workspace in WORKSPACE_WIDGETS:
-                    del WORKSPACE_WIDGETS[workspace]
-                return True
+            workspace = parent.objectName()
+
+        else:
+            workspace = f'{self.objectName()}WorkspaceControl'
+
+        print('Close workspace', workspace)
+        if cmds.workspaceControl(workspace, query=True, exists=True):
+            cmds.deleteUI(workspace)
+            if workspace in WORKSPACE_WIDGETS:
+                del WORKSPACE_WIDGETS[workspace]
+
+            return True
 
         return QWidget.close(self)
 
