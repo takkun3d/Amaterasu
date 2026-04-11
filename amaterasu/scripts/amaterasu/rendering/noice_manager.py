@@ -379,7 +379,7 @@ class ImageCompareView(QGraphicsView):
     def wheelEvent(self, event: QWheelEvent) -> None:
         '''Override'''
         factor = 1.1
-        if event.delta() > 0:
+        if event.angleDelta().y() > 0:
             self.scale(factor, factor)
         else:
             self.scale(1.0 / factor, 1.0 / factor)
