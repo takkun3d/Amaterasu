@@ -47,15 +47,25 @@ class RangeSlider(QtWidgets.QWidget):
 
     valueChanged: QtCore.Signal = QtCore.Signal(int, int)
 
-    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+    def __init__(
+        self,
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Widget,
+    ) -> None:
         """Initialize the RangeSlider widget.
 
         Args:
             parent (QtWidgets.QWidget | None, optional): The parent widget.
                 Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): Window flags.
+                Defaults to QtCore.Qt.WindowType.Widget.
         """
-        super().__init__(parent)
-        self.setMinimumHeight(30)
+        super().__init__(parent, flag)
+        self.setMinimumSize(100, 20)
+        self.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding,
+            QtWidgets.QSizePolicy.Policy.Fixed,
+        )
 
         self._minimum: int = 0
         self._maximum: int = 100
