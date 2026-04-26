@@ -20,8 +20,9 @@
 """Settings management framework for Amaterasu tools.
 
 This module provides a robust system for managing, saving, and loading
-tool settings. It uses metaclasses to automate the registration of
-settings variants and supports data binding for automatic UI synchronization.
+tool settings. It features a Multiton pattern for instance-specific settings
+and a data binding system that automatically synchronizes UI elements
+while preventing memory corruption or crashes.
 """
 from __future__ import annotations
 from typing import Generic, TypeVar, Type, Callable, Any, Iterator, cast
@@ -84,7 +85,7 @@ class EnumMeta(type):
         return iter(cls.__values)
 
 
-class SettingsMeta(EnumMeta, utils.SingletonMeta):
+class SettingsMeta(EnumMeta, utils.MultitonMeta):
     """Metaclass blending Enum discovery and Singleton behavior.
 
     Used by ToolSettings to ensure global availability of settings while
@@ -93,10 +94,11 @@ class SettingsMeta(EnumMeta, utils.SingletonMeta):
 
 
 class Variant(Generic[T]):
-    """Represents a single setting entry with optional data binding.
+    """Represents a single setting entry with safe UI data binding.
 
-    A Variant holds a specific value and can be bound to UI setter/getter
-    methods to automate synchronization between data and interface.
+    A Variant holds a specific value and can be bound to a UI setter/getter.
+    It supports lifecycle management by checking the existence of the bound
+    C++ objects (Qt widgets) before execution.
     """
 
     def __init__(self, default_value: T) -> None:
@@ -149,10 +151,11 @@ class Variant(Generic[T]):
     def reset(self) -> None:
         """Reset the value to its default state."""
         self.__value = self.__default_value
+        self.commit()
 
     def bind(
         self,
-        setter: Callable[[Any], None],
+        setter: Callable[[Any], Any],
         getter: Callable[[], Any],
         encoder: Callable[[Any], Any] | None = None,
         decoder: Callable[[Any], Any] | None = None,
@@ -160,7 +163,7 @@ class Variant(Generic[T]):
         """Bind UI methods to this setting for automatic synchronization.
 
         Args:
-            setter (Callable[[Any], None]): Method to update the UI from data.
+            setter (Callable[[Any], Any]): Method to update the UI from data.
             getter (Callable[[], Any]): Method to retrieve data from the UI.
             encoder (Callable[[Any], Any] | None, optional): Func to process
                 data before saving. Defaults to None.
@@ -192,6 +195,21 @@ class Variant(Generic[T]):
                 value = self.__encoder(value)
 
             self.__value = value
+
+    def clone(self) -> Variant[T]:
+        """Create a fresh copy of this variant for a new settings instance.
+
+        This is crucial for the Multiton pattern, ensuring each tool instance
+        has its own independent binding information while sharing the same
+        default value defined in the class.
+
+        Returns:
+            Variant[T]: A new Variant instance with the same default value
+                and name, but without any active UI bindings.
+        """
+        new_variant: Variant[T] = Variant(self.__default_value)
+        new_variant.set_name(self.__name)
+        return new_variant
 
 
 class BaseHandler:
@@ -288,16 +306,28 @@ class BaseSettings(metaclass=EnumMeta):
     """Core settings container with iteration and dictionary-like access."""
 
     def __init__(self, handler: BaseHandler | None = None) -> None:
-        """Initialize the settings container and load data.
+        """Initialize the settings container and clone variants for the instance.
+
+        This constructor clones all class-level Variants into instance-level
+        attributes. This prevents different tool instances from interfering
+        with each other's UI bindings.
 
         Args:
-            handler (BaseHandler | None, optional): Storage handler.
+            handler (BaseHandler | None, optional): Storage handler for
+                saving/loading. Defaults to None.
         """
         if handler is None:
             handler = BaseHandler()
 
         super().__init__()
         self.__handler: BaseHandler = handler
+        self.__instance_variants: dict[str, Variant[Any]] = {}
+        for cls_variant in self.__class__:
+            name: str = cls_variant.name()
+            cloned: Variant[Any] = cls_variant.clone()
+            self.__instance_variants[name] = cloned
+            setattr(self, name, cloned)
+
         self.read()
 
     def __getitem__(self, key: str) -> Any:
@@ -306,7 +336,7 @@ class BaseSettings(metaclass=EnumMeta):
 
     def __iter__(self) -> Iterator[Variant[Any]]:
         """Iterate over all setting variants."""
-        return iter(self.__class__)
+        return iter(self.__instance_variants.values())
 
     def reset(self) -> None:
         """Reset all setting variants to their default values."""
@@ -344,9 +374,19 @@ class BaseSettings(metaclass=EnumMeta):
 class ToolSettings(BaseSettings, metaclass=SettingsMeta):
     """Amaterasu-specific settings class with automatic path resolution."""
 
+    def __init__(
+        self,
+        handler: BaseHandler | None = None,
+        instance_id: str = "default",
+    ) -> None:
+        super().__init__(handler)
+
     @classmethod
     def instance(
-        cls: Type[SelfToolSettings], file_name: str, auto_path: bool = False
+        cls: Type[SelfToolSettings],
+        file_name: str,
+        auto_path: bool = False,
+        instance_id: str = "default",
     ) -> SelfToolSettings:
         """Factory method to get the singleton settings instance.
 
@@ -364,7 +404,7 @@ class ToolSettings(BaseSettings, metaclass=SettingsMeta):
             file_path = pathlib.Path(file_name)
 
         handler: JsonHandler = JsonHandler(file_path)
-        return cls(handler)
+        return cls(handler, instance_id=instance_id)
 
     @staticmethod
     def build_file_name(file_name: str) -> pathlib.Path:

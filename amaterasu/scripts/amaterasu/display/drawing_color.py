@@ -67,12 +67,9 @@ class Settings(framework.ToolSettings):
     last_tab_index: framework.Variant[int] = framework.Variant(0)
     rgb: framework.Variant[list[float]] = framework.Variant([0.0, 0.275, 0.098])
     preset_name: framework.Variant[str] = framework.Variant("Soft Pastel")
-    h_min: framework.Variant[float] = framework.Variant(0.0)
-    h_max: framework.Variant[float] = framework.Variant(1.0)
-    s_min: framework.Variant[float] = framework.Variant(0.2)
-    s_max: framework.Variant[float] = framework.Variant(0.45)
-    v_min: framework.Variant[float] = framework.Variant(0.85)
-    v_max: framework.Variant[float] = framework.Variant(1.0)
+    h_range: framework.Variant[list[float]] = framework.Variant([0.0, 1.0])
+    s_range: framework.Variant[list[float]] = framework.Variant([0.2, 0.45])
+    v_range: framework.Variant[list[float]] = framework.Variant([0.85, 1.0])
 
 
 class IndexColorWidget(QtWidgets.QWidget):
@@ -404,6 +401,60 @@ class AutoColorizeWidget(QtWidgets.QWidget):
         self.__saturation.set_values(int(s[0] * 100), int(s[1] * 100))
         self.__value.set_values(int(v[0] * 100), int(v[1] * 100))
 
+    def hue_range(self) -> list[float]:
+        """Get the current hue range.
+
+        Returns:
+            list[float]: The hue range as [min, max] between 0.0 and 1.0.
+        """
+        return [self.__hue.low_value() / 100.0, self.__hue.high_value() / 100.0]
+
+    def set_hue_range(self, v: list[float]) -> None:
+        """Set the hue range.
+
+        Args:
+            v (list[float]): The hue range as [min, max] between 0.0 and 1.0.
+        """
+        self.__hue.set_values(int(v[0] * 100), int(v[1] * 100))
+
+    def saturation_range(self) -> list[float]:
+        """Get the current saturation range.
+
+        Returns:
+            list[float]: The saturation range as [min, max] between 0.0 and 1.0.
+        """
+        return [
+            self.__saturation.low_value() / 100.0,
+            self.__saturation.high_value() / 100.0,
+        ]
+
+    def set_saturation_range(self, v: list[float]) -> None:
+        """Set the saturation range.
+
+        Args:
+            v (list[float]): The saturation range as [min, max] between 0.0 and 1.0.
+        """
+        self.__saturation.set_values(int(v[0] * 100), int(v[1] * 100))
+
+    def value_range(self) -> list[float]:
+        """Get the current value (brightness) range.
+
+        Returns:
+            list[float]: The value range as [min, max] between 0.0 and 1.0.
+        """
+        return [
+            self.__value.low_value() / 100.0,
+            self.__value.high_value() / 100.0,
+        ]
+
+    def set_value_range(self, v: list[float]) -> None:
+        """Set the value (brightness) range.
+
+        Args:
+            v (list[float]): The value range as [min, max] between 0.0 and 1.0.
+        """
+        self.__value.set_values(int(v[0] * 100), int(v[1] * 100))
+
 
 class MainWindow(framework.ToolWindow):
     """Tool main window."""
@@ -450,41 +501,44 @@ class MainWindow(framework.ToolWindow):
 
         # self.__tabs.currentChanged.connect(self.save_settings)
 
-    def load_settings(self) -> None:
-        """Load UI settings from the configuration file."""
-        settings: Settings = Settings.instance(__name__, True)
-        self.restoreGeometry(utils.ascii_to_qt(settings.window_geo.value()))
-        self.__tabs.setCurrentIndex(settings.last_tab_index.value())
-        self.__rgb_widget.set_color(settings.rgb.value())
-        self.__auto_widget.set_preset_name(settings.preset_name.value())
-        self.__auto_widget.set_hsv_ranges(
-            (settings.h_min.value(), settings.h_max.value()),
-            (settings.s_min.value(), settings.s_max.value()),
-            (settings.v_min.value(), settings.v_max.value()),
+        settings: Settings = self.tool_settings()
+
+        settings.window_geo.bind(
+            setter=self.restoreGeometry,
+            getter=self.saveGeometry,
+            encoder=utils.qt_to_ascii,
+            decoder=utils.ascii_to_qt,
+        )
+        settings.last_tab_index.bind(
+            setter=self.__tabs.setCurrentIndex,
+            getter=self.__tabs.currentIndex,
+        )
+        settings.rgb.bind(
+            setter=self.__rgb_widget.set_color,
+            getter=self.__rgb_widget.color,
+        )
+        settings.preset_name.bind(
+            setter=self.__auto_widget.set_preset_name,
+            getter=self.__auto_widget.preset_name,
+        )
+        settings.h_range.bind(
+            setter=self.__auto_widget.set_hue_range,
+            getter=self.__auto_widget.hue_range,
+        )
+        settings.s_range.bind(
+            setter=self.__auto_widget.set_saturation_range,
+            getter=self.__auto_widget.saturation_range,
+        )
+        settings.v_range.bind(
+            setter=self.__auto_widget.set_value_range,
+            getter=self.__auto_widget.value_range,
         )
 
-    def save_settings(self) -> None:
-        """Save UI settings to the configuration file."""
-        settings: Settings = Settings.instance(__name__, True)
-        settings.window_geo.set_value(utils.qt_to_ascii(self.saveGeometry()))
-        settings.last_tab_index.set_value(self.__tabs.currentIndex())
-        settings.rgb.set_value(self.__rgb_widget.color())
-        settings.preset_name.set_value(self.__auto_widget.preset_name())
-
-        hsv: dict[str, tuple[float, float]] = self.__auto_widget.hsv_ranges()
-        settings.h_min.set_value(hsv["h"][0])
-        settings.h_max.set_value(hsv["h"][1])
-        settings.s_min.set_value(hsv["s"][0])
-        settings.s_max.set_value(hsv["s"][1])
-        settings.v_min.set_value(hsv["v"][0])
-        settings.v_max.set_value(hsv["v"][1])
-        settings.write()
-
-    def reset_settings(self) -> None:
-        """Reset UI settings to their default values."""
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
+    def tool_settings(self) -> Settings:
+        settings: Settings = Settings.instance(
+            __name__, True, instance_id=str(id(self))
+        )
+        return settings
 
     def about(self) -> None:
         """Show the about dialog with tool information."""

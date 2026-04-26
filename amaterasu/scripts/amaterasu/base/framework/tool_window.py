@@ -21,14 +21,13 @@
 
 This module provides the `ToolWindow` abstract base class, which extends
 the foundational `BaseToolWindow` to include a standardized UI layout.
-It automatically sets up a menu bar with 'File' and 'Help' menus, and
-defines abstract methods for saving, loading, and resetting tool settings,
-ensuring a consistent user experience across all Amaterasu tools.
+It automatically sets up a menu bar, handles settings lifecycle via Multiton,
+and ensures stable UI-to-data synchronization.
 """
 from __future__ import annotations
 import abc
 from amaterasu.base.qt import QtCore, QtGui, QtWidgets
-from amaterasu.base.framework import workspace_control
+from amaterasu.base.framework import workspace_control, settings
 
 
 class ToolWindow(
@@ -36,12 +35,11 @@ class ToolWindow(
     abc.ABC,
     metaclass=workspace_control.QWidgetABCMeta,
 ):
-    """Abstract base class for standard Amaterasu tool windows.
+    """Abstract base class for Amaterasu tool windows.
 
-    This class provides a pre-configured UI template including a main layout,
-    a menu bar (with File/Help menus), and a central area for tool-specific
-    options. It enforces the implementation of settings management methods
-    (load, save, reset) to maintain consistency.
+    This class manages the standard UI structure (menus, option area) and
+    provides hooks for managing settings that are unique to each instance
+    of the window.
     """
 
     def __init__(
@@ -146,19 +144,49 @@ class ToolWindow(
         self.load_settings()
         super().show()
 
-    @abc.abstractmethod
-    def load_settings(self) -> None:
-        """Loads tool-specific settings from a configuration file."""
+    def tool_settings(self) -> settings.ToolSettings | None:
+        """Get the settings instance for this specific tool window.
 
-    @abc.abstractmethod
+        Subclasses should implement this to return a Multiton settings instance
+        using self.__unique_id to ensure instance-specific data isolation.
+
+        Returns:
+            settings.ToolSettings | None: The settings object or None if not used.
+        """
+        return None
+
+    def load_settings(self) -> None:
+        """Read values from storage and update the UI widgets.
+
+        This method updates the internal settings object from disk and
+        triggers the synchronization to the bound UI widgets.
+        """
+        s: settings.ToolSettings | None = self.tool_settings()
+        if s:
+            s.read()
+
     @QtCore.Slot()
     def save_settings(self) -> None:
-        """Saves the current tool settings to a configuration file."""
+        """Fetch current UI values and commit them to the settings storage.
 
-    @abc.abstractmethod
+        This method triggers the synchronization from UI widgets to the
+        internal settings object and writes the data to disk.
+        """
+        s: settings.ToolSettings | None = self.tool_settings()
+        if s:
+            s.write()
+
     @QtCore.Slot()
     def reset_settings(self) -> None:
-        """Resets the tool settings to their default values."""
+        """Reset all tool settings to their default values and update UI.
+
+        This action clears the current settings instance, restores defaults,
+        and synchronizes both the UI and the saved file.
+        """
+        s: settings.ToolSettings | None = self.tool_settings()
+        if s:
+            s.reset()
+            s.write()
 
     @abc.abstractmethod
     @QtCore.Slot()
