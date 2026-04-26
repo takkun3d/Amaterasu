@@ -456,13 +456,7 @@ class MainWindow(framework.ToolWindow):
         self.restoreGeometry(utils.ascii_to_qt(settings.window_geo.value()))
         self.__tabs.setCurrentIndex(settings.last_tab_index.value())
         self.__rgb_widget.set_color(settings.rgb.value())
-        print(settings.preset_name.value())
         self.__auto_widget.set_preset_name(settings.preset_name.value())
-        print(
-            (settings.h_min.value(), settings.h_max.value()),
-            (settings.s_min.value(), settings.s_max.value()),
-            (settings.v_min.value(), settings.v_max.value()),
-        )
         self.__auto_widget.set_hsv_ranges(
             (settings.h_min.value(), settings.h_max.value()),
             (settings.s_min.value(), settings.s_max.value()),

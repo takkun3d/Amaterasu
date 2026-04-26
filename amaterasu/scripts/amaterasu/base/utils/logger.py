@@ -27,10 +27,11 @@ visible to the user without requiring the Script Editor.
 from __future__ import annotations
 import logging
 from logging import Logger
-from amaterasu.base import utils, widgets
+from amaterasu.base import widgets
+from amaterasu.base.utils.singleton import Singleton
 
 
-class ToastLogHandler(utils.Singleton, logging.Handler):
+class ToastLogHandler(Singleton, logging.Handler):
     """A custom logging handler that routes log records to ToastWidgets.
 
     It acts as a singleton to ensure all messages are queued and displayed

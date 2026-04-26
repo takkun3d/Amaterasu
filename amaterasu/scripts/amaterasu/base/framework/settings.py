@@ -29,7 +29,7 @@ import pathlib
 import json
 import re
 import amaterasu
-from amaterasu.base import utils
+from amaterasu.base.utils.singleton import SingletonMeta
 
 BAD_FILE_NAME: str = r"[\\|/|:|?|.|\"|<|>|\||\r|\n|\t|\v|\s]"
 SelfToolSettings = TypeVar("SelfToolSettings", bound="ToolSettings")
@@ -84,7 +84,7 @@ class EnumMeta(type):
         return iter(cls.__values)
 
 
-class SettingsMeta(EnumMeta, utils.SingletonMeta):
+class SettingsMeta(EnumMeta, SingletonMeta):
     """Metaclass blending Enum discovery and Singleton behavior.
 
     Used by ToolSettings to ensure global availability of settings while
