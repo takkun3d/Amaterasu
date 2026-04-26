@@ -2086,7 +2086,6 @@ class BaseToolWidget(QWidget):
         else:
             workspace = f'{self.objectName()}WorkspaceControl'
 
-        print('Close workspace', workspace)
         if cmds.workspaceControl(workspace, query=True, exists=True):
             cmds.deleteUI(workspace)
             if workspace in WORKSPACE_WIDGETS:
