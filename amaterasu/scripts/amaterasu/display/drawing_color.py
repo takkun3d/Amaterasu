@@ -31,16 +31,14 @@ import hashlib
 import colorsys
 from maya import cmds
 from amaterasu.base.qt import QtCore, QtWidgets
-from amaterasu.base.widgets import RangeSlider
-from ..lib import logger, parser, widgets
+from amaterasu.base import dcc, framework, utils, widgets
 
 __product__: str = "Drawing Color"
 __version__: str = "1.30"
-__doc__ = "Set drawing color to selected nodes."
 __copyright__ = (
     "Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License."
 )
-_logger: logger.Logger = logger.get_logger(__product__)
+_logger: utils.Logger = utils.get_logger(__product__)
 
 TRASH: str = "a_trash.png"
 PRESETS: dict[str, list[float]] = {
@@ -62,19 +60,19 @@ PRESETS: dict[str, list[float]] = {
 }
 
 
-class Settings(parser.ToolSettings):
+class Settings(framework.ToolSettings):
     """Settings for tool."""
 
-    window_geo: parser.Variant[str] = parser.Variant("")
-    last_tab_index: parser.Variant[int] = parser.Variant(0)
-    rgb: parser.Variant[list[float]] = parser.Variant([0.0, 0.275, 0.098])
-    preset_name: parser.Variant[str] = parser.Variant("Soft Pastel")
-    h_min: parser.Variant[float] = parser.Variant(0.0)
-    h_max: parser.Variant[float] = parser.Variant(1.0)
-    s_min: parser.Variant[float] = parser.Variant(0.2)
-    s_max: parser.Variant[float] = parser.Variant(0.45)
-    v_min: parser.Variant[float] = parser.Variant(0.85)
-    v_max: parser.Variant[float] = parser.Variant(1.0)
+    window_geo: framework.Variant[str] = framework.Variant("")
+    last_tab_index: framework.Variant[int] = framework.Variant(0)
+    rgb: framework.Variant[list[float]] = framework.Variant([0.0, 0.275, 0.098])
+    preset_name: framework.Variant[str] = framework.Variant("Soft Pastel")
+    h_min: framework.Variant[float] = framework.Variant(0.0)
+    h_max: framework.Variant[float] = framework.Variant(1.0)
+    s_min: framework.Variant[float] = framework.Variant(0.2)
+    s_max: framework.Variant[float] = framework.Variant(0.45)
+    v_min: framework.Variant[float] = framework.Variant(0.85)
+    v_max: framework.Variant[float] = framework.Variant(1.0)
 
 
 class IndexColorWidget(QtWidgets.QWidget):
@@ -114,7 +112,7 @@ class IndexColorWidget(QtWidgets.QWidget):
 
             if i == 0:
                 trash_button: widgets.IconButton = widgets.IconButton(self)
-                trash_button.set_icon(widgets.icon_from_file_name(TRASH))
+                trash_button.set_icon(dcc.get_icon_path(TRASH))
                 trash_button.setFixedSize(QtCore.QSize(24, 24))
                 trash_button.clicked.connect(functools.partial(self.apply, i))
                 main_layout.addWidget(trash_button, row, col)
@@ -132,7 +130,7 @@ class IndexColorWidget(QtWidgets.QWidget):
         main_layout.setRowStretch(row + 1, 1)
         main_layout.setColumnStretch(8, 1)
 
-    @widgets.undo
+    @dcc.undo
     def apply(self, index: int) -> None:
         """Apply the selected index color to the current selection.
 
@@ -191,9 +189,9 @@ class RGBColorWidget(QtWidgets.QWidget):
         button.clicked.connect(self.remove_rgb_color_callback)
         rgb_layout.addWidget(button)
 
-        self.color_palette = widgets.ColorPalette(None, 8, self)
-        self.color_palette.clicked.connect(self.__set_color_from_palette)
-        layout.addRow(self.color_palette)
+        palette: widgets.ColorPalette = widgets.ColorPalette(None, 8, self)
+        palette.clicked.connect(self.__set_color_from_palette)
+        layout.addRow(palette)
 
     def __set_color_from_palette(self, color: list[float]) -> None:
         """Set the RGB color to the ColorSelectButton from the clicked palette.
@@ -203,7 +201,7 @@ class RGBColorWidget(QtWidgets.QWidget):
         """
         self.__rgb_color.set_color(*color)
 
-    @widgets.undo
+    @dcc.undo
     def remove_rgb_color_callback(self) -> None:
         """Callback to remove RGB color overrides from selected nodes."""
         self.applied.emit()
@@ -211,7 +209,7 @@ class RGBColorWidget(QtWidgets.QWidget):
         if result:
             _logger.info("Done.")
 
-    @widgets.undo
+    @dcc.undo
     def apply_rgb_color_callback(self) -> None:
         """Callback to apply the selected RGB color override to
         selected nodes."""
@@ -271,17 +269,17 @@ class AutoColorizeWidget(QtWidgets.QWidget):
         self.__preset.currentIndexChanged.connect(self.preset_changed)
         layout.addRow(widgets.FormLabel('Presets'), self.__preset)
 
-        self.__hue: RangeSlider = RangeSlider(self)
+        self.__hue: widgets.RangeSlider = widgets.RangeSlider(self)
         self.__hue.set_range(0, 100)
         self.__hue.set_bar_color((220, 90, 90))
         layout.addRow(widgets.FormLabel('Hue'), self.__hue)
 
-        self.__saturation: RangeSlider = RangeSlider(self)
+        self.__saturation: widgets.RangeSlider = widgets.RangeSlider(self)
         self.__saturation.set_range(0, 100)
         self.__saturation.set_bar_color((90, 220, 130))
         layout.addRow(widgets.FormLabel('Saturation'), self.__saturation)
 
-        self.__value: RangeSlider = RangeSlider(self)
+        self.__value: widgets.RangeSlider = widgets.RangeSlider(self)
         self.__value.set_range(0, 100)
         self.__value.set_bar_color((90, 150, 220))
         layout.addRow(widgets.FormLabel('Value'), self.__value)
@@ -316,7 +314,7 @@ class AutoColorizeWidget(QtWidgets.QWidget):
         self.__saturation.set_values(int(s_min * 100), int(s_max * 100))
         self.__value.set_values(int(v_min * 100), int(v_max * 100))
 
-    @widgets.undo
+    @dcc.undo
     def remove_color_callback(self) -> None:
         """Callback to remove color overrides from selected nodes."""
         self.applied.emit()
@@ -324,7 +322,7 @@ class AutoColorizeWidget(QtWidgets.QWidget):
         if result:
             _logger.info("Done.")
 
-    @widgets.undo
+    @dcc.undo
     def apply_auto_colorize_callback(self) -> None:
         """Callback to apply UUID-based automatic HSV coloring to
         selected nodes."""
@@ -335,7 +333,7 @@ class AutoColorizeWidget(QtWidgets.QWidget):
 
         self.applied.emit()
 
-        result: bool = apply_colors(
+        result: bool = apply_auto_color(
             selection,
             self.__hue.low_value() / 100.0,
             self.__hue.high_value() / 100.0,
@@ -407,7 +405,7 @@ class AutoColorizeWidget(QtWidgets.QWidget):
         self.__value.set_values(int(v[0] * 100), int(v[1] * 100))
 
 
-class MainWindow(widgets.ToolWidget):
+class MainWindow(framework.ToolWindow):
     """Tool main window."""
 
     def __init__(
@@ -430,10 +428,9 @@ class MainWindow(widgets.ToolWidget):
         self.setWindowTitle(__product__)
         self.resize(250, 220)
 
-        option_widget: QtWidgets.QWidget = self.option_widget()
-        main_layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(
-            option_widget
-        )
+    def create_ui(self, parent: QtWidgets.QWidget) -> None:
+        """Create the tool-specific user interface."""
+        main_layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(parent)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
         self.__tabs: QtWidgets.QTabWidget = QtWidgets.QTabWidget(self)
@@ -456,7 +453,7 @@ class MainWindow(widgets.ToolWidget):
     def load_settings(self) -> None:
         """Load UI settings from the configuration file."""
         settings: Settings = Settings.instance(__name__, True)
-        self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
+        self.restoreGeometry(utils.ascii_to_qt(settings.window_geo.value()))
         self.__tabs.setCurrentIndex(settings.last_tab_index.value())
         self.__rgb_widget.set_color(settings.rgb.value())
         print(settings.preset_name.value())
@@ -475,7 +472,7 @@ class MainWindow(widgets.ToolWidget):
     def save_settings(self) -> None:
         """Save UI settings to the configuration file."""
         settings: Settings = Settings.instance(__name__, True)
-        settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
+        settings.window_geo.set_value(utils.qt_to_ascii(self.saveGeometry()))
         settings.last_tab_index.set_value(self.__tabs.currentIndex())
         settings.rgb.set_value(self.__rgb_widget.color())
         settings.preset_name.set_value(self.__auto_widget.preset_name())
@@ -497,12 +494,12 @@ class MainWindow(widgets.ToolWidget):
 
     def about(self) -> None:
         """Show the about dialog with tool information."""
-        widgets.AboutDialog.info(
+        framework.AboutDialog.info(
             self, __product__, __version__, __copyright__, __doc__
         )
 
 
-def apply_colors(
+def apply_auto_color(
     transforms: list[str],
     h_min: float,
     h_max: float,
