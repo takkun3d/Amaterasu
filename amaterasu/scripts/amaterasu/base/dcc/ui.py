@@ -17,30 +17,13 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Base widgets module for Amaterasu.
+""""""
+from maya import OpenMayaUI
+from amaterasu.base.qt import QtWidgets, wrap_instance
 
-This module provides common, reusable UI components for Amaterasu tools.
-It serves as a central hub for importing custom widgets, such as buttons,
-palettes, layouts, and sliders, ensuring a consistent interface across
-the application.
-"""
-from amaterasu.base.widgets.color_button import ColorButton
-from amaterasu.base.widgets.color_palette import ColorPalette
-from amaterasu.base.widgets.color_select_button import ColorSelectButton
-from amaterasu.base.widgets.form_label import FormLabel
-from amaterasu.base.widgets.form_layout import FormLayout
-from amaterasu.base.widgets.icon_button import IconButton
-from amaterasu.base.widgets.range_slider import RangeSlider
-from amaterasu.base.widgets.toast import ToastWidget, ToastSignalEmitter
 
-__all__: list[str] = [
-    "ColorButton",
-    "ColorPalette",
-    "ColorSelectButton",
-    "FormLabel",
-    "FormLayout",
-    "IconButton",
-    "RangeSlider",
-    "ToastWidget",
-    "ToastSignalEmitter",
-]
+def get_maya_window() -> QtWidgets.QWidget | None:
+    """"""
+    return wrap_instance(
+        int(OpenMayaUI.MQtUtil.mainWindow()), QtWidgets.QWidget
+    )

@@ -17,30 +17,37 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Base widgets module for Amaterasu.
+"""Decorators for DCC application commands.
 
-This module provides common, reusable UI components for Amaterasu tools.
-It serves as a central hub for importing custom widgets, such as buttons,
-palettes, layouts, and sliders, ensuring a consistent interface across
-the application.
+This module provides useful decorators for Maya, such as grouping
+multiple commands into a single undo chunk.
 """
-from amaterasu.base.widgets.color_button import ColorButton
-from amaterasu.base.widgets.color_palette import ColorPalette
-from amaterasu.base.widgets.color_select_button import ColorSelectButton
-from amaterasu.base.widgets.form_label import FormLabel
-from amaterasu.base.widgets.form_layout import FormLayout
-from amaterasu.base.widgets.icon_button import IconButton
-from amaterasu.base.widgets.range_slider import RangeSlider
-from amaterasu.base.widgets.toast import ToastWidget, ToastSignalEmitter
+from __future__ import annotations
+from typing import Any, Callable
+import functools
+from maya import cmds
 
-__all__: list[str] = [
-    "ColorButton",
-    "ColorPalette",
-    "ColorSelectButton",
-    "FormLabel",
-    "FormLayout",
-    "IconButton",
-    "RangeSlider",
-    "ToastWidget",
-    "ToastSignalEmitter",
-]
+
+def undo(func: Callable[..., Any]) -> Callable[..., Any]:
+    """Decorator to group Maya commands into a single undo chunk.
+
+    This ensures that all operations performed within the decorated
+    function can be undone with a single 'Ctrl+Z' operation in Maya.
+
+    Args:
+        func (Callable): The function to wrap.
+
+    Returns:
+        Callable: The wrapped function executing within an undo chunk.
+    """
+
+    @functools.wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        try:
+            cmds.undoInfo(openChunk=True)
+            return func(*args, **kwargs)
+
+        finally:
+            cmds.undoInfo(closeChunk=True)
+
+    return wrapper

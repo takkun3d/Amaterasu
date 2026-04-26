@@ -17,30 +17,24 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Base widgets module for Amaterasu.
+"""Base framework module for Amaterasu.
 
-This module provides common, reusable UI components for Amaterasu tools.
-It serves as a central hub for importing custom widgets, such as buttons,
-palettes, layouts, and sliders, ensuring a consistent interface across
-the application.
+This module provides the core architectural components for building Amaterasu tools.
+It includes base window classes, Maya workspace control integration, and standard
+dialogs, ensuring a consistent lifecycle and UI structure across all tools.
 """
-from amaterasu.base.widgets.color_button import ColorButton
-from amaterasu.base.widgets.color_palette import ColorPalette
-from amaterasu.base.widgets.color_select_button import ColorSelectButton
-from amaterasu.base.widgets.form_label import FormLabel
-from amaterasu.base.widgets.form_layout import FormLayout
-from amaterasu.base.widgets.icon_button import IconButton
-from amaterasu.base.widgets.range_slider import RangeSlider
-from amaterasu.base.widgets.toast import ToastWidget, ToastSignalEmitter
+
+from amaterasu.base.framework.workspace_control import WorkspaceControlWindow
+from amaterasu.base.framework.tool_window import ToolWindow
+from amaterasu.base.framework.standard_tool_window import StandardToolWindow
+from amaterasu.base.framework.about_dialog import AboutDialog
+from amaterasu.base.framework.settings import ToolSettings, Variant
 
 __all__: list[str] = [
-    "ColorButton",
-    "ColorPalette",
-    "ColorSelectButton",
-    "FormLabel",
-    "FormLayout",
-    "IconButton",
-    "RangeSlider",
-    "ToastWidget",
-    "ToastSignalEmitter",
+    "WorkspaceControlWindow",
+    "ToolWindow",
+    "StandardToolWindow",
+    "AboutDialog",
+    "ToolSettings",
+    "Variant",
 ]

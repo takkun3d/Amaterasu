@@ -23,6 +23,7 @@ This module provides a specialized slider widget (RangeSlider) that allows users
 to select an integer range with two handles. It is designed to be a reusable
 base component for various Amaterasu tools.
 """
+from __future__ import annotations
 import enum
 from amaterasu.base.qt import QtCore, QtGui, QtWidgets
 
