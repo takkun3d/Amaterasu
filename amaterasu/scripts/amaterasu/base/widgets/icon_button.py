@@ -25,7 +25,7 @@ as well as a custom signal for right-click detection.
 """
 from __future__ import annotations
 from amaterasu.base.qt import QtCore, QtGui, QtWidgets
-from amaterasu.base.dcc import paths
+from amaterasu.base import dcc
 
 
 class IconButton(QtWidgets.QPushButton):
@@ -109,7 +109,7 @@ class IconButton(QtWidgets.QPushButton):
         Args:
             icon (str): The file name of the default icon (e.g., "icon.png").
         """
-        self.__default_icon = QtGui.QIcon(paths.get_icon_path(icon))
+        self.__default_icon = QtGui.QIcon(dcc.get_icon_path(icon))
         super().setIcon(self.__default_icon)
 
     def set_hover_icon(self, icon: str) -> None:
@@ -118,7 +118,7 @@ class IconButton(QtWidgets.QPushButton):
         Args:
             icon (str): The file name of the hover icon.
         """
-        self.__hover_icon = QtGui.QIcon(paths.get_icon_path(icon))
+        self.__hover_icon = QtGui.QIcon(dcc.get_icon_path(icon))
 
     def set_pressed_icon(self, icon: str) -> None:
         """Set the icon to display when the button is pressed.
@@ -126,5 +126,5 @@ class IconButton(QtWidgets.QPushButton):
         Args:
             icon (str): The file name of the pressed icon.
         """
-        self.__pressed_icon = QtGui.QIcon(paths.get_icon_path(icon))
+        self.__pressed_icon = QtGui.QIcon(dcc.get_icon_path(icon))
         self.setStyleSheet('QPushButton:pressed{border:none; padding:0;}')
