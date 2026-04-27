@@ -123,7 +123,6 @@ class AboutDialog(QtWidgets.QDialog):
 <p>{document}</p>
 <hr />
 <p>{copyright_}</p>
-<p>This software is provided "AS IS", without warranty of any kind.</p>
 """
         dialog: AboutDialog = cls(parent)
         dialog.setWindowTitle(f"About {product}")

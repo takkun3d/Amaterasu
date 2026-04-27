@@ -35,9 +35,6 @@ from amaterasu.base import dcc, framework, utils, widgets
 
 __product__: str = "Drawing Color"
 __version__: str = "1.30"
-__copyright__ = (
-    "Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License."
-)
 _logger: utils.Logger = utils.get_logger(__product__)
 
 TRASH: str = "a_trash.png"
@@ -456,7 +453,7 @@ class AutoColorizeWidget(QtWidgets.QWidget):
         self.__value.set_values(int(v[0] * 100), int(v[1] * 100))
 
 
-class MainWindow(framework.ToolWindow):
+class MainWindow(framework.ToolWindow[Settings]):
     """Tool main window."""
 
     def __init__(
@@ -501,50 +498,38 @@ class MainWindow(framework.ToolWindow):
 
         # self.__tabs.currentChanged.connect(self.save_settings)
 
-        settings: Settings = self.tool_settings()
-
-        settings.window_geo.bind(
-            setter=self.restoreGeometry,
-            getter=self.saveGeometry,
-            encoder=utils.qt_to_ascii,
-            decoder=utils.ascii_to_qt,
-        )
-        settings.last_tab_index.bind(
-            setter=self.__tabs.setCurrentIndex,
-            getter=self.__tabs.currentIndex,
-        )
-        settings.rgb.bind(
-            setter=self.__rgb_widget.set_color,
-            getter=self.__rgb_widget.color,
-        )
-        settings.preset_name.bind(
-            setter=self.__auto_widget.set_preset_name,
-            getter=self.__auto_widget.preset_name,
-        )
-        settings.h_range.bind(
-            setter=self.__auto_widget.set_hue_range,
-            getter=self.__auto_widget.hue_range,
-        )
-        settings.s_range.bind(
-            setter=self.__auto_widget.set_saturation_range,
-            getter=self.__auto_widget.saturation_range,
-        )
-        settings.v_range.bind(
-            setter=self.__auto_widget.set_value_range,
-            getter=self.__auto_widget.value_range,
-        )
-
-    def tool_settings(self) -> Settings:
-        settings: Settings = Settings.instance(
-            __name__, True, instance_id=str(id(self))
-        )
-        return settings
-
-    def about(self) -> None:
-        """Show the about dialog with tool information."""
-        framework.AboutDialog.info(
-            self, __product__, __version__, __copyright__, __doc__
-        )
+        settings: Settings | None = self.tool_settings()
+        if settings:
+            settings.window_geo.bind(
+                setter=self.restoreGeometry,
+                getter=self.saveGeometry,
+                encoder=utils.qt_to_ascii,
+                decoder=utils.ascii_to_qt,
+            )
+            settings.last_tab_index.bind(
+                setter=self.__tabs.setCurrentIndex,
+                getter=self.__tabs.currentIndex,
+            )
+            settings.rgb.bind(
+                setter=self.__rgb_widget.set_color,
+                getter=self.__rgb_widget.color,
+            )
+            settings.preset_name.bind(
+                setter=self.__auto_widget.set_preset_name,
+                getter=self.__auto_widget.preset_name,
+            )
+            settings.h_range.bind(
+                setter=self.__auto_widget.set_hue_range,
+                getter=self.__auto_widget.hue_range,
+            )
+            settings.s_range.bind(
+                setter=self.__auto_widget.set_saturation_range,
+                getter=self.__auto_widget.saturation_range,
+            )
+            settings.v_range.bind(
+                setter=self.__auto_widget.set_value_range,
+                getter=self.__auto_widget.value_range,
+            )
 
 
 def apply_auto_color(

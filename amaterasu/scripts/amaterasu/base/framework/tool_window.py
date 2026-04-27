@@ -25,14 +25,40 @@ It automatically sets up a menu bar, handles settings lifecycle via Multiton,
 and ensures stable UI-to-data synchronization.
 """
 from __future__ import annotations
+from typing import TypeVar, Generic
+from types import ModuleType
 import abc
+import sys
 from amaterasu.base.qt import QtCore, QtGui, QtWidgets
-from amaterasu.base.framework import workspace_control, settings
+from amaterasu.base.framework import workspace_control, about_dialog, settings
+
+T = TypeVar("T", bound=settings.ToolSettings)
+
+DEFAULT_LICENSE: str = """Copyright (c) 2014-2016 takkun (takkun3d).<br />
+<br />
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:<br />
+<br />
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.<br />
+<br />
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE."""
 
 
 class ToolWindow(
     workspace_control.WorkspaceControlWindow,
     abc.ABC,
+    Generic[T],
     metaclass=workspace_control.QWidgetABCMeta,
 ):
     """Abstract base class for Amaterasu tool windows.
@@ -144,15 +170,23 @@ class ToolWindow(
         self.load_settings()
         super().show()
 
-    def tool_settings(self) -> settings.ToolSettings | None:
-        """Get the settings instance for this specific tool window.
+    def tool_settings(self) -> T | None:
+        """Automatically find and return the Settings instance for this tool.
 
-        Subclasses should implement this to return a Multiton settings instance
-        using self.__unique_id to ensure instance-specific data isolation.
-
-        Returns:
-            settings.ToolSettings | None: The settings object or None if not used.
+        This method looks for a class named 'Settings' in the module where
+        the subclass is defined.
         """
+        module: ModuleType | None = sys.modules.get(self.__module__)
+        if not module:
+            return None
+
+        settings_cls: type[T] | None = getattr(module, "Settings", None)
+        if settings_cls and issubclass(settings_cls, settings.ToolSettings):
+            instance: T = settings_cls.instance(
+                self.__module__, auto_path=True, instance_id=str(id(self))
+            )
+            return instance
+
         return None
 
     def load_settings(self) -> None:
@@ -188,47 +222,54 @@ class ToolWindow(
             s.reset()
             s.write()
 
-    @abc.abstractmethod
     @QtCore.Slot()
     def about(self) -> None:
-        """Shows the 'About' dialog for the tool."""
+        """Shows the 'About' dialog for the tool by reading module attributes."""
+        module: ModuleType | None = sys.modules.get(self.__module__)
+        product: str = getattr(module, "__product__", self.__class__.__name__)
+        version: str = getattr(module, "__version__", "Unknown")
+        copyright_text: str = getattr(module, "__copyright__", DEFAULT_LICENSE)
+        doc: str = getattr(module, "__doc__", "")
+        about_dialog.AboutDialog.info(
+            self, product, version, copyright_text, doc
+        )
 
-    def menu_bar(self) -> QtWidgets.QMenuBar:
-        """Gets the main menu bar widget.
+    # def menu_bar(self) -> QtWidgets.QMenuBar:
+    #     """Gets the main menu bar widget.
 
-        Returns:
-            QtWidgets.QMenuBar: The menu bar instance.
-        """
-        return self.__menu_bar
+    #     Returns:
+    #         QtWidgets.QMenuBar: The menu bar instance.
+    #     """
+    #     return self.__menu_bar
 
-    def file_menu(self) -> QtWidgets.QMenu:
-        """Gets the 'File' menu.
+    # def file_menu(self) -> QtWidgets.QMenu:
+    #     """Gets the 'File' menu.
 
-        Returns:
-            QtWidgets.QMenu: The file menu instance.
-        """
-        return self.__file_menu
+    #     Returns:
+    #         QtWidgets.QMenu: The file menu instance.
+    #     """
+    #     return self.__file_menu
 
-    def help_menu(self) -> QtWidgets.QMenu:
-        """Gets the 'Help' menu.
+    # def help_menu(self) -> QtWidgets.QMenu:
+    #     """Gets the 'Help' menu.
 
-        Returns:
-            QtWidgets.QMenu: The help menu instance.
-        """
-        return self.__help_menu
+    #     Returns:
+    #         QtWidgets.QMenu: The help menu instance.
+    #     """
+    #     return self.__help_menu
 
-    def option_widget(self) -> QtWidgets.QWidget:
-        """Gets the central widget container for tool-specific UI elements.
+    # def option_widget(self) -> QtWidgets.QWidget:
+    #     """Gets the central widget container for tool-specific UI elements.
 
-        Returns:
-            QtWidgets.QWidget: The container widget.
-        """
-        return self.__option_widget
+    #     Returns:
+    #         QtWidgets.QWidget: The container widget.
+    #     """
+    #     return self.__option_widget
 
-    def option_layout(self) -> QtWidgets.QLayout:
-        """Gets the layout applied to the tool-specific option area.
+    # def option_layout(self) -> QtWidgets.QLayout:
+    #     """Gets the layout applied to the tool-specific option area.
 
-        Returns:
-            QtWidgets.QLayout: The vertical layout instance.
-        """
-        return self.__sub_layout
+    #     Returns:
+    #         QtWidgets.QLayout: The vertical layout instance.
+    #     """
+    #     return self.__sub_layout
