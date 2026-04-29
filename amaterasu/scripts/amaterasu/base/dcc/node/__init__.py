@@ -17,22 +17,21 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Base DCC module for Amaterasu.
+"""Node manipulation utilities for Amaterasu.
 
-This module provides common utilities and decorators for integrating
-Amaterasu tools with Digital Content Creation (DCC) applications like Maya.
-It serves as a central hub for accessing DCC-specific functions, such as
-path resolution and undo stack management.
+This package provides centralized utility functions for operating on DCC nodes
+(e.g., Maya transform or shape nodes). It abstracts away DCC-specific commands,
+allowing higher-level Amaterasu tools to interact with nodes safely and
+consistently without duplicating business logic.
 """
-
-from amaterasu.base.dcc.paths import get_icon_path
-from amaterasu.base.dcc.decorators import undo
-from amaterasu.base.dcc.ui import get_maya_window
-from amaterasu.base.dcc import node
+from amaterasu.base.dcc.node.color import (
+    set_index_color,
+    set_rgb_color,
+    clear_color,
+)
 
 __all__: list[str] = [
-    "get_icon_path",
-    "undo",
-    "get_maya_window",
-    "node",
+    "set_index_color",
+    "set_rgb_color",
+    "clear_color",
 ]

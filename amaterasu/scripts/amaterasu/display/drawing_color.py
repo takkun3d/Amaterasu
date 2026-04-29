@@ -24,6 +24,7 @@ RGB-based drawing overrides to Maya transform nodes. It includes manual
 color assignment features as well as a UUID-based automatic colorization
 system for improved viewport visibility.
 """
+
 from __future__ import annotations
 import hashlib
 import colorsys
@@ -106,9 +107,8 @@ class IndexColorWidget(QtWidgets.QWidget):
             index (int): The color index (0-31) to apply.
         """
         self.applied.emit()
-        result: bool = apply(0, index)
-        if result:
-            _logger.info("Done.")
+        dcc.node.set_index_color(index)
+        _logger.info("Done.")
 
 
 class RGBColorWidget(QtWidgets.QWidget):
@@ -173,18 +173,16 @@ class RGBColorWidget(QtWidgets.QWidget):
     def remove_rgb_color_callback(self) -> None:
         """Callback to remove RGB color overrides from selected nodes."""
         self.applied.emit()
-        result: bool = apply(1, 0)
-        if result:
-            _logger.info("Done.")
+        dcc.node.clear_color()
+        _logger.info("Done.")
 
     @dcc.undo
     def apply_rgb_color_callback(self) -> None:
         """Callback to apply the selected RGB color override to
         selected nodes."""
         self.applied.emit()
-        result: bool = apply(1, 0, self.__rgb_color.color())
-        if result:
-            _logger.info("Done.")
+        dcc.node.set_rgb_color(self.__rgb_color.color())
+        _logger.info("Done.")
 
     def color(self) -> list[float]:
         """Get the current RGB color.
@@ -286,23 +284,16 @@ class AutoColorizeWidget(QtWidgets.QWidget):
     def remove_color_callback(self) -> None:
         """Callback to remove color overrides from selected nodes."""
         self.applied.emit()
-        result: bool = apply(1, 0)
-        if result:
-            _logger.info("Done.")
+        dcc.node.clear_color()
+        _logger.info("Done.")
 
     @dcc.undo
     def apply_auto_colorize_callback(self) -> None:
         """Callback to apply UUID-based automatic HSV coloring to
         selected nodes."""
-        selection: list[str] = cmds.ls(selection=True, type='transform')
-        if not selection:
-            _logger.warning('Select objects to colorize.')
-            return
 
         self.applied.emit()
-
-        result: bool = apply_auto_color(
-            selection,
+        apply_auto_color(
             self.__hue.low_value() / 100.0,
             self.__hue.high_value() / 100.0,
             self.__saturation.low_value() / 100.0,
@@ -310,8 +301,7 @@ class AutoColorizeWidget(QtWidgets.QWidget):
             self.__value.low_value() / 100.0,
             self.__value.high_value() / 100.0,
         )
-        if result:
-            _logger.info("Applied colors to %s nodes.", len(selection))
+        _logger.info("Done.")
 
     def preset_name(self) -> str:
         """Get current preset name.
@@ -507,18 +497,18 @@ class MainWindow(framework.ToolWindow[Settings]):
 
 
 def apply_auto_color(
-    transforms: list[str],
     h_min: float,
     h_max: float,
     s_min: float,
     s_max: float,
     v_min: float,
     v_max: float,
+    nodes: list[str] | None = None,
 ) -> bool:
     """Generate and apply unique colors to the given transforms based on UUID.
 
     Args:
-        transforms (list[str]): List of transform node names to colorize.
+        nodes (list[str]): List of node names to colorize.
         h_min (float): Minimum hue value (0.0 - 1.0).
         h_max (float): Maximum hue value (0.0 - 1.0).
         s_min (float): Minimum saturation value (0.0 - 1.0).
@@ -529,7 +519,10 @@ def apply_auto_color(
     Returns:
         bool: True if colors were successfully applied.
     """
-    for node in transforms:
+    if nodes is None:
+        nodes = cmds.ls(selection=True)
+
+    for node in nodes:
         uuids: list[str] = cmds.ls(node, uuid=True)
         if not uuids:
             continue
@@ -553,13 +546,12 @@ def apply_auto_color(
         g: float
         b: float
         r, g, b = colorsys.hsv_to_rgb(h, s, v)
-        cmds.setAttr(f"{node}.overrideEnabled", 1)
-        cmds.setAttr(f"{node}.overrideRGBColors", 1)
-        cmds.setAttr(f"{node}.overrideColorRGB", r, g, b)
+        dcc.node.set_rgb_color([r, g, b], nodes=[node])
 
     return True
 
 
+# TODO: Remove this function once perspective_guide and decompose_rotate are updated.
 def apply(
     mode: int,
     index: int = 0,
@@ -567,69 +559,21 @@ def apply(
     force_layer: bool = True,
     selection: list[str] | None = None,
 ) -> bool:
-    """Apply display color to selected nodes.
-
-    Args:
-        mode (int): 0 for Index Color mode, 1 for RGB Color mode.
-        index (int, optional): The color index (0-31).
-            Defaults to 0.
-        rgb (list[float] | None, optional): The RGB color values.
-            Defaults to None.
-        force_layer (bool, optional): Whether to disconnect existing
-            display layers.
-            Defaults to True.
-        selection (list[str] | None, optional): List of nodes to colorize.
-            If None, uses current selection. Defaults to None.
-
-    Returns:
-        bool: True if successful, False if an error occurred or no objects
-            were selected.
-    """
-    if not selection:
-        selection = cmds.ls(selection=True)
-
-    if not selection:
-        _logger.error("Select object to set wireframe color.")
-        return False
-
-    if index >= 32:
-        _logger.error("Color index is maximum value of 31.")
-        return False
-
-    if index <= -1:
-        _logger.error("Color index is minimum value of 0.")
-        return False
-
-    for node in selection:
-        if force_layer:
-            plugs: list[str] = cmds.listConnections(
-                f"{node}.drawOverride",
-                type="displayLayer",
-                source=True,
-                destination=False,
-                plugs=True,
-            )
-            if plugs:
-                cmds.disconnectAttr(plugs[0], f"{node}.drawOverride")
-
-        # Index Color
-        if mode == 0:
-            if index == 0:
-                cmds.setAttr(f"{node}.overrideEnabled", 0)
-            else:
-                cmds.setAttr(f"{node}.overrideEnabled", 1)
-                cmds.setAttr(f"{node}.overrideRGBColors", 0)
-                cmds.setAttr(f"{node}.overrideColor", index)
-
-        # RGB Color
+    """Deprecated: Use amaterasu.base.dcc.node.color instead."""
+    if mode == 0:
+        if index == 0:
+            dcc.node.clear_color(nodes=selection)
         else:
-            if rgb is None:
-                cmds.setAttr(f"{node}.overrideEnabled", 0)
-            else:
-                cmds.setAttr(f"{node}.overrideEnabled", 1)
-                cmds.setAttr(f"{node}.overrideRGBColors", 1)
-                cmds.setAttr(f"{node}.overrideColorRGB", *rgb, type="double3")
-
+            dcc.node.set_index_color(
+                index, nodes=selection, force_layer=force_layer
+            )
+    else:
+        if rgb is None:
+            dcc.node.clear_color(nodes=selection)
+        else:
+            dcc.node.set_rgb_color(
+                rgb, nodes=selection, force_layer=force_layer
+            )
     return True
 
 
