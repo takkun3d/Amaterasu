@@ -77,15 +77,9 @@ class Settings(framework.ToolSettings):
     last_tab_index: framework.Variant[int] = framework.Variant(0)
     rgb: framework.Variant[list[float]] = framework.Variant([0.0, 0.275, 0.098])
     preset_name: framework.Variant[str] = framework.Variant("Soft Pastel")
-    h_range: framework.Variant[tuple[float, float]] = framework.Variant(
-        (0.0, 1.0)
-    )
-    s_range: framework.Variant[tuple[float, float]] = framework.Variant(
-        (0.2, 0.45)
-    )
-    v_range: framework.Variant[tuple[float, float]] = framework.Variant(
-        (0.85, 1.0)
-    )
+    h_range: framework.Variant[list[float]] = framework.Variant([0.0, 1.0])
+    s_range: framework.Variant[list[float]] = framework.Variant([0.2, 0.45])
+    v_range: framework.Variant[list[float]] = framework.Variant([0.85, 1.0])
 
 
 class IndexColorWidget(QtWidgets.QWidget):
@@ -351,7 +345,7 @@ class AutoColorizeWidget(QtWidgets.QWidget):
         """Get the current hue range.
 
         Returns:
-            tuple[float, float]: The hue range as [min, max] between 0.0 and 1.0.
+            list[float]: The hue range as [min, max] between 0.0 and 1.0.
         """
         return [
             self.__hue.low_value() / 100.0,
@@ -366,16 +360,16 @@ class AutoColorizeWidget(QtWidgets.QWidget):
         """
         self.__hue.set_values(int(v[0] * 100), int(v[1] * 100))
 
-    def saturation_range(self) -> tuple[float, float]:
+    def saturation_range(self) -> list[float]:
         """Get the current saturation range.
 
         Returns:
-            tuple[float, float]: The saturation range as [min, max] between 0.0 and 1.0.
+            list[float]: The saturation range as [min, max] between 0.0 and 1.0.
         """
-        return (
+        return [
             self.__saturation.low_value() / 100.0,
             self.__saturation.high_value() / 100.0,
-        )
+        ]
 
     def set_saturation_range(self, v: list[float]) -> None:
         """Set the saturation range.
@@ -385,16 +379,16 @@ class AutoColorizeWidget(QtWidgets.QWidget):
         """
         self.__saturation.set_values(int(v[0] * 100), int(v[1] * 100))
 
-    def value_range(self) -> tuple[float, float]:
+    def value_range(self) -> list[float]:
         """Get the current value (brightness) range.
 
         Returns:
-            tuple[float, float]: The value range as [min, max] between 0.0 and 1.0.
+            list[float]: The value range as [min, max] between 0.0 and 1.0.
         """
-        return (
+        return [
             self.__value.low_value() / 100.0,
             self.__value.high_value() / 100.0,
-        )
+        ]
 
     def set_value_range(self, v: list[float]) -> None:
         """Set the value (brightness) range.
