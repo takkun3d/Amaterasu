@@ -57,15 +57,35 @@ PRESETS: dict[str, list[float]] = {
 
 
 class Settings(framework.ToolSettings):
-    """Settings for tool."""
+    """Settings for the Drawing Color tool.
+
+    This class manages the persistent settings for the tool's UI, ensuring
+    that user preferences like window geometry, selected colors, and auto-color
+    ranges are saved and restored across sessions.
+
+    Attributes:
+        window_geo (framework.Variant[str]): The saved window geometry data.
+        last_tab_index (framework.Variant[int]): The index of the last opened tab.
+        rgb (framework.Variant[list[float]]): The last applied RGB color.
+        preset_name (framework.Variant[str]): The name of the selected auto-color preset.
+        h_range (framework.Variant[list[float]]): The hue slider range as [min, max].
+        s_range (framework.Variant[list[float]]): The saturation slider range as [min, max].
+        v_range (framework.Variant[list[float]]): The value slider range as [min, max].
+    """
 
     window_geo: framework.Variant[str] = framework.Variant("")
     last_tab_index: framework.Variant[int] = framework.Variant(0)
     rgb: framework.Variant[list[float]] = framework.Variant([0.0, 0.275, 0.098])
     preset_name: framework.Variant[str] = framework.Variant("Soft Pastel")
-    h_range: framework.Variant[list[float]] = framework.Variant([0.0, 1.0])
-    s_range: framework.Variant[list[float]] = framework.Variant([0.2, 0.45])
-    v_range: framework.Variant[list[float]] = framework.Variant([0.85, 1.0])
+    h_range: framework.Variant[tuple[float, float]] = framework.Variant(
+        (0.0, 1.0)
+    )
+    s_range: framework.Variant[tuple[float, float]] = framework.Variant(
+        (0.2, 0.45)
+    )
+    v_range: framework.Variant[tuple[float, float]] = framework.Variant(
+        (0.85, 1.0)
+    )
 
 
 class IndexColorWidget(QtWidgets.QWidget):
@@ -293,14 +313,19 @@ class AutoColorizeWidget(QtWidgets.QWidget):
         selected nodes."""
 
         self.applied.emit()
-        apply_auto_color(
+        hue: list[float] = [
             self.__hue.low_value() / 100.0,
             self.__hue.high_value() / 100.0,
+        ]
+        saturation: list[float] = [
             self.__saturation.low_value() / 100.0,
             self.__saturation.high_value() / 100.0,
+        ]
+        value: list[float] = [
             self.__value.low_value() / 100.0,
             self.__value.high_value() / 100.0,
-        )
+        ]
+        apply_auto_color(hue, saturation, value)
         _logger.info("Done.")
 
     def preset_name(self) -> str:
@@ -322,53 +347,16 @@ class AutoColorizeWidget(QtWidgets.QWidget):
             self.__preset.setCurrentIndex(idx)
             self.preset_changed()
 
-    def hsv_ranges(self) -> dict[str, tuple[float, float]]:
-        """Get current HSV slider ranges (0.0 - 1.0).
-
-        Returns:
-            dict[str, tuple[float, float]]: A dictionary containing
-                the min and max
-                values for hue ('h'), saturation ('s'), and value ('v').
-        """
-        return {
-            "h": (
-                self.__hue.low_value() / 100.0,
-                self.__hue.high_value() / 100.0,
-            ),
-            "s": (
-                self.__saturation.low_value() / 100.0,
-                self.__saturation.high_value() / 100.0,
-            ),
-            "v": (
-                self.__value.low_value() / 100.0,
-                self.__value.high_value() / 100.0,
-            ),
-        }
-
-    def set_hsv_ranges(
-        self,
-        h: tuple[float, float],
-        s: tuple[float, float],
-        v: tuple[float, float],
-    ) -> None:
-        """Set HSV slider ranges (0.0 - 1.0).
-
-        Args:
-            h (tuple[float, float]): Hue range as (min, max).
-            s (tuple[float, float]): Saturation range as (min, max).
-            v (tuple[float, float]): Value range as (min, max).
-        """
-        self.__hue.set_values(int(h[0] * 100), int(h[1] * 100))
-        self.__saturation.set_values(int(s[0] * 100), int(s[1] * 100))
-        self.__value.set_values(int(v[0] * 100), int(v[1] * 100))
-
     def hue_range(self) -> list[float]:
         """Get the current hue range.
 
         Returns:
-            list[float]: The hue range as [min, max] between 0.0 and 1.0.
+            tuple[float, float]: The hue range as [min, max] between 0.0 and 1.0.
         """
-        return [self.__hue.low_value() / 100.0, self.__hue.high_value() / 100.0]
+        return [
+            self.__hue.low_value() / 100.0,
+            self.__hue.high_value() / 100.0,
+        ]
 
     def set_hue_range(self, v: list[float]) -> None:
         """Set the hue range.
@@ -378,16 +366,16 @@ class AutoColorizeWidget(QtWidgets.QWidget):
         """
         self.__hue.set_values(int(v[0] * 100), int(v[1] * 100))
 
-    def saturation_range(self) -> list[float]:
+    def saturation_range(self) -> tuple[float, float]:
         """Get the current saturation range.
 
         Returns:
-            list[float]: The saturation range as [min, max] between 0.0 and 1.0.
+            tuple[float, float]: The saturation range as [min, max] between 0.0 and 1.0.
         """
-        return [
+        return (
             self.__saturation.low_value() / 100.0,
             self.__saturation.high_value() / 100.0,
-        ]
+        )
 
     def set_saturation_range(self, v: list[float]) -> None:
         """Set the saturation range.
@@ -397,16 +385,16 @@ class AutoColorizeWidget(QtWidgets.QWidget):
         """
         self.__saturation.set_values(int(v[0] * 100), int(v[1] * 100))
 
-    def value_range(self) -> list[float]:
+    def value_range(self) -> tuple[float, float]:
         """Get the current value (brightness) range.
 
         Returns:
-            list[float]: The value range as [min, max] between 0.0 and 1.0.
+            tuple[float, float]: The value range as [min, max] between 0.0 and 1.0.
         """
-        return [
+        return (
             self.__value.low_value() / 100.0,
             self.__value.high_value() / 100.0,
-        ]
+        )
 
     def set_value_range(self, v: list[float]) -> None:
         """Set the value (brightness) range.
@@ -496,28 +484,26 @@ class MainWindow(framework.ToolWindow[Settings]):
 
 
 def apply_auto_color(
-    h_min: float,
-    h_max: float,
-    s_min: float,
-    s_max: float,
-    v_min: float,
-    v_max: float,
+    h_range: list[float],
+    s_range: list[float],
+    v_range: list[float],
     nodes: list[str] | None = None,
 ) -> bool:
     """Generate and apply unique colors to the given transforms based on UUID.
 
     Args:
-        nodes (list[str]): List of node names to colorize.
-        h_min (float): Minimum hue value (0.0 - 1.0).
-        h_max (float): Maximum hue value (0.0 - 1.0).
-        s_min (float): Minimum saturation value (0.0 - 1.0).
-        s_max (float): Maximum saturation value (0.0 - 1.0).
-        v_min (float): Minimum brightness value (0.0 - 1.0).
-        v_max (float): Maximum brightness value (0.0 - 1.0).
+        h_range (list[float]): Hue min and max (0.0 - 1.0).
+        s_range (list[float]): Saturation min and max (0.0 - 1.0).
+        v_range (list[float]): Brightness min and max (0.0 - 1.0).
+        nodes (list[str] | None): List of node names to colorize.
 
     Returns:
         bool: True if colors were successfully applied.
     """
+    h_min, h_max = h_range
+    s_min, s_max = s_range
+    v_min, v_max = v_range
+
     if nodes is None:
         nodes = cmds.ls(selection=True)
 
@@ -541,9 +527,6 @@ def apply_auto_color(
             v_max - v_min
         )
 
-        r: float
-        g: float
-        b: float
         r, g, b = colorsys.hsv_to_rgb(h, s, v)
         dcc.node.set_rgb_color([r, g, b], nodes=[node])
 
