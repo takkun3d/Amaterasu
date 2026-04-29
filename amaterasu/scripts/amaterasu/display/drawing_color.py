@@ -24,9 +24,7 @@ RGB-based drawing overrides to Maya transform nodes. It includes manual
 color assignment features as well as a UUID-based automatic colorization
 system for improved viewport visibility.
 """
-
 from __future__ import annotations
-import functools
 import hashlib
 import colorsys
 from maya import cmds
@@ -72,7 +70,8 @@ class Settings(framework.ToolSettings):
 class IndexColorWidget(QtWidgets.QWidget):
     """Widget for manual index color selection.
 
-    Provides a grid of Maya index colors and a trash button for removing colors.
+    Uses the generic IndexColorPalette to provide a grid of Maya index colors
+    and handles the application logic for the drawing color tool.
     """
 
     applied: QtCore.Signal = QtCore.Signal()
@@ -92,37 +91,12 @@ class IndexColorWidget(QtWidgets.QWidget):
         """
         super().__init__(parent, flag)
 
-        main_layout: QtWidgets.QGridLayout = QtWidgets.QGridLayout(self)
-        main_layout.setContentsMargins(4, 4, 4, 4)
-        main_layout.setSpacing(2)
+        main_layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
 
-        row: int = -1
-        col: int = -1
-        for i in range(32):
-            col += 1
-            if not i % 8:
-                row += 1
-                col = 0
-
-            if i == 0:
-                trash_button: widgets.IconButton = widgets.IconButton(self)
-                trash_button.set_icon(dcc.get_icon_path(TRASH))
-                trash_button.setFixedSize(QtCore.QSize(24, 24))
-                trash_button.clicked.connect(functools.partial(self.apply, i))
-                main_layout.addWidget(trash_button, row, col)
-
-            else:
-                color: list[float] = cmds.colorIndex(
-                    i, query=True
-                )  # type: ignore
-                button: widgets.ColorButton = widgets.ColorButton(self)
-                button.set_color(color[0], color[1], color[2])
-                button.setFixedSize(QtCore.QSize(24, 24))
-                button.clicked.connect(functools.partial(self.apply, i))
-                main_layout.addWidget(button, row, col)
-
-        main_layout.setRowStretch(row + 1, 1)
-        main_layout.setColumnStretch(8, 1)
+        self.__palette = widgets.IndexColorPalette(self)
+        self.__palette.index_selected.connect(self.apply)
+        main_layout.addWidget(self.__palette)
 
     @dcc.undo
     def apply(self, index: int) -> None:
