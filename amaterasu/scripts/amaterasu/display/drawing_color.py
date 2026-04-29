@@ -400,7 +400,12 @@ class AutoColorizeWidget(QtWidgets.QWidget):
 
 
 class MainWindow(framework.ToolWindow[Settings]):
-    """Tool main window."""
+    """Main window for the Drawing Color tool.
+
+    This window integrates various color override utilities into a unified
+    interface. It manages color selection tabs (Index, RGB, Auto) and
+    synchronizes the UI state with persistent tool settings.
+    """
 
     def __init__(
         self,
@@ -423,7 +428,16 @@ class MainWindow(framework.ToolWindow[Settings]):
         self.resize(250, 220)
 
     def create_ui(self, parent: QtWidgets.QWidget) -> None:
-        """Create the tool-specific user interface."""
+        """Construct the user interface and bind settings.
+
+        This method initializes the main layout, creates the tab widget containing
+        different color override tools, and establishes data bindings between
+        the UI components and the tool's persistent settings.
+
+        Args:
+            parent (QtWidgets.QWidget): The central container widget provided
+                by the framework where all UI elements should be added.
+        """
         main_layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(parent)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
