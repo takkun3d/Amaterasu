@@ -462,38 +462,37 @@ class MainWindow(framework.ToolWindow[Settings]):
 
         # self.__tabs.currentChanged.connect(self.save_settings)
 
-        settings: Settings | None = self.tool_settings()
-        if settings:
-            settings.window_geo.bind(
-                setter=self.restoreGeometry,
-                getter=self.saveGeometry,
-                encoder=utils.qt_to_ascii,
-                decoder=utils.ascii_to_qt,
-            )
-            settings.last_tab_index.bind(
-                setter=self.__tabs.setCurrentIndex,
-                getter=self.__tabs.currentIndex,
-            )
-            settings.rgb.bind(
-                setter=self.__rgb_widget.set_color,
-                getter=self.__rgb_widget.color,
-            )
-            settings.preset_name.bind(
-                setter=self.__auto_widget.set_preset_name,
-                getter=self.__auto_widget.preset_name,
-            )
-            settings.h_range.bind(
-                setter=self.__auto_widget.set_hue_range,
-                getter=self.__auto_widget.hue_range,
-            )
-            settings.s_range.bind(
-                setter=self.__auto_widget.set_saturation_range,
-                getter=self.__auto_widget.saturation_range,
-            )
-            settings.v_range.bind(
-                setter=self.__auto_widget.set_value_range,
-                getter=self.__auto_widget.value_range,
-            )
+        settings: Settings = self.tool_settings()
+        settings.window_geo.bind(
+            setter=self.restoreGeometry,
+            getter=self.saveGeometry,
+            encoder=utils.qt_to_ascii,
+            decoder=utils.ascii_to_qt,
+        )
+        settings.last_tab_index.bind(
+            setter=self.__tabs.setCurrentIndex,
+            getter=self.__tabs.currentIndex,
+        )
+        settings.rgb.bind(
+            setter=self.__rgb_widget.set_color,
+            getter=self.__rgb_widget.color,
+        )
+        settings.preset_name.bind(
+            setter=self.__auto_widget.set_preset_name,
+            getter=self.__auto_widget.preset_name,
+        )
+        settings.h_range.bind(
+            setter=self.__auto_widget.set_hue_range,
+            getter=self.__auto_widget.hue_range,
+        )
+        settings.s_range.bind(
+            setter=self.__auto_widget.set_saturation_range,
+            getter=self.__auto_widget.saturation_range,
+        )
+        settings.v_range.bind(
+            setter=self.__auto_widget.set_value_range,
+            getter=self.__auto_widget.value_range,
+        )
 
 
 def apply_auto_color(

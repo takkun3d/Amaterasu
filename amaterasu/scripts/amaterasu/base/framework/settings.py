@@ -24,6 +24,7 @@ tool settings. It features a Multiton pattern for instance-specific settings
 and a data binding system that automatically synchronizes UI elements
 while preventing memory corruption or crashes.
 """
+
 from __future__ import annotations
 from typing import Generic, TypeVar, Type, Callable, Any, Iterator, cast
 import pathlib
@@ -240,7 +241,6 @@ class BaseHandler:
 
     def write(self, data: dict[str, Any]) -> bool:
         """Write settings data. Must be implemented by subclasses."""
-        print(data)
         return True
 
 

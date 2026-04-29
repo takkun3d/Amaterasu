@@ -24,8 +24,9 @@ the foundational `BaseToolWindow` to include a standardized UI layout.
 It automatically sets up a menu bar, handles settings lifecycle via Multiton,
 and ensures stable UI-to-data synchronization.
 """
+
 from __future__ import annotations
-from typing import TypeVar, Generic
+from typing import Any, TypeVar, Generic, cast, get_args, get_origin
 from types import ModuleType
 import abc
 import sys
@@ -85,6 +86,15 @@ class ToolWindow(
                 Defaults to ''.
         """
         super().__init__(parent=parent, flag=flag, unique_id=unique_id)
+
+        settings_class: type[T] = self.__extract_settings_class()
+        self.__settings: T = settings_class.instance(
+            self.__module__,
+            auto_path=True,
+            instance_id=str(
+                id(self),
+            ),
+        )
 
         self.__main_layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(self)
         self.__main_layout.setContentsMargins(0, 0, 0, 0)
@@ -170,24 +180,46 @@ class ToolWindow(
         self.load_settings()
         super().show()
 
-    def tool_settings(self) -> T | None:
-        """Automatically find and return the Settings instance for this tool.
+    def __extract_settings_class(self) -> type[T]:
+        """Extract the settings class type from the generic type hints.
 
-        This method looks for a class named 'Settings' in the module where
-        the subclass is defined.
+        Analyzes the class's `__orig_bases__` to find the type argument `T`
+        passed to `ToolWindow[T]`. This ensures that the window is properly
+        bound to a valid `ToolSettings` subclass at runtime.
+
+        Returns:
+            type[T]: The extracted settings class type.
+
+        Raises:
+            TypeError: If the class is missing a generic type argument, or
+                if the provided type does not inherit from `ToolSettings`.
         """
-        module: ModuleType | None = sys.modules.get(self.__module__)
-        if not module:
-            return None
+        for base in getattr(self.__class__, "__orig_bases__", []):
+            if get_origin(base) is ToolWindow:
+                args: tuple[Any, ...] = get_args(base)
+                if not args:
+                    continue
 
-        settings_cls: type[T] | None = getattr(module, "Settings", None)
-        if settings_cls and issubclass(settings_cls, settings.ToolSettings):
-            instance: T = settings_cls.instance(
-                self.__module__, auto_path=True, instance_id=str(id(self))
-            )
-            return instance
+                settings_type: Any = args[0]
+                if issubclass(settings_type, settings.ToolSettings):
+                    return cast(type[T], settings_type)
 
-        return None
+                raise TypeError(
+                    f"Fatal Error: '{settings_type.__name__}' must inherit from ToolSettings."
+                )
+
+        raise TypeError(
+            f"Fatal Error: {self.__class__.__name__} must specify a Settings type. "
+        )
+
+    def tool_settings(self) -> T:
+        """Get the dedicated settings instance for this tool window.
+
+        Returns:
+            T: The instantiated settings object. It is guaranteed to be a
+            valid subclass of `ToolSettings` and will never be None.
+        """
+        return self.__settings
 
     def load_settings(self) -> None:
         """Read values from storage and update the UI widgets.
@@ -195,9 +227,7 @@ class ToolWindow(
         This method updates the internal settings object from disk and
         triggers the synchronization to the bound UI widgets.
         """
-        s: settings.ToolSettings | None = self.tool_settings()
-        if s:
-            s.read()
+        self.tool_settings().read()
 
     @QtCore.Slot()
     def save_settings(self) -> None:
@@ -206,9 +236,7 @@ class ToolWindow(
         This method triggers the synchronization from UI widgets to the
         internal settings object and writes the data to disk.
         """
-        s: settings.ToolSettings | None = self.tool_settings()
-        if s:
-            s.write()
+        self.tool_settings().write()
 
     @QtCore.Slot()
     def reset_settings(self) -> None:
@@ -217,10 +245,8 @@ class ToolWindow(
         This action clears the current settings instance, restores defaults,
         and synchronizes both the UI and the saved file.
         """
-        s: settings.ToolSettings | None = self.tool_settings()
-        if s:
-            s.reset()
-            s.write()
+        self.tool_settings().reset()
+        self.tool_settings().write()
 
     @QtCore.Slot()
     def about(self) -> None:
