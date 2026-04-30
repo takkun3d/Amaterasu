@@ -172,16 +172,8 @@ class RGBColorWidget(QtWidgets.QWidget):
         rgb_layout.addWidget(button)
 
         palette: widgets.ColorPalette = widgets.ColorPalette(None, 8, self)
-        palette.clicked.connect(self.__set_color_from_palette)
+        palette.clicked.connect(self.__rgb_color.set_color)
         layout.addRow(palette)
-
-    def __set_color_from_palette(self, color: list[float]) -> None:
-        """Set the RGB color to the ColorSelectButton from the clicked palette.
-
-        Args:
-            color (list[float]): The RGB color values as a list of floats.
-        """
-        self.__rgb_color.set_color(*color)
 
     @dcc.undo
     def remove_rgb_color_callback(self) -> None:
@@ -212,7 +204,7 @@ class RGBColorWidget(QtWidgets.QWidget):
         Args:
             color (list[float]): The RGB color to set.
         """
-        self.__rgb_color.set_color(*color)
+        self.__rgb_color.set_color(color)
 
 
 class AutoColorizeWidget(QtWidgets.QWidget):

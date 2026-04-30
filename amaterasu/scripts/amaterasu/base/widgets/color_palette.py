@@ -23,6 +23,7 @@ This module provides the `ColorPalette` class, a reusable UI component
 that displays a grid of color buttons, allowing users to select from a
 predefined or custom list of colors.
 """
+
 from __future__ import annotations
 from typing import cast
 from amaterasu.base.qt import QtCore, QtWidgets
@@ -94,7 +95,7 @@ class ColorPalette(QtWidgets.QWidget):
         """
         for i, rgb in enumerate(colors):
             button: widgets.ColorButton = widgets.ColorButton(self)
-            button.set_color(*rgb)
+            button.set_color(rgb)
             button.clicked.connect(self.__on_color_selected)
 
             row: int = i // self.__max_columns
@@ -114,7 +115,7 @@ class ColorPalette(QtWidgets.QWidget):
             index (int): The index of the button to update.
             color (list[float]): The new RGB color to set as [r, g, b].
         """
-        self.__buttons[index].set_color(*color)
+        self.__buttons[index].set_color(color)
 
     def set_colors(self, colors: list[list[float]]) -> None:
         """Rebuild the entire palette with a new set of colors.

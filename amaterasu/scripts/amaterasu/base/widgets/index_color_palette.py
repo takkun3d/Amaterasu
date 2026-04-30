@@ -25,6 +25,7 @@ are intended to be pure UI elements. They rely on Qt signals to communicate
 user interactions and strictly avoid containing Maya-specific business logic,
 ensuring maximum reusability and clean MVC architecture.
 """
+
 from __future__ import annotations
 import functools
 from maya import cmds
@@ -77,7 +78,7 @@ class IndexColorPalette(QtWidgets.QWidget):
             else:
                 color: list[float] = cmds.colorIndex(i, query=True)  # type: ignore
                 button = ColorButton(self)
-                button.set_color(color[0], color[1], color[2])
+                button.set_color(color)
                 button.setFixedSize(QtCore.QSize(24, 24))
 
             button.clicked.connect(

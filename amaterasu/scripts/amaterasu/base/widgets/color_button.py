@@ -22,6 +22,7 @@
 This module provides the `ColorButton` class, a reusable UI component
 that displays a specific solid color as its background.
 """
+
 from __future__ import annotations
 from amaterasu.base.qt import QtWidgets
 
@@ -50,28 +51,26 @@ class ColorButton(QtWidgets.QPushButton):
         self.__color: list[float] = [0.0, 0.275, 0.098]
 
         self.setObjectName(f"ColorButton{str(id(self))}")
-        self.set_color(*self.__color)
+        self.set_color(self.__color)
 
-    def set_color(self, r: float, g: float, b: float) -> None:
+    def set_color(self, rgb: list[float]) -> None:
         """Set the background color of the button.
 
         Args:
-            r (float): Red value (0.0 - 1.0).
-            g (float): Green value (0.0 - 1.0).
-            b (float): Blue value (0.0 - 1.0).
+            rgb (list[float]): RGB value (0.0 - 1.0).
         """
-        self.__color = [r, g, b]
+        self.__color = rgb
         self.setStyleSheet(
             COLOR_BUTTON_QSS
             % (
                 self.objectName(),
-                r * 255,
-                g * 255,
-                b * 255,
+                rgb[0] * 255,
+                rgb[1] * 255,
+                rgb[2] * 255,
                 self.objectName(),
-                r * 255,
-                g * 255,
-                b * 255,
+                rgb[0] * 255,
+                rgb[1] * 255,
+                rgb[2] * 255,
             )
         )
 
