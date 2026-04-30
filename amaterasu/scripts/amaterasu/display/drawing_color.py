@@ -121,8 +121,8 @@ class IndexColorWidget(QtWidgets.QWidget):
             index (int): The color index (0-31) to apply.
         """
         self.applied.emit()
-        dcc.node.set_index_color(index)
-        _logger.info("Done.")
+        result: utils.Result = dcc.node.set_index_color(index)
+        result.log(_logger)
 
 
 class RGBColorWidget(QtWidgets.QWidget):
@@ -179,16 +179,16 @@ class RGBColorWidget(QtWidgets.QWidget):
     def remove_rgb_color_callback(self) -> None:
         """Callback to remove RGB color overrides from selected nodes."""
         self.applied.emit()
-        dcc.node.clear_color()
-        _logger.info("Done.")
+        result: utils.Result = dcc.node.clear_color()
+        result.log(_logger)
 
     @dcc.undo
     def apply_rgb_color_callback(self) -> None:
         """Callback to apply the selected RGB color override to
         selected nodes."""
         self.applied.emit()
-        dcc.node.set_rgb_color(self.__rgb_color.color())
-        _logger.info("Done.")
+        result: utils.Result = dcc.node.set_rgb_color(self.__rgb_color.color())
+        result.log(_logger)
 
     def color(self) -> list[float]:
         """Get the current RGB color.
@@ -290,8 +290,8 @@ class AutoColorizeWidget(QtWidgets.QWidget):
     def remove_color_callback(self) -> None:
         """Callback to remove color overrides from selected nodes."""
         self.applied.emit()
-        dcc.node.clear_color()
-        _logger.info("Done.")
+        result: utils.Result = dcc.node.clear_color()
+        result.log(_logger)
 
     @dcc.undo
     def apply_auto_colorize_callback(self) -> None:
@@ -311,8 +311,8 @@ class AutoColorizeWidget(QtWidgets.QWidget):
             self.__value.low_value() / 100.0,
             self.__value.high_value() / 100.0,
         ]
-        apply_auto_color(hue, saturation, value)
-        _logger.info("Done.")
+        result: utils.Result = apply_auto_color(hue, saturation, value)
+        result.log(_logger)
 
     def preset_name(self) -> str:
         """Get current preset name.
@@ -488,7 +488,7 @@ def apply_auto_color(
     s_range: list[float],
     v_range: list[float],
     nodes: list[str] | None = None,
-) -> bool:
+) -> utils.Result:
     """Generate and apply unique colors to the given transforms based on UUID.
 
     Args:
@@ -498,8 +498,9 @@ def apply_auto_color(
         nodes (list[str] | None): List of node names to colorize.
 
     Returns:
-        bool: True if colors were successfully applied.
+        utils.Result: An object containing the merged results of the operation.
     """
+    result: utils.Result = utils.Result()
     h_min, h_max = h_range
     s_min, s_max = s_range
     v_min, v_max = v_range
@@ -507,9 +508,14 @@ def apply_auto_color(
     if nodes is None:
         nodes = cmds.ls(selection=True)
 
+    if not nodes:
+        result.set_error("Select nodes to set drawing color.")
+        return result
+
     for node in nodes:
         uuids: list[str] = cmds.ls(node, uuid=True)
         if not uuids:
+            result.add_failure(node, "Failed to get UUID.")
             continue
 
         uuid_str: str = uuids[0]
@@ -527,10 +533,11 @@ def apply_auto_color(
             v_max - v_min
         )
 
-        r, g, b = colorsys.hsv_to_rgb(h, s, v)
-        dcc.node.set_rgb_color([r, g, b], nodes=[node])
+        color: list[float] = list(colorsys.hsv_to_rgb(h, s, v))
+        r: utils.Result = dcc.node.set_rgb_color(color, nodes=[node])
+        result.merge(r)
 
-    return True
+    return result
 
 
 # TODO: Remove this function once perspective_guide and decompose_rotate are updated.
