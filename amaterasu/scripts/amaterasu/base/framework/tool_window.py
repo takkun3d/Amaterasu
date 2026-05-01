@@ -95,51 +95,73 @@ class ToolWindow(
                 id(self),
             ),
         )
+        self.__init_ui()
 
-        self.__main_layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(self)
-        self.__main_layout.setContentsMargins(0, 0, 0, 0)
+    def __init_ui(self) -> None:
+        """Initializes the base layout and constructs the menu bar.
 
-        self.create_menu()
+        This method acts as the entry point for UI construction. It guarantees
+        that the main layout and menu bar are always created before delegating
+        the inner framework layout construction to `create_frame_ui`.
+        """
+        main_layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        self.create_menu(main_layout)
+        self.create_framework_ui(main_layout)
 
-        self.__sub_layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(self)
-        self.__sub_layout.setContentsMargins(10, 0, 10, 10)
-        self.__main_layout.addLayout(self.__sub_layout)
+    def create_framework_ui(self, layout: QtWidgets.QVBoxLayout) -> None:
+        """Builds the internal framework UI structure.
 
-        self.__option_widget: QtWidgets.QWidget = QtWidgets.QWidget(self)
-        self.__sub_layout.addWidget(self.__option_widget, True)
+        This method defines how the space below the menu bar is utilized.
+        Subclasses (such as `StandardToolWindow`) can override this to inject
+        custom layouts, like scroll areas or execution buttons, before
+        triggering the tool-specific `create_ui`.
 
-        self.create_ui(self.__option_widget)
+        Args:
+            layout (QtWidgets.QVBoxLayout): The main vertical layout of the window.
+        """
+        sub_layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(self)
+        sub_layout.setContentsMargins(10, 0, 10, 10)
+        layout.addLayout(sub_layout)
 
-    def create_menu(self) -> None:
+        option_widget: QtWidgets.QWidget = QtWidgets.QWidget(self)
+        sub_layout.addWidget(option_widget, True)
+
+        self.create_ui(option_widget)
+
+    def create_menu(self, layout: QtWidgets.QVBoxLayout) -> None:
         """Creates the standard menu bar and menus for the tool widget.
 
         This sets up the basic 'File' (Save, Reset, Exit) and 'Help' (About)
         menus. It also invokes `create_custom_menu` to allow subclasses to
         inject their own specific menus.
+
+        Args:
+            layout (QtWidgets.QVBoxLayout): The main vertical layout of the window.
         """
-        self.__menu_bar: QtWidgets.QMenuBar = QtWidgets.QMenuBar(self)
-        self.__main_layout.addWidget(self.__menu_bar)
+        menu_bar: QtWidgets.QMenuBar = QtWidgets.QMenuBar(self)
+        layout.addWidget(menu_bar)
 
-        self.__file_menu: QtWidgets.QMenu = QtWidgets.QMenu("File", self)
-        self.__menu_bar.addMenu(self.__file_menu)
+        file_menu: QtWidgets.QMenu = QtWidgets.QMenu("File", self)
+        menu_bar.addMenu(file_menu)
 
-        action: QtGui.QAction = self.__file_menu.addAction("Save Settings")
+        action: QtGui.QAction = file_menu.addAction("Save Settings")
         action.triggered.connect(self.save_settings)
 
-        action = self.__file_menu.addAction("Reset Settings")
+        action = file_menu.addAction("Reset Settings")
         action.triggered.connect(self.reset_settings)
 
-        self.__file_menu.addSeparator()
+        file_menu.addSeparator()
 
-        action: QtGui.QAction = self.__file_menu.addAction("Exit")
+        action: QtGui.QAction = file_menu.addAction("Exit")
         action.triggered.connect(self.close)
 
-        self.create_custom_menu(self.__menu_bar)
+        self.create_custom_menu(menu_bar)
 
-        self.__help_menu: QtWidgets.QMenu = QtWidgets.QMenu("Help", self)
-        self.__menu_bar.addMenu(self.__help_menu)
+        help_menu: QtWidgets.QMenu = QtWidgets.QMenu("Help", self)
+        menu_bar.addMenu(help_menu)
 
-        action: QtGui.QAction = self.__help_menu.addAction("About")
+        action: QtGui.QAction = help_menu.addAction("About")
         action.triggered.connect(self.about)
 
     def create_custom_menu(self, menu_bar: QtWidgets.QMenuBar) -> None:

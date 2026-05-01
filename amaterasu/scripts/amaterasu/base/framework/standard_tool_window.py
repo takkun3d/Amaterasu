@@ -25,6 +25,7 @@ area for options and standard execution buttons ('Apply & Close',
 'Apply', 'Close') at the bottom of the window. It is ideal for tools
 that require user input followed by a specific execution action.
 """
+
 from __future__ import annotations
 from typing import TypeVar, Generic
 import abc
@@ -42,8 +43,8 @@ class StandardToolWindow(
 
     This class extends `ToolWindow` to provide a standardized layout
     featuring a scrollable option area and three standard action buttons
-    ('Apply & Close', 'Apply', 'Close'). Subclasses must implement
-    `create_tool_ui` and `apply` execution logic.
+    ('Apply & Close', 'Apply', 'Close'). Subclasses only need to implement
+    `create_ui` to build the custom options and `apply` for execution logic.
     """
 
     def __init__(
@@ -52,7 +53,7 @@ class StandardToolWindow(
         flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Widget,
         unique_id: str = "",
     ) -> None:
-        """Initializes the StandardToolWindow with layout and standard buttons.
+        """Initializes the StandardToolWindow.
 
         Args:
             parent (QtWidgets.QWidget | None, optional): The parent widget.
@@ -64,60 +65,58 @@ class StandardToolWindow(
         """
         super().__init__(parent=parent, flag=flag, unique_id=unique_id)
 
-    def create_ui(self, parent: QtWidgets.QWidget) -> None:
-        """Creates the standard layout with scroll area and buttons.
+    def create_frame_ui(self, layout: QtWidgets.QVBoxLayout) -> None:
+        """Overrides the framework UI build process to add a scroll area and buttons.
 
-        Note: Subclasses should NOT override this method. Instead,
-        implement `create_tool_ui` to build custom UI elements.
+        This method injects a scrollable container for the tool options and
+        appends the standard execution buttons ('Apply & Close', 'Apply', 'Close')
+        at the bottom of the provided layout. It then delegates the internal UI
+        construction to `create_ui`.
+
+        Args:
+            layout (QtWidgets.QVBoxLayout): The parent layout where the scroll
+                area and buttons should be added.
         """
-        main_layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(parent)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(8)
+        layout.setSpacing(8)
 
-        self.__scroll: QtWidgets.QScrollArea = QtWidgets.QScrollArea(parent)
-        self.__scroll.setWidgetResizable(True)
-        self.__scroll.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
-        self.__scroll.setMinimumHeight(1)
-        main_layout.addWidget(self.__scroll, 1)
+        scroll_area: QtWidgets.QScrollArea = QtWidgets.QScrollArea(self)
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        scroll_area.setMinimumHeight(1)
+        layout.addWidget(scroll_area, 1)
 
-        self.__tool_option_widget: QtWidgets.QWidget = QtWidgets.QWidget(
-            self.__scroll
-        )
-        self.__scroll.setWidget(self.__tool_option_widget)
+        option_widget: QtWidgets.QWidget = QtWidgets.QWidget(scroll_area)
+        scroll_area.setWidget(option_widget)
 
-        self.create_tool_ui(self.__tool_option_widget)
+        self.create_ui(option_widget)
 
         button_layout: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout()
         button_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.addLayout(button_layout)
+        layout.addLayout(button_layout)
 
-        self.__apply_close: QtWidgets.QPushButton = QtWidgets.QPushButton(
-            "Apply && Close", parent
+        button: QtWidgets.QPushButton = QtWidgets.QPushButton(
+            "Apply && Close", self
         )
-        self.__apply_close.clicked.connect(self.apply_close)
-        button_layout.addWidget(self.__apply_close)
+        button.clicked.connect(self.apply_close)
+        button_layout.addWidget(button)
 
-        self.__apply: QtWidgets.QPushButton = QtWidgets.QPushButton(
-            "Apply", parent
-        )
-        self.__apply.clicked.connect(self.apply)
-        button_layout.addWidget(self.__apply)
+        button = QtWidgets.QPushButton("Apply", self)
+        button.clicked.connect(self.apply)
+        button_layout.addWidget(button)
 
-        self.__close: QtWidgets.QPushButton = QtWidgets.QPushButton(
-            "Close", parent
-        )
-        self.__close.clicked.connect(self.close)
-        button_layout.addWidget(self.__close)
+        button = QtWidgets.QPushButton("Close", self)
+        button.clicked.connect(self.close)
+        button_layout.addWidget(button)
 
     @abc.abstractmethod
-    def create_tool_ui(self, parent: QtWidgets.QWidget) -> None:
+    def create_ui(self, parent: QtWidgets.QWidget) -> None:
         """Creates the tool-specific user interface.
 
         This abstract method must be implemented by subclasses to build and
-        layout their custom UI components within the scroll area.
+        layout their custom UI components within the main option area.
 
         Args:
-            parent (QtWidgets.QWidget): The container widget where the
+            parent (QtWidgets.QWidget): The central container widget where the
                 custom UI elements should be added.
         """
 
