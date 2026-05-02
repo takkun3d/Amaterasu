@@ -76,8 +76,10 @@
         {"label": "Drawing Color", "module": "amaterasu.display.drawing_color", "is_window_only": true},
         {"divider": "Viewport"},
         {"label": "Perspective Guide", "module": "amaterasu.display.perspective_guide", "option_func": "option()"},
-        {"label": "XRay Geometry", "module": "amaterasu.display.xray_geometry", "is_window_only": true},
-        {"label": "Local Axis", "module": "amaterasu.display.local_axis", "is_window_only": true}
+        {"label": "Enable Xray Geometry", "module": "amaterasu.display.xray_geometry", "main_func": "enable()"},
+        {"label": "Disable Xray Geometry", "module": "amaterasu.display.xray_geometry", "main_func": "disable()"},
+        {"label": "Show Local Axis", "module": "amaterasu.display.local_axis", "main_func": "show()"},
+        {"label": "Hide Local Axis", "module": "amaterasu.display.local_axis", "main_func": "hide()"}
       ]
     },
     {

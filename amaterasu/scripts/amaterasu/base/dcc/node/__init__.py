@@ -27,6 +27,7 @@ conventions) to keep tool logic clean and decoupled from direct DCC API calls.
 """
 
 from __future__ import annotations
+from amaterasu.base.dcc.node.display import set_xray, set_display_local_axis
 from amaterasu.base.dcc.node.drawing import (
     set_drawing_index_color,
     set_drawing_rgb_color,
@@ -39,6 +40,8 @@ from amaterasu.base.dcc.node.outliner import (
 )
 
 __all__: list[str] = [
+    "set_xray",
+    "set_display_local_axis",
     "set_drawing_index_color",
     "set_drawing_rgb_color",
     "clear_drawing_color",
