@@ -24,15 +24,18 @@ It serves as a central hub for importing custom widgets, such as buttons,
 palettes, layouts, and sliders, ensuring a consistent interface across
 the application.
 """
+
 from amaterasu.base.widgets.color_button import ColorButton
 from amaterasu.base.widgets.color_palette import ColorPalette
 from amaterasu.base.widgets.color_select_button import ColorSelectButton
 from amaterasu.base.widgets.form_label import FormLabel
 from amaterasu.base.widgets.form_layout import FormLayout
+from amaterasu.base.widgets.horizontal_line import HorizontalLine
 from amaterasu.base.widgets.icon_button import IconButton
 from amaterasu.base.widgets.index_color_palette import IndexColorPalette
 from amaterasu.base.widgets.range_slider import RangeSlider
 from amaterasu.base.widgets.toast import ToastWidget, ToastSignalEmitter
+from amaterasu.base.widgets.vertical_line import VerticalLine
 
 __all__: list[str] = [
     "ColorButton",
@@ -41,8 +44,10 @@ __all__: list[str] = [
     "IndexColorPalette",
     "FormLabel",
     "FormLayout",
+    "HorizontalLine",
     "IconButton",
     "RangeSlider",
     "ToastWidget",
     "ToastSignalEmitter",
+    "VerticalLine",
 ]

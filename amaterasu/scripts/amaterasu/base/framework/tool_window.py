@@ -26,7 +26,7 @@ and ensures stable UI-to-data synchronization.
 """
 
 from __future__ import annotations
-from typing import Any, TypeVar, Generic, cast, get_args, get_origin
+from typing import Any, TypeVar, Generic, cast, get_args
 from types import ModuleType
 import abc
 import sys
@@ -35,7 +35,7 @@ from amaterasu.base.framework import workspace_control, about_dialog, settings
 
 T = TypeVar("T", bound=settings.ToolSettings)
 
-DEFAULT_LICENSE: str = """Copyright (c) 2014-2016 takkun (takkun3d).<br />
+DEFAULT_LICENSE: str = """Copyright (c) 2014-2026 takkun (takkun3d).<br />
 <br />
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -216,19 +216,17 @@ class ToolWindow(
             TypeError: If the class is missing a generic type argument, or
                 if the provided type does not inherit from `ToolSettings`.
         """
-        for base in getattr(self.__class__, "__orig_bases__", []):
-            if get_origin(base) is ToolWindow:
+        for cls in self.__class__.__mro__:
+            for base in getattr(cls, "__orig_bases__", []):
                 args: tuple[Any, ...] = get_args(base)
                 if not args:
                     continue
 
-                settings_type: Any = args[0]
-                if issubclass(settings_type, settings.ToolSettings):
-                    return cast(type[T], settings_type)
-
-                raise TypeError(
-                    f"Fatal Error: '{settings_type.__name__}' must inherit from ToolSettings."
-                )
+                for arg in args:
+                    if isinstance(arg, type) and issubclass(
+                        arg, settings.ToolSettings
+                    ):
+                        return cast(type[T], arg)
 
         raise TypeError(
             f"Fatal Error: {self.__class__.__name__} must specify a Settings type. "
