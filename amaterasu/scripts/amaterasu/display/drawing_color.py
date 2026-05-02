@@ -433,22 +433,22 @@ class MainWindow(framework.ToolWindow[Settings]):
         main_layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(parent)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.__tabs: QtWidgets.QTabWidget = QtWidgets.QTabWidget(self)
-        main_layout.addWidget(self.__tabs)
+        tabs: QtWidgets.QTabWidget = QtWidgets.QTabWidget(self)
+        main_layout.addWidget(tabs)
 
-        self.__index_widget: IndexColorWidget = IndexColorWidget(self)
-        self.__index_widget.applied.connect(self.save_settings)
-        self.__tabs.addTab(self.__index_widget, "Index")
+        index_widget: IndexColorWidget = IndexColorWidget(self)
+        index_widget.applied.connect(self.save_settings)
+        tabs.addTab(index_widget, "Index")
 
-        self.__rgb_widget: RGBColorWidget = RGBColorWidget(self)
-        self.__rgb_widget.applied.connect(self.save_settings)
-        self.__tabs.addTab(self.__rgb_widget, "RGB")
+        rgb_widget: RGBColorWidget = RGBColorWidget(self)
+        rgb_widget.applied.connect(self.save_settings)
+        tabs.addTab(rgb_widget, "RGB")
 
-        self.__auto_widget: AutoColorizeWidget = AutoColorizeWidget(self)
-        self.__auto_widget.applied.connect(self.save_settings)
-        self.__tabs.addTab(self.__auto_widget, "Auto")
+        auto_widget: AutoColorizeWidget = AutoColorizeWidget(self)
+        auto_widget.applied.connect(self.save_settings)
+        tabs.addTab(auto_widget, "Auto")
 
-        # self.__tabs.currentChanged.connect(self.save_settings)
+        # tabs.currentChanged.connect(self.save_settings)
 
         settings: Settings = self.tool_settings()
         settings.window_geo.bind(
@@ -458,28 +458,28 @@ class MainWindow(framework.ToolWindow[Settings]):
             decoder=utils.ascii_to_qt,
         )
         settings.last_tab_index.bind(
-            setter=self.__tabs.setCurrentIndex,
-            getter=self.__tabs.currentIndex,
+            setter=tabs.setCurrentIndex,
+            getter=tabs.currentIndex,
         )
         settings.rgb.bind(
-            setter=self.__rgb_widget.set_color,
-            getter=self.__rgb_widget.color,
+            setter=rgb_widget.set_color,
+            getter=rgb_widget.color,
         )
         settings.preset_name.bind(
-            setter=self.__auto_widget.set_preset_name,
-            getter=self.__auto_widget.preset_name,
+            setter=auto_widget.set_preset_name,
+            getter=auto_widget.preset_name,
         )
         settings.h_range.bind(
-            setter=self.__auto_widget.set_hue_range,
-            getter=self.__auto_widget.hue_range,
+            setter=auto_widget.set_hue_range,
+            getter=auto_widget.hue_range,
         )
         settings.s_range.bind(
-            setter=self.__auto_widget.set_saturation_range,
-            getter=self.__auto_widget.saturation_range,
+            setter=auto_widget.set_saturation_range,
+            getter=auto_widget.saturation_range,
         )
         settings.v_range.bind(
-            setter=self.__auto_widget.set_value_range,
-            getter=self.__auto_widget.value_range,
+            setter=auto_widget.set_value_range,
+            getter=auto_widget.value_range,
         )
 
 
