@@ -33,6 +33,10 @@ from amaterasu.base.dcc.node.drawing import (
     clear_drawing_color,
 )
 from amaterasu.base.dcc.node.hide_history import show_history, hide_history
+from amaterasu.base.dcc.node.outliner import (
+    set_outliner_color,
+    clear_outliner_color,
+)
 
 __all__: list[str] = [
     "set_drawing_index_color",
@@ -40,4 +44,6 @@ __all__: list[str] = [
     "clear_drawing_color",
     "show_history",
     "hide_history",
+    "set_outliner_color",
+    "clear_outliner_color",
 ]
