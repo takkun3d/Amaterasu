@@ -226,7 +226,7 @@ def create_vanishing_point(
         if i == 0:
             cmds.setAttr(f"{curve}.lineWidth", VP_WIDTH)
 
-        dcc.node.set_rgb_color(rgb=VP_COLOR, nodes=[curve])
+        dcc.node.set_drawing_rgb_color(rgb=VP_COLOR, nodes=[curve])
         curves.append(curve)
 
     dcc.shape.combine(curves[0], curves[1:])
@@ -302,7 +302,7 @@ def apply(
             0
         ]  # type: ignore
         cmds.setAttr(f"{eye_level}.lineWidth", EL_WIDTH)
-        dcc.node.set_rgb_color(rgb=EL_COLOR, nodes=[eye_level])
+        dcc.node.set_drawing_rgb_color(rgb=EL_COLOR, nodes=[eye_level])
 
         dcc.node.hide_history(
             cmds.listRelatives(eye_level, shapes=True, path=True)

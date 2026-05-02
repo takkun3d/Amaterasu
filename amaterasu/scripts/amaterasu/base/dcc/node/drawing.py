@@ -75,6 +75,8 @@ def _apply_color_override(
 
         cmds.setAttr(f"{node}.overrideEnabled", 1 if enabled else 0)
         if not enabled:
+            cmds.setAttr(f"{node}.overrideRGBColors", 0)
+            cmds.setAttr(f"{node}.overrideColor", 0)
             return result
 
         if rgb is not None:
@@ -92,7 +94,7 @@ def _apply_color_override(
     return result
 
 
-def set_index_color(
+def set_drawing_index_color(
     index: int, nodes: list[str] | None = None, force_layer: bool = True
 ) -> utils.Result:
     """Apply an index-based color override to nodes.
@@ -121,7 +123,7 @@ def set_index_color(
     return result
 
 
-def set_rgb_color(
+def set_drawing_rgb_color(
     rgb: list[float],
     nodes: list[str] | None = None,
     force_layer: bool = True,
@@ -151,7 +153,7 @@ def set_rgb_color(
     return result
 
 
-def clear_color(nodes: list[str] | None = None) -> utils.Result:
+def clear_drawing_color(nodes: list[str] | None = None) -> utils.Result:
     """Disable color overrides on nodes.
 
     Args:

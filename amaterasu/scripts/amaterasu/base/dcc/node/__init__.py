@@ -27,17 +27,17 @@ conventions) to keep tool logic clean and decoupled from direct DCC API calls.
 """
 
 from __future__ import annotations
-from amaterasu.base.dcc.node.color import (
-    set_index_color,
-    set_rgb_color,
-    clear_color,
+from amaterasu.base.dcc.node.drawing import (
+    set_drawing_index_color,
+    set_drawing_rgb_color,
+    clear_drawing_color,
 )
 from amaterasu.base.dcc.node.hide_history import show_history, hide_history
 
 __all__: list[str] = [
-    "set_index_color",
-    "set_rgb_color",
-    "clear_color",
+    "set_drawing_index_color",
+    "set_drawing_rgb_color",
+    "clear_drawing_color",
     "show_history",
     "hide_history",
 ]
