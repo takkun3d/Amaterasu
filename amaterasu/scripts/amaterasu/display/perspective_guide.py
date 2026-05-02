@@ -359,6 +359,7 @@ def main(settings: Settings | None = None) -> None:
 
     if settings is None:
         settings = Settings.instance(__name__, True)
+        settings.read()
 
     result: utils.Result = apply(
         camera,
