@@ -65,7 +65,7 @@ class StandardToolWindow(
         """
         super().__init__(parent=parent, flag=flag, unique_id=unique_id)
 
-    def create_frame_ui(self, layout: QtWidgets.QVBoxLayout) -> None:
+    def create_framework_ui(self, layout: QtWidgets.QVBoxLayout) -> None:
         """Overrides the framework UI build process to add a scroll area and buttons.
 
         This method injects a scrollable container for the tool options and
@@ -79,34 +79,34 @@ class StandardToolWindow(
         """
         layout.setSpacing(8)
 
+        sub_layout: QtWidgets.QGridLayout = QtWidgets.QGridLayout(self)
+        sub_layout.setContentsMargins(10, 0, 10, 10)
+        layout.addLayout(sub_layout)
+
         scroll_area: QtWidgets.QScrollArea = QtWidgets.QScrollArea(self)
         scroll_area.setWidgetResizable(True)
         scroll_area.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
         scroll_area.setMinimumHeight(1)
-        layout.addWidget(scroll_area, 1)
+        sub_layout.addWidget(scroll_area, 1, 0, 1, 3)
 
         option_widget: QtWidgets.QWidget = QtWidgets.QWidget(scroll_area)
         scroll_area.setWidget(option_widget)
 
         self.create_ui(option_widget)
 
-        button_layout: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout()
-        button_layout.setContentsMargins(0, 0, 0, 0)
-        layout.addLayout(button_layout)
-
         button: QtWidgets.QPushButton = QtWidgets.QPushButton(
             "Apply && Close", self
         )
         button.clicked.connect(self.apply_close)
-        button_layout.addWidget(button)
+        sub_layout.addWidget(button, 2, 0)
 
         button = QtWidgets.QPushButton("Apply", self)
         button.clicked.connect(self.apply)
-        button_layout.addWidget(button)
+        sub_layout.addWidget(button, 2, 1)
 
         button = QtWidgets.QPushButton("Close", self)
         button.clicked.connect(self.close)
-        button_layout.addWidget(button)
+        sub_layout.addWidget(button, 2, 2)
 
     @abc.abstractmethod
     def create_ui(self, parent: QtWidgets.QWidget) -> None:

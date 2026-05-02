@@ -17,27 +17,18 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Base DCC module for Amaterasu.
+"""Shape manipulation and management utilities for Maya nodes.
 
-This module provides common utilities and decorators for integrating
-Amaterasu tools with Digital Content Creation (DCC) applications like Maya.
-It serves as a central hub for accessing DCC-specific functions, such as
-path resolution and undo stack management.
+This sub-package provides a collection of functions to handle Maya shape
+nodes safely and efficiently. It acts as a centralized facade, aggregating
+various shape operations (such as combining, reparenting, and future
+additions like extraction or curve manipulation) to keep tool logic clean
+and decoupled from direct DCC API calls.
 """
 
 from __future__ import annotations
-from amaterasu.base.dcc.paths import get_icon_path
-from amaterasu.base.dcc.decorators import undo
-from amaterasu.base.dcc.ui import get_maya_window
-from amaterasu.base.dcc import node
-from amaterasu.base.dcc import shape
-from amaterasu.base.dcc import attribute
+from amaterasu.base.dcc.shape.combine import combine
 
 __all__: list[str] = [
-    "get_icon_path",
-    "undo",
-    "get_maya_window",
-    "node",
-    "shape",
-    "attribute",
+    "combine",
 ]

@@ -121,7 +121,7 @@ class IndexColorWidget(QtWidgets.QWidget):
             index (int): The color index (0-31) to apply.
         """
         self.applied.emit()
-        result: utils.Result = dcc.node.set_index_color(index)
+        result: utils.Result = dcc.node.set_drawing_index_color(index)
         result.log(_logger)
 
 
@@ -179,7 +179,7 @@ class RGBColorWidget(QtWidgets.QWidget):
     def remove_rgb_color_callback(self) -> None:
         """Callback to remove RGB color overrides from selected nodes."""
         self.applied.emit()
-        result: utils.Result = dcc.node.clear_color()
+        result: utils.Result = dcc.node.clear_drawing_color()
         result.log(_logger)
 
     @dcc.undo
@@ -187,7 +187,9 @@ class RGBColorWidget(QtWidgets.QWidget):
         """Callback to apply the selected RGB color override to
         selected nodes."""
         self.applied.emit()
-        result: utils.Result = dcc.node.set_rgb_color(self.__rgb_color.color())
+        result: utils.Result = dcc.node.set_drawing_rgb_color(
+            self.__rgb_color.color()
+        )
         result.log(_logger)
 
     def color(self) -> list[float]:
@@ -290,7 +292,7 @@ class AutoColorizeWidget(QtWidgets.QWidget):
     def remove_color_callback(self) -> None:
         """Callback to remove color overrides from selected nodes."""
         self.applied.emit()
-        result: utils.Result = dcc.node.clear_color()
+        result: utils.Result = dcc.node.clear_drawing_color()
         result.log(_logger)
 
     @dcc.undo
@@ -534,13 +536,13 @@ def apply_auto_color(
         )
 
         color: list[float] = list(colorsys.hsv_to_rgb(h, s, v))
-        r: utils.Result = dcc.node.set_rgb_color(color, nodes=[node])
+        r: utils.Result = dcc.node.set_drawing_rgb_color(color, nodes=[node])
         result.merge(r)
 
     return result
 
 
-# TODO: Remove this function once perspective_guide and decompose_rotate are updated.
+# TODO: Remove this function once decompose_rotate are updated.
 def apply(
     mode: int,
     index: int = 0,
@@ -551,16 +553,16 @@ def apply(
     """Deprecated: Use amaterasu.base.dcc.node.color instead."""
     if mode == 0:
         if index == 0:
-            dcc.node.clear_color(nodes=selection)
+            dcc.node.clear_drawing_color(nodes=selection)
         else:
-            dcc.node.set_index_color(
+            dcc.node.set_drawing_index_color(
                 index, nodes=selection, force_layer=force_layer
             )
     else:
         if rgb is None:
-            dcc.node.clear_color(nodes=selection)
+            dcc.node.clear_drawing_color(nodes=selection)
         else:
-            dcc.node.set_rgb_color(
+            dcc.node.set_drawing_rgb_color(
                 rgb, nodes=selection, force_layer=force_layer
             )
     return True

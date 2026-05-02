@@ -17,21 +17,27 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Node manipulation utilities for Amaterasu.
+"""General node manipulation and management utilities for Maya.
 
-This package provides centralized utility functions for operating on DCC nodes
-(e.g., Maya transform or shape nodes). It abstracts away DCC-specific commands,
-allowing higher-level Amaterasu tools to interact with nodes safely and
-consistently without duplicating business logic.
+This sub-package provides a collection of functions to handle general Maya
+nodes safely and efficiently. It acts as a centralized facade, aggregating
+various node-level operations (such as drawing color overrides, history
+visibility, and future additions like hierarchy management or naming
+conventions) to keep tool logic clean and decoupled from direct DCC API calls.
 """
-from amaterasu.base.dcc.node.color import (
-    set_index_color,
-    set_rgb_color,
-    clear_color,
+
+from __future__ import annotations
+from amaterasu.base.dcc.node.drawing import (
+    set_drawing_index_color,
+    set_drawing_rgb_color,
+    clear_drawing_color,
 )
+from amaterasu.base.dcc.node.hide_history import show_history, hide_history
 
 __all__: list[str] = [
-    "set_index_color",
-    "set_rgb_color",
-    "clear_color",
+    "set_drawing_index_color",
+    "set_drawing_rgb_color",
+    "clear_drawing_color",
+    "show_history",
+    "hide_history",
 ]
