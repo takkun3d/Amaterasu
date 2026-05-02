@@ -25,14 +25,19 @@ It serves as a central hub for accessing DCC-specific functions, such as
 path resolution and undo stack management.
 """
 
+from __future__ import annotations
 from amaterasu.base.dcc.paths import get_icon_path
 from amaterasu.base.dcc.decorators import undo
 from amaterasu.base.dcc.ui import get_maya_window
 from amaterasu.base.dcc import node
+from amaterasu.base.dcc import shape
+from amaterasu.base.dcc import attribute
 
 __all__: list[str] = [
     "get_icon_path",
     "undo",
     "get_maya_window",
     "node",
+    "shape",
+    "attribute",
 ]

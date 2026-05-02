@@ -17,27 +17,18 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""General node manipulation and management utilities for Maya.
+"""Shape manipulation and management utilities for Maya nodes.
 
-This sub-package provides a collection of functions to handle general Maya
+This sub-package provides a collection of functions to handle Maya shape
 nodes safely and efficiently. It acts as a centralized facade, aggregating
-various node-level operations (such as drawing color overrides, history
-visibility, and future additions like hierarchy management or naming
-conventions) to keep tool logic clean and decoupled from direct DCC API calls.
+various shape operations (such as combining, reparenting, and future
+additions like extraction or curve manipulation) to keep tool logic clean
+and decoupled from direct DCC API calls.
 """
 
 from __future__ import annotations
-from amaterasu.base.dcc.node.color import (
-    set_index_color,
-    set_rgb_color,
-    clear_color,
-)
-from amaterasu.base.dcc.node.hide_history import show_history, hide_history
+from amaterasu.base.dcc.shape.combine import combine
 
 __all__: list[str] = [
-    "set_index_color",
-    "set_rgb_color",
-    "clear_color",
-    "show_history",
-    "hide_history",
+    "combine",
 ]

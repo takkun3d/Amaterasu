@@ -24,12 +24,9 @@ vanishing points and eye-level indicators, attached to a selected Maya camera.
 """
 
 from __future__ import annotations
-from itertools import product
 from maya import cmds
 from amaterasu.base.qt import QtCore, QtWidgets
 from amaterasu.base import utils, framework, dcc, widgets
-from amaterasu.edit import combine_shapes
-from amaterasu.modify import lock_hide_transform, history_visibility
 
 __product__: str = "Perspective Guide"
 __version__: str = "1.11"
@@ -159,7 +156,9 @@ class MainWindow(framework.StandardToolWindow[Settings]):
 
     @dcc.undo
     def apply(self) -> None:
-        """Executes the tool's main logic by saving settings and calling main()."""
+        """
+        Executes the tool's main logic by saving settings and calling main().
+        """
         self.save_settings()
         main(self.tool_settings())
 
@@ -216,13 +215,10 @@ def create_vanishing_point(
             angle * rotate_mask[axis][2],
         )
         cmds.setAttr(f"{curve}.rotate", *rotate, type="double3")
-        for attr, _axis in product(["t", "r", "s"], ["x", "y", "z"]):
-            cmds.setAttr(f"{curve}.{attr}{_axis}", lock=True)
+        dcc.attribute.lock([curve], translate=True, rotate=True, scale=True)
 
         curve = cmds.parent(curve, parent)[0]
-        for attr, _axis in product(["t", "r", "s"], ["x", "y", "z"]):
-            cmds.setAttr(f"{curve}.{attr}{_axis}", lock=False)
-
+        dcc.attribute.unlock([curve], translate=True, rotate=True, scale=True)
         cmds.makeIdentity(
             curve, apply=True, translate=True, rotate=True, scale=True
         )
@@ -233,18 +229,10 @@ def create_vanishing_point(
         dcc.node.set_rgb_color(rgb=VP_COLOR, nodes=[curve])
         curves.append(curve)
 
-    combine_shapes.apply(curves[0], curves[1:])
-    for attr, _axis in product(["t", "s"], ["x", "y", "z"]):
-        cmds.setAttr(
-            f"{curves[0]}.{attr}{_axis}",
-            lock=True,
-            keyable=False,
-            channelBox=False,
-        )
-    history_visibility.main(
-        cmds.listRelatives(curves[0], shapes=True, path=True),
-        0,
-    )
+    dcc.shape.combine(curves[0], curves[1:])
+    dcc.attribute.lock_and_hide([curves[0]], translate=True, scale=True)
+    dcc.node.hide_history(cmds.listRelatives(curves[0], shapes=True, path=True))
+
     curves[0] = cmds.rename(curves[0], f"{base_name}{axis_name[axis]}_crv")
     return curves[0]
 
@@ -298,11 +286,8 @@ def apply(
     cmds.connectAttr(
         f"{camera_decompose}.outputTranslate", f"{group}.translate"
     )
-    history_visibility.main([group], 0)
-    for attr, _axis in product(["t", "r"], ["x", "y", "z"]):
-        cmds.setAttr(
-            f"{group}.{attr}{_axis}", lock=True, keyable=False, channelBox=False
-        )
+    dcc.node.hide_history([group])
+    dcc.attribute.lock_and_hide([group], translate=True, rotate=True)
 
     # Eye Level
     if is_eye_level:
@@ -318,11 +303,13 @@ def apply(
         ]  # type: ignore
         cmds.setAttr(f"{eye_level}.lineWidth", EL_WIDTH)
         dcc.node.set_rgb_color(rgb=EL_COLOR, nodes=[eye_level])
-        history_visibility.main(
-            cmds.listRelatives(eye_level, shapes=True, path=True),
-            0,
+
+        dcc.node.hide_history(
+            cmds.listRelatives(eye_level, shapes=True, path=True)
         )
-        lock_hide_transform.lock([eye_level], False)
+        dcc.attribute.lock_and_hide(
+            [eye_level], translate=True, rotate=True, scale=True
+        )
         eye_level = cmds.parent(eye_level, group)[0]
 
     # Vanishing Point
