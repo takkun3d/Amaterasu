@@ -1,138 +1,138 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Sort Nodes
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Sorts selected nodes in the Maya outliner."""
+
 from __future__ import annotations
-from typing import TYPE_CHECKING
-
-try:
-    from PySide2.QtCore import Qt
-    from PySide2.QtWidgets import QWidget
-
-except ImportError:
-    if not TYPE_CHECKING:
-        from PySide6.QtCore import Qt
-        from PySide6.QtWidgets import QWidget
 from maya import cmds
-from ..lib import logger, parser, widgets
+from amaterasu.base.qt import QtCore, QtWidgets
+from amaterasu.base import dcc, framework, utils, widgets
+
+__product__: str = "Sort Nodes"
+__version__: str = "1.20"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Sort Nodes'
-__version__: str = '1.10'
-__doc__ = 'Sort nodes in the outliner.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+class Settings(framework.ToolSettings):
+    """Settings for the Sort Nodes tool.
+
+    Attributes:
+        window_geo (framework.Variant[str]): The saved window geometry data.
+        sort_order (framework.Variant[int]): The sorting method
+            (0: Ascend, 1: Descend, 2: Selected).
+    """
+
+    window_geo: framework.Variant[str] = framework.Variant("")
+    sort_order: framework.Variant[int] = framework.Variant(2)
 
 
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-class Settings(parser.ToolSettings):
-    '''Settings for tool.'''
+class MainWindow(framework.StandardToolWindow[Settings]):
+    """Main window for the Sort Nodes tool.
 
-    window_geo: parser.Variant[str] = parser.Variant('')
-    sort_order: parser.Variant[int] = parser.Variant(2)
-
-
-class MainWindow(widgets.StandardToolWidget):
-    '''Tool main window'''
+    This window provides a UI for selecting the sort order and applying
+    the sort operation to the selected nodes in the Maya outliner.
+    """
 
     def __init__(
         self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-        unique_id: str = '',
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Widget,
+        unique_id: str = "",
     ) -> None:
-        '''Initialize widget.'''
+        """Initializes the MainWindow widget.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The window flags.
+                Defaults to QtCore.Qt.WindowType.Widget.
+            unique_id (str, optional): A unique identifier for the window
+                instance. Defaults to "".
+        """
         super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
         self.resize(400, 200)
 
-        option_widget: QWidget = self.option_widget()
-        main_layout: widgets.FormLayout = widgets.FormLayout(option_widget)
+    def create_ui(self, parent: QtWidgets.QWidget) -> None:
+        """Creates the tool-specific user interface and binds settings.
 
-        self.__sort_order: widgets.RadioButtons = widgets.RadioButtons(self)
-        self.__sort_order.set_labels(('Ascend', 'Deascend', 'Selected'))
-        main_layout.addRow(widgets.FormLabel('Sort Order'), self.__sort_order)
+        Args:
+            parent (QtWidgets.QWidget): The parent widget to attach the UI
+                elements to.
+        """
+        main_layout: widgets.FormLayout = widgets.FormLayout(parent)
 
-    # override
-    def load_settings(self) -> None:
-        '''Load ui settings from file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
-        self.__sort_order.set_check_id(settings.sort_order.value())
+        sort_order: QtWidgets.QComboBox = QtWidgets.QComboBox(parent)
+        sort_order.addItems(["Ascend", "Descend", "Selected"])
+        main_layout.addRow(widgets.FormLabel("Sort Order"), sort_order)
 
-    # override
-    def save_settings(self) -> None:
-        '''Save ui settings to file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
-        settings.sort_order.set_value(self.__sort_order.check_id())
-        settings.write()
-
-    # override
-    def reset_settings(self) -> None:
-        '''Reset ui settings.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
-
-    # override
-    def about(self) -> None:
-        '''Show a about dialog.[override]'''
-        widgets.AboutDialog.info(
-            self, __product__, __version__, __copyright__, __doc__
+        settings: Settings = self.tool_settings()
+        settings.window_geo.bind(
+            setter=self.restoreGeometry,
+            getter=self.saveGeometry,
+            encoder=utils.qt_to_ascii,
+            decoder=utils.ascii_to_qt,
+        )
+        settings.sort_order.bind(
+            setter=sort_order.setCurrentIndex,
+            getter=sort_order.currentIndex,
         )
 
-    @widgets.undo
+    @dcc.undo
     def apply(self) -> None:
-        '''Apply[override]'''
+        """Executes the tool's main logic by applying the configured settings."""
         self.save_settings()
         main()
 
 
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
-def apply(sort_order: int, source_nodes: list[str]) -> bool:
-    '''Sort nodes in the outliner.'''
-    if sort_order == 0:  # Alphabetical, ascend
-        source_nodes.sort()
+def option(unique_id: str = "") -> None:
+    """Shows the tool's option window.
 
-    elif sort_order == 1:  # Alphabetical, deascend
-        source_nodes.sort(reverse=True)
-
-    for node in source_nodes:
-        cmds.reorder(node, back=True)
-
-    return True
-
-
-def option(unique_id: str = '') -> None:
-    '''Show window.'''
+    Args:
+        unique_id (str, optional): A unique identifier for the window instance.
+            Defaults to "".
+    """
     window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()
 
 
-def main() -> None:
-    '''Do it.'''
-    selection: list[str] = cmds.ls(selection=True, type='transform')
+def main(settings: Settings | None = None) -> None:
+    """Executes the sort nodes operation on the current selection.
+
+    If no settings are provided, it automatically reads the saved settings
+    from the disk before executing.
+
+    Args:
+        settings (Settings | None, optional): The settings instance to use for
+            the sort operation. Defaults to None.
+    """
+    selection: list[str] = cmds.ls(selection=True, type="transform")
     if not selection:
-        _logger.error('Select objects to sort node in the outliner.')
+        _logger.error("Select objects to sort nodes in the outliner.")
         return
 
-    settings: Settings = Settings.instance(__name__, True)
-    apply(settings.sort_order.value(), selection)
-    _logger.info('Done.')
+    if settings is None:
+        settings = Settings.instance(__name__, True)
+        settings.read()
+
+    result: utils.Result = dcc.node.sort(
+        selection,
+        settings.sort_order.value(),
+    )
+    result.log(_logger)
