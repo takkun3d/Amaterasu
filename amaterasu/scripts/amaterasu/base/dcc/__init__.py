@@ -29,6 +29,9 @@ from __future__ import annotations
 from amaterasu.base.dcc.paths import get_icon_path
 from amaterasu.base.dcc.decorators import undo
 from amaterasu.base.dcc.ui import get_maya_window
+
+from amaterasu.base.dcc import project
+from amaterasu.base.dcc import scene
 from amaterasu.base.dcc import node
 from amaterasu.base.dcc import shape
 from amaterasu.base.dcc import attribute
@@ -37,6 +40,8 @@ __all__: list[str] = [
     "get_icon_path",
     "undo",
     "get_maya_window",
+    "project",
+    "scene",
     "node",
     "shape",
     "attribute",

@@ -1,190 +1,66 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Auto Set Project
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""The project is automatically set when scene is opened in Maya.
+
+This tool ensures that Maya's current project workspace is updated
+to match the location of the scene file being opened, preventing
+missing texture links and relative path issues.
+"""
+
 from __future__ import annotations
-from typing import Any
-import pathlib
-from maya import cmds, mel
-from ..lib import logger
+from amaterasu.base import dcc, utils
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Auto Set Project'
-__version__: str = '1.00'
-__doc__ = 'The project is automatically set when secene is opened in Maya.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+__product__: str = "Auto Set Project"
+__version__: str = "1.00"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
+def main(file_path: str = "", force: bool = False) -> None:
+    """Executes the Auto Set Project routine.
 
-
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
-def select_maya_scene() -> str:
-    '''Opens a dialog for selecting a scene file.'''
-    file_filter: str = mel.eval('buildDefaultMayaOpenFilterList()')
-    starting_directory: str = cmds.workspace(query=True, fullName=True)
-    file_name: list[str] = cmds.fileDialog2(
-        returnFilter=True,
-        caption='Open (Amaterasu)',
-        fileMode=1,
-        okCaption='Open',
-        optionsUICreate='fileOperationsOptionsUISetup Open',
-        optionsUIInit='fileOperationsOptionsUIInitValues Open',
-        selectionChanged='fileOperationsSelectionChangedCallback Open',
-        optionsUICommit2='fileOperationsOptionsUICallback Open',
-        fileTypeChanged='setCurrentFileTypeOption Open',
-        fileFilter=file_filter,
-        selectFileFilter='Maya Scenes',
-        startingDirectory=starting_directory,
-        optionsUICancel='fileOptionsCancel',
-    )
-
-    if not file_name:
-        return ''
-
-    return file_name[0]
-
-
-def is_save_changes() -> int:
-    '''Check to see if it needs to be saved. If necessary, guide them.'''
-    return_value: int = 0
-    if cmds.file(query=True, modified=True):
-        save: str = 'Save'
-        dont_save: str = "Don't Save"
-        cancel: str = 'Cancel'
-        result: str = ''
-        filename: str = cmds.file(query=True, sceneName=True)
-        if filename != '':
-            confirm_message: str = f'Save changes to {filename}'
-            result = cmds.confirmDialog(
-                title='Save Changes',
-                message=confirm_message,
-                button=[save, dont_save, cancel],
-                defaultButton=save,
-                cancelButton=cancel,
-            )
-
-            if result == save:
-                cmds.file(save=True)
-                return_value = 1
-
-            elif result == dont_save:
-                return_value = 1
-
-            elif result in (cancel, 'dismiss'):
-                return_value = 0
-
-        else:
-            result = cmds.confirmDialog(
-                title='Warning: Scene Not Saved',
-                message='Save changes to untitled scene?',
-                button=[save, dont_save, cancel],
-                defaultButton=save,
-                cancelButton=cancel,
-            )
-            if result == save:
-                return_value = mel.eval('projectViewer("SaveAs")')
-
-            elif result == dont_save:
-                return_value = 1
-
-            elif result in (cancel, 'dismiss'):
-                return_value = 0
-    else:
-        return_value = 1
-
-    return return_value
-
-
-def project_directory(scene_file: str) -> str:
-    '''Search workspace.mel.'''
-    result: str = ''
-    file_path: pathlib.Path = pathlib.Path(scene_file)
-    if file_path.is_file():
-        file_path = file_path.parent
-
-    work_space_mel: list[pathlib.Path] = list(file_path.glob('workspace.mel'))
-    if not work_space_mel:
-        if pathlib.Path(file_path.anchor) == file_path:
-            # not found workspace.mel
-            return ''
-
-        result = project_directory(str(file_path.parent))
-
-    else:
-        result = str(work_space_mel[0].parent)
-
-    return result
-
-
-def open_maya_scene(file_name: str) -> None:
-    '''Open the maya scene.'''
-    kwargs: dict[str, Any] = {}
-    option: str = mel.eval('$temp = $gFileOptionsString;')
-    if len(option) > 0:
-        kwargs['options'] = option
-
-    if cmds.optionVar(exists='fileExecuteSN') and not cmds.optionVar(
-        query='fileExecuteSN'
-    ):
-        kwargs['executeScriptNodes'] = False
-
-    if cmds.optionVar(exists='fileIgnoreVersion') and cmds.optionVar(
-        query='fileIgnoreVersion'
-    ):
-        kwargs['ignoreVersion'] = True
-
-    if cmds.optionVar(exists='fileOpenRefLoadSetting'):
-        ref_load_setting: str = cmds.optionVar(query='fileOpenRefLoadSetting')
-        if ref_load_setting != 'default':
-            kwargs['loadReferenceDepth'] = ref_load_setting
-
-    if cmds.optionVar(query='fileOpenReserveNamespaces'):
-        kwargs['reserveNamespaces'] = True
-
-    file_types: list[str] = cmds.file(file_name, query=True, type=True)
-    if file_types:
-        kwargs['type'] = file_types[0]
-
-    kwargs['open'] = True
-
-    cmds.file(file_name, force=True, **kwargs)
-    mel.eval(f'addRecentFile("{file_name}", "{file_types[0]}")')
-
-
-def main(force: bool = False) -> None:
-    '''Do it.'''
+    Args:
+        file_path (str, optional): The explicit path of the scene to open.
+            Defaults to "".
+        force (bool, optional): If True, bypasses save prompts and dialogs.
+            Requires `file_path` to be provided. Defaults to False.
+    """
     if not force:
-        file_name: str = select_maya_scene()
-        if file_name == '':
+        if not dcc.scene.prompt_save_changes():
             return
 
-        is_save: int = is_save_changes()
-        if is_save == 0:
+        file_path = dcc.scene.prompt_select_file()
+        if not file_path:
             return
 
-    project_path: str = project_directory(file_name)
-    if project_path == '':
-        _logger.error('The file defining the project does not exist.')
+    else:
+        if not file_path:
+            _logger.error("A file path must be provided when force is True.")
+            return
+
+    project_path: str = dcc.project.find_workspace(file_path)
+    if not project_path:
+        _logger.error(
+            "The file defining the project (workspace.mel) does not exist."
+        )
         return
 
-    escaped_project_path: str = project_path.replace('\\', '\\\\')
-    mel.eval(f'setProject "{escaped_project_path}"')
-    open_maya_scene(file_name)
-    _logger.info('Done : %s', project_path)
+    dcc.project.set_project(project_path)
+    result: utils.Result = dcc.scene.open_file(file_path)
+    result.log(_logger, success_msg=f"Done : {project_path}")
