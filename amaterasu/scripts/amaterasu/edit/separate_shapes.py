@@ -1,87 +1,39 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Separate Shapes
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Separates multiple shapes under a single transform into individual transforms."""
+
 from __future__ import annotations
-from typing import Any
 from maya import cmds
-from ..lib import logger
+from amaterasu.base import dcc, utils
 
-
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Separate Shapes'
-__version__: str = '1.00'
-__doc__ = 'Separate Shapes from selection.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
-
-
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-
-
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
-def apply(source_nodes: list[str]) -> bool:
-    '''Separate shapes.'''
-    result: list[bool] = []
-    for source_node in source_nodes:
-        shapes: list[str] | None = cmds.listRelatives(
-            source_node, shapes=True, path=True
-        )
-        if not shapes:
-            _logger.warning('Does not exists shape : %s', source_node)
-            result.append(False)
-            continue
-
-        if len(source_node) <= 1:
-            _logger.warning('There is only one shape : %s', source_node)
-            result.append(False)
-            continue
-
-        parent_nodes: list[str] | None = cmds.listRelatives(
-            source_node, parent=True, shapes=False, path=True
-        )
-        parent_node: str = '|'
-        if parent_nodes and len(parent_nodes) >= 1:
-            parent_node = parent_nodes[0]
-
-        for shape in shapes[1:]:
-            transform: str = cmds.createNode(
-                'transform', name=shape.replace('Shape', ''), parent=parent_node
-            )
-            matrix: Any = cmds.xform(
-                source_node, query=True, matrix=True, worldSpace=True
-            )
-            cmds.xform(transform, matrix=matrix, worldSpace=True)
-            cmds.parent(shape, transform, addObject=True, shape=True)
-            cmds.parent(shape, removeObject=True, shape=True)
-
-        result.append(True)
-
-    return all(result)
+__product__: str = "Separate Shapes"
+__version__: str = "1.10"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
 def main() -> None:
-    '''Do it.'''
-    selection: list[str] = cmds.ls(selection=True, type='transform')
+    """Executes the separate shape operation on the current selection."""
+    selection: list[str] = cmds.ls(selection=True, type="transform")
     if not selection:
-        _logger.error('Select objects to separate shapes.')
+        _logger.error("Select objects to separate shapes.")
         return
 
-    result: bool = apply(selection)
-    if result:
-        _logger.info('Done.')
+    result: utils.Result = dcc.shape.separate(selection)
+    result.log(_logger)
