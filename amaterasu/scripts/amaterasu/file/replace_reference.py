@@ -1,247 +1,208 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Replace Reference
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Replaces the reference file for selected nodes with a specified file.
+
+This tool provides a UI to select a new Maya scene file and replace the
+currently selected references with it. It also offers options to
+automatically update the namespace and reference node name to match
+the new file.
+"""
+
 from __future__ import annotations
-from typing import TYPE_CHECKING
 import os
+from amaterasu.base.qt import QtCore, QtWidgets
+from amaterasu.base import dcc, framework, utils, widgets
 
-try:
-    from PySide2.QtCore import Qt
-    from PySide2.QtWidgets import (
-        QWidget,
-        QHBoxLayout,
-        QLineEdit,
-        QCheckBox,
-        QFileDialog,
-    )
-
-except ImportError:
-    if not TYPE_CHECKING:
-        from PySide6.QtCore import Qt
-        from PySide6.QtWidgets import (
-            QWidget,
-            QHBoxLayout,
-            QLineEdit,
-            QCheckBox,
-            QFileDialog,
-        )
-from maya import cmds, mel
-from ..lib import logger, parser, widgets
+__product__: str = "Replace Reference"
+__version__: str = "1.10"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Replace Reference'
-__version__: str = '1.10'
-__doc__ = 'Replaces the reference from selected node.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+class Settings(framework.ToolSettings):
+    """Settings for the Replace Reference tool.
 
-FILE_FORMAT: dict[str, str] = {'.ma': 'mayaAscii', '.mb': 'mayaBinary'}
+    Attributes:
+        window_geo (framework.Variant[str]): The saved window geometry data.
+        file_path (framework.Variant[str]): The path of the replacement file.
+        update_namespace (framework.Variant[bool]): Whether to update the namespace.
+        update_node_name (framework.Variant[bool]): Whether to update the reference node name.
+    """
 
-
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-class Settings(parser.ToolSettings):
-    '''Settings for tool.'''
-
-    window_geo: parser.Variant[str] = parser.Variant('')
-    file_path: parser.Variant[str] = parser.Variant('')
-    update_namespace: parser.Variant[bool] = parser.Variant(True)
-    update_node_name: parser.Variant[bool] = parser.Variant(True)
+    window_geo: framework.Variant[str] = framework.Variant("")
+    file_path: framework.Variant[str] = framework.Variant("")
+    update_namespace: framework.Variant[bool] = framework.Variant(True)
+    update_node_name: framework.Variant[bool] = framework.Variant(True)
 
 
-class MainWindow(widgets.StandardToolWidget):
-    '''Tool main window'''
+class MainWindow(framework.StandardToolWindow[Settings]):
+    """Main window for the Replace Reference tool.
+
+    Provides a user interface for selecting a replacement file and configuring
+    the replacement options before applying them to the selected references.
+    """
 
     def __init__(
         self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-        unique_id: str = '',
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Widget,
+        unique_id: str = "",
     ) -> None:
-        '''Initialize widget.'''
+        """Initializes the MainWindow widget.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The Qt window flags.
+                Defaults to QtCore.Qt.WindowType.Widget.
+            unique_id (str, optional): A unique identifier for the widget.
+                Defaults to "".
+        """
         super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
         self.resize(400, 200)
+        self.__file_path: widgets.BrowseWidget
 
-        option_widget: QWidget = self.option_widget()
-        main_layout: widgets.FormLayout = widgets.FormLayout(option_widget)
+    def create_ui(self, parent: QtWidgets.QWidget) -> None:
+        """Creates the tool-specific user interface and binds settings.
 
-        filepath_layout: QHBoxLayout = QHBoxLayout(self)
-        self.__file_path: QLineEdit = QLineEdit(self)
-        filepath_layout.addWidget(self.__file_path)
+        Args:
+            parent (QtWidgets.QWidget): The central container widget where the
+                custom UI elements should be added.
+        """
+        main_layout: widgets.FormLayout = widgets.FormLayout(parent)
 
-        file_dialog_button: widgets.IconButton = widgets.IconButton()
-        file_dialog_button.set_icon(widgets.image_file_path('a_folder.png'))
-        file_dialog_button.clicked.connect(self.__open_file_dialog)
-        filepath_layout.addWidget(file_dialog_button)
-        main_layout.addRow(widgets.FormLabel('file'), filepath_layout)
+        self.__file_path = widgets.BrowseWidget(parent)
+        self.__file_path.set_icon("a_folder.png")
+        self.__file_path.clicked.connect(self.__open_file_dialog)
+        main_layout.addRow(widgets.FormLabel("File"), self.__file_path)
 
-        self.__update_namespace: QCheckBox = QCheckBox('Update Namespace', self)
-        main_layout.addRow('', self.__update_namespace)
-
-        self.__update_reference_name: QCheckBox = QCheckBox(
-            'Update Reference Name', self
+        update_namespace: QtWidgets.QCheckBox = QtWidgets.QCheckBox(
+            "Update Namespace", parent
         )
-        main_layout.addRow('', self.__update_reference_name)
+        main_layout.addRow("", update_namespace)
 
-    # override
-    def load_settings(self) -> None:
-        '''Load ui settings from file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
-        self.__file_path.setText(settings.file_path.value())
-        self.__update_namespace.setChecked(settings.update_namespace.value())
-        self.__update_reference_name.setChecked(
-            settings.update_node_name.value()
+        update_reference_name: QtWidgets.QCheckBox = QtWidgets.QCheckBox(
+            "Update Reference Name", parent
         )
+        main_layout.addRow("", update_reference_name)
 
-    # override
-    def save_settings(self) -> None:
-        '''Save ui settings to file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
-        settings.file_path.set_value(self.__file_path.text())
-        settings.update_namespace.set_value(self.__update_namespace.isChecked())
-        settings.update_node_name.set_value(
-            self.__update_reference_name.isChecked()
+        settings: Settings = self.tool_settings()
+        settings.window_geo.bind(
+            setter=self.restoreGeometry,
+            getter=self.saveGeometry,
+            encoder=utils.qt_to_ascii,
+            decoder=utils.ascii_to_qt,
         )
-        settings.write()
-
-    # override
-    def reset_settings(self) -> None:
-        '''Reset ui settings.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
-
-    # override
-    def about(self) -> None:
-        '''Show a about dialog.[override]'''
-        widgets.AboutDialog.info(
-            self, __product__, __version__, __copyright__, __doc__
+        settings.file_path.bind(
+            setter=self.__file_path.set_text,
+            getter=self.__file_path.text,
+        )
+        settings.update_namespace.bind(
+            setter=update_namespace.setChecked,
+            getter=update_namespace.isChecked,
+        )
+        settings.update_node_name.bind(
+            setter=update_reference_name.setChecked,
+            getter=update_reference_name.isChecked,
         )
 
     def __open_file_dialog(self) -> None:
-        '''Open File Dialog'''
+        """Opens a file dialog to select a Maya scene file."""
         current_dir: str = os.path.dirname(self.__file_path.text())
-        result: tuple(str, str) = QFileDialog.getOpenFileName(
+        result: tuple[str, str] = QtWidgets.QFileDialog.getOpenFileName(
             self,
-            'Specific Maya Scene File',
+            "Specific Maya Scene File",
             current_dir,
-            'Maya Files (*.ma *.mb)',
+            "Maya Files (*.ma *.mb)",
         )
-        if result[0] != '':
-            self.__file_path.setText(result[0])
+        if result[0]:
+            self.__file_path.set_text(result[0])
 
-    @widgets.undo
+    @dcc.undo
     def apply(self) -> None:
-        '''Apply'''
+        """Executes the tool's main logic by applying the configured settings."""
         self.save_settings()
-        settings: Settings = Settings.instance(__name__, True)
-        apply(
+        settings: Settings = self.tool_settings()
+        result: utils.Result = apply(
             settings.file_path.value(),
             settings.update_namespace.value(),
             settings.update_node_name.value(),
         )
-
-
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
-def get_reference_nodes(nodes: list[str]) -> list[str]:
-    '''Return reference nodes form selected nodes.'''
-    references: list[str] = [
-        cmds.referenceQuery(node, referenceNode=True) for node in nodes
-    ]
-    references = list(set(references))
-    return references
-
-
-def get_selected_references() -> list[str]:
-    '''Return selected in the Reference Editor.'''
-    try:
-        reference_editor: str = mel.eval('$temp = $gReferenceEditorPanel;')
-        references: list[str] = cmds.sceneEditor(
-            reference_editor, query=True, selectReference=True
-        )
-    except RuntimeError:
-        return []
-
-    return references
-
-
-def replace_reference_file(reference: str, file_path: str) -> bool:
-    '''Replace file of reference.'''
-    format: str = FILE_FORMAT[os.path.splitext(file_path)[-1]]
-    cmds.file(file_path, loadReference=reference, type=format, options='v=0;')
-    return True
-
-
-def set_namespace_from_filename(reference: str) -> bool:
-    '''Set namespace from filename'''
-    file_path: str = cmds.referenceQuery(reference, filename=True)
-    basename: str = os.path.splitext(os.path.basename(file_path))[0]
-    cmds.file(file_path, edit=True, namespace=basename)
-    return True
-
-
-def set_reference_name_from_filename(reference: str) -> bool:
-    '''Set reference name from filename.'''
-    file_path: str = cmds.referenceQuery(reference, filename=True)
-    basename: str = os.path.splitext(os.path.basename(file_path))[0]
-
-    cmds.lockNode(reference, lock=False)
-    reference = cmds.rename(reference, f'{basename}RN')
-    cmds.lockNode(reference, lock=True)
-    return True
+        result.log(_logger)
 
 
 def apply(
     file_path: str,
     update_namespace: bool = True,
     update_node_name: bool = True,
-) -> bool:
-    '''Replaces the reference from selected node.'''
+) -> utils.Result:
+    """Replaces the reference for selected nodes safely.
+
+    Args:
+        file_path (str): The path to the new Maya scene file.
+        update_namespace (bool, optional): If True, updates the namespace
+            to match the new filename. Defaults to True.
+        update_node_name (bool, optional): If True, updates the reference
+            node name to match the new filename. Defaults to True.
+
+    Returns:
+        utils.Result: An object containing the merged results of the
+            replacement operations.
+    """
+    result: utils.Result = utils.Result()
+
     if not os.path.exists(file_path):
-        _logger.error('Does not exists file : %s', file_path)
-        return False
+        result.set_error(f"Does not exist file : {file_path}")
+        return result
 
-    references: list[str] = get_selected_references()
-    if not references:
-        references = get_reference_nodes(cmds.ls(selection=True))
+    references: list[str] = dcc.reference.get_selected_reference_nodes()
 
     if not references:
-        _logger.error(
-            'Select node or Reference Editor item to replace reference file.'
+        result.set_error(
+            "Select node or Reference Editor item to replace reference file."
         )
-        return False
+        return result
 
     for reference in references:
-        replace_reference_file(reference, file_path)
+        rep_res: utils.Result = dcc.reference.replace(reference, file_path)
+        if rep_res.status() != utils.ResultStatus.SUCCESS:
+            result.merge(rep_res)
+            continue
+
         if update_namespace:
-            set_namespace_from_filename(reference)
+            ns_res: utils.Result = dcc.reference.update_namespace(reference)
+            result.merge(ns_res)
 
         if update_node_name:
-            set_reference_name_from_filename(reference)
+            name_res: utils.Result = dcc.reference.update_name(reference)
+            result.merge(name_res)
 
-    return True
+    return result
 
 
-def main(unique_id: str = '') -> None:
-    '''Show window.'''
+def main(unique_id: str = "") -> None:
+    """Shows the tool window.
+
+    Args:
+        unique_id (str, optional): Unique ID for the tool window instance.
+            Defaults to "".
+    """
     window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()
