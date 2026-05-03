@@ -101,3 +101,33 @@ def clear_outliner_color(nodes: list[str] | None = None) -> utils.Result:
             result.add_failure(node, reason)
 
     return result
+
+
+def sort(nodes: list[str], sort_order: int = 2) -> utils.Result:
+    """Sorts nodes in the outliner based on the specified order.
+
+    Args:
+        nodes (list[str]): The nodes to sort.
+        sort_order (int, optional): The sorting method.
+            0 for Ascending, 1 for Descending, 2 for Selection order.
+            Defaults to 2.
+
+    Returns:
+        utils.Result: The result of the operation.
+    """
+    result: utils.Result = utils.Result()
+
+    if sort_order == 0:
+        nodes = sorted(nodes)
+
+    elif sort_order == 1:
+        nodes = sorted(nodes, reverse=True)
+
+    for node in nodes:
+        try:
+            cmds.reorder(node, back=True)
+
+        except RuntimeError as e:
+            result.add_failure(node, str(e))
+
+    return result

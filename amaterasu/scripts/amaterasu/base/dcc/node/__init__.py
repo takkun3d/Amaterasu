@@ -37,6 +37,7 @@ from amaterasu.base.dcc.node.hide_history import show_history, hide_history
 from amaterasu.base.dcc.node.outliner import (
     set_outliner_color,
     clear_outliner_color,
+    sort,
 )
 
 __all__: list[str] = [
@@ -49,4 +50,5 @@ __all__: list[str] = [
     "hide_history",
     "set_outliner_color",
     "clear_outliner_color",
+    "sort",
 ]
