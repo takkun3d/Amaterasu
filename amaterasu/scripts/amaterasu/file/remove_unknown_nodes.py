@@ -1,53 +1,42 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Remove Unknown Nodes
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Removes unknown nodes from the open scene.
+
+This tool cleans up the current scene by finding and deleting all nodes
+of type 'unknown'. This is essential for preventing errors when saving
+or referencing the scene in different environments.
+"""
+
 from __future__ import annotations
-from maya import cmds
-from ..lib import logger
+from amaterasu.base import dcc, utils
+
+__product__: str = "Remove Unknown Nodes"
+__version__: str = "1.10"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Remove Unknown Nodes'
-__version__: str = '1.01'
-__doc__ = 'Remove unknown nodes from an open scene.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
-
-
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-
-
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
 def main() -> None:
-    '''Do it.'''
-    nodes: list[str] = cmds.ls(type='unknown')
-    for node in nodes:
-        try:
-            cmds.lockNode(node, lock=False)
-            cmds.delete(node)
-            _logger.info('Delete node : %s', node)
+    """Executes the removal of unknown nodes.
 
-        except RuntimeError:
-            _logger.warning('Can not delete node : %s', node)
-
-        except ValueError:
-            # Ignore nodes deleted in conjunction.
-            pass
-
-    _logger.info('Done.')
+    Delegates the unlocking and deletion of unknown nodes to the base
+    DCC scene utilities, then logs the resulting status.
+    """
+    result: utils.Result = dcc.scene.remove_unknown_nodes()
+    result.log(_logger)

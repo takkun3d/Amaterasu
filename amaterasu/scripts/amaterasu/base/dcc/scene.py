@@ -152,3 +152,70 @@ def open_file(file_path: str) -> utils.Result:
         result.set_error(str(e))
 
     return result
+
+
+def remove_node_editor_info() -> utils.Result:
+    """Removes all nodeGraphEditorInfo nodes from the current scene.
+
+    Safely disconnects any connected plugs before deleting the nodes
+    to prevent dependency graph issues.
+
+    Returns:
+        utils.Result: The result of the operation.
+    """
+    result: utils.Result = utils.Result()
+    nodes: list[str] = cmds.ls(type="nodeGraphEditorInfo") or []
+
+    for node in nodes:
+        try:
+            connections: list[str] = (
+                cmds.listConnections(node, connections=True, plugs=True) or []
+            )
+            # for dst_plug, src_plug in zip(connections[::2], connections[1::2]):
+            #     cmds.disconnectAttr(src_plug, dst_plug)
+
+            # cmds.delete(node)
+            for i in range(0, len(connections), 2):
+                node_plug: str = connections[i]
+                connected_plug: str = connections[i + 1]
+
+                if cmds.connectionInfo(node_plug, isDestination=True):
+                    cmds.disconnectAttr(connected_plug, node_plug)
+
+                else:
+                    cmds.disconnectAttr(node_plug, connected_plug)
+
+            cmds.delete(node)
+            result.add_info(node, "Removed nodeGraphEditorInfo")
+
+        except (RuntimeError, ValueError):
+            result.add_failure(node, "Failed to remove")
+
+    return result
+
+
+def remove_unknown_nodes() -> utils.Result:
+    """Removes all unknown nodes from the current scene.
+
+    Unlocks the nodes before attempting deletion. Ignores nodes that
+    are automatically deleted in conjunction with others.
+
+    Returns:
+        utils.Result: The result of the operation.
+    """
+    result: utils.Result = utils.Result()
+    nodes: list[str] = cmds.ls(type="unknown") or []
+
+    for node in nodes:
+        try:
+            cmds.lockNode(node, lock=False)
+            cmds.delete(node)
+            result.add_info(node, "Removed unknown node")
+
+        except RuntimeError:
+            result.add_failure(node, "Cannot delete node")
+
+        except ValueError:
+            pass
+
+    return result
