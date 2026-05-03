@@ -1,60 +1,35 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Select Animated Nodes
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Selects nodes that have animation curves attached."""
+
 from __future__ import annotations
 from maya import cmds
-from ..lib import logger
+from amaterasu.base import dcc, utils
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Select Animated Nodes'
-__version__: str = '1.00'
-__doc__ = 'Select animated nodes.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+__product__: str = "Select Animated Nodes"
+__version__: str = "1.10"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-
-
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
 def main() -> None:
-    '''Do it.'''
-    selection: set[str] = set(cmds.ls(selection=True))
-    result: set[str] = set([])
-
-    anim_curves: list[str] = cmds.ls(
-        type=['animCurveTA', 'animCurveTL', 'animCurveTT', 'animCurveTU']
-    )
-    for anim_curve in anim_curves:
-        connections: list[str] = cmds.listConnections(anim_curve)
-        if not connections:
-            continue
-
-        for node in connections:
-            result.add(node)
-
-    if selection:
-        result = selection & result
-
-    if result:
-        cmds.select(*list(result))
-        _logger.info('Done.')
-
-    else:
-        _logger.warning('Does not exists animed node.')
+    """Executes the select animated nodes operation."""
+    selection: list[str] = cmds.ls(selection=True)
+    result: utils.Result = dcc.selection.filter_animated(selection)
+    result.log(_logger)
