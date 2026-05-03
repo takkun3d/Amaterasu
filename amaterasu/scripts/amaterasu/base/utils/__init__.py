@@ -28,7 +28,7 @@ from amaterasu.base.utils.qt_convert import qt_to_ascii, ascii_to_qt
 from amaterasu.base.utils.logger import Logger, get_logger
 from amaterasu.base.utils.singleton import SingletonMeta, Singleton
 from amaterasu.base.utils.multiton import MultitonMeta, Multiton
-from amaterasu.base.utils.result import Result
+from amaterasu.base.utils.result import ResultStatus, Result
 
 __all__: list[str] = [
     "qt_to_ascii",
@@ -39,5 +39,6 @@ __all__: list[str] = [
     "Singleton",
     "MultitonMeta",
     "Multiton",
+    "ResultStatus",
     "Result",
 ]
