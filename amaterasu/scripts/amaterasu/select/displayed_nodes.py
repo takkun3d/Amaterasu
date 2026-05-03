@@ -1,99 +1,40 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Select Displayed Nodes
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Selects nodes that are displayed within the active camera view."""
+
 from __future__ import annotations
-from maya import OpenMaya, OpenMayaUI, OpenMayaRender
-from ..lib import logger
+from maya import cmds
+from amaterasu.base import dcc, utils
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Select Displayed Nodes'
-__version__: str = '1.00'
-__doc__ = 'Select displayed nodes.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+__product__: str = "Select Displayed Nodes"
+__version__: str = "1.10"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-
-
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
 def main() -> None:
-    '''Dot it.'''
-    active_view: OpenMayaUI.M3dView = OpenMayaUI.M3dView.active3dView()
-    port_width: int = active_view.portWidth()
-    port_height: int = active_view.portHeight()
+    """Executes the select displayed nodes operation."""
+    nodes: list[str] = dcc.viewport.displayed_nodes()
+    if not nodes:
+        cmds.select(clear=True)
+        _logger.error("No nodes were visible to select.")
+        return
 
-    camera_path: OpenMaya.MDagPath = OpenMaya.MDagPath()
-    active_view.getCamera(camera_path)
-    camera = OpenMaya.MFnCamera(camera_path)
-
-    render_settings = OpenMayaRender.MCommonRenderSettingsData()
-    OpenMayaRender.MRenderUtil.getCommonRenderSettings(render_settings)
-    overscan: float = camera.overscan()
-    hfa: float = render_settings.deviceAspectRatio
-    vfa: float = render_settings.pixelAspectRatio
-
-    aspect_ratio: float = hfa / vfa
-    non_padded_aspect_ratio: float = aspect_ratio
-
-    port_aspect_ratio: float = float(port_width) / float(port_height)
-    port_horiz: bool = port_aspect_ratio > aspect_ratio
-
-    film_fit: OpenMaya.MFnCamera.FilmFit = camera.filmFit()
-    if film_fit == OpenMaya.MFnCamera.kFillFilmFit:
-        if port_horiz:
-            film_fit = OpenMaya.MFnCamera.kHorizontalFilmFit
-        else:
-            film_fit = OpenMaya.MFnCamera.kVerticalFilmFit
-
-    if film_fit == OpenMaya.MFnCamera.kOverscanFilmFit:
-        if port_horiz:
-            film_fit = OpenMaya.MFnCamera.kVerticalFilmFit
-        else:
-            film_fit = OpenMaya.MFnCamera.kHorizontalFilmFit
-
-    x: float = 0
-    y: float = 0
-    if film_fit in (
-        OpenMaya.MFnCamera.kHorizontalFilmFit,
-        OpenMaya.MFnCamera.kInvalid,
-    ):
-        x = port_width / overscan
-        y = x / non_padded_aspect_ratio
-    else:
-        y = port_height / overscan
-        x = y * non_padded_aspect_ratio
-
-    x *= camera.lensSqueezeRatio()
-    x1: int = int((port_width / 2.0) - (x / 2.0))
-    y1: int = int((port_height / 2.0) - (y / 2.0))
-
-    x2: int = int((port_width / 2.0) + (x / 2.0))
-    y2: int = int((port_height / 2.0) + (y / 2.0))
-
-    current_celection_mode: OpenMaya.MGlobal.MSelectionMode = (
-        OpenMaya.MGlobal.selectionMode()
-    )
-    OpenMaya.MGlobal.setSelectionMode(OpenMaya.MGlobal.kSelectLeafMode)
-
-    OpenMaya.MGlobal.selectFromScreen(
-        x1, y1, x2, y2, OpenMaya.MGlobal.kReplaceList
-    )
-    OpenMaya.MGlobal.setSelectionMode(current_celection_mode)
-    _logger.info('Done.')
+    cmds.select(*nodes, replace=True)
+    _logger.info("Done.")
