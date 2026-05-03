@@ -1,75 +1,39 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Replace Shapes
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Replaces shapes of selected nodes with the shape of the last selected node."""
+
 from __future__ import annotations
 from maya import cmds
-from ..lib import logger
+from amaterasu.base import dcc, utils
 
-
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Replace Shapes'
-__version__: str = '1.00'
-__doc__ = 'Replace Shapes from selected nodes.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
-
-
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-
-
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
-def apply(source_node: str, destination_nodes: list[str]) -> bool:
-    '''Replace shapes.'''
-    source_shapes: list[str] = (
-        cmds.listRelatives(source_node, shapes=True, path=True) or []
-    )
-    if not source_shapes:
-        _logger.error('Does not exists shapes : %s', source_node)
-        return False
-
-    for destination_node in destination_nodes:
-        source_dummy: str = cmds.duplicate(source_node, returnRootsOnly=True)[0]
-        source_shapes = cmds.listRelatives(source_dummy, shapes=True, path=True)
-        old_shapes: list[str] = (
-            cmds.listRelatives(destination_node, shapes=True, path=True) or []
-        )
-
-        for shape in source_shapes:
-            cmds.parent(shape, destination_node, addObject=True, shape=True)
-
-        cmds.parent(source_dummy, removeObject=True)
-        if old_shapes:
-            cmds.delete(*old_shapes)
-
-    return True
+__product__: str = "Replace Shapes"
+__version__: str = "1.10"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
 def main() -> None:
-    '''Dot it.'''
-    selection: list[str] = cmds.ls(selection=True, type='transform')
-    if not selection:
-        _logger.error('Select objects to replace shape.')
+    """Executes the replace shape operation on the current selection."""
+    selection: list[str] = cmds.ls(selection=True, type="transform")
+    if len(selection) < 2:
+        _logger.error("Select at least 2 objects to replace shapes.")
         return
 
-    if len(selection) < 2:
-        _logger.error('Select least 2 objects to replace shape.')
-
-    result: bool = apply(selection[-1], selection[:-1])
-    if result:
-        _logger.info('Done.')
+    result: utils.Result = dcc.shape.replace(selection[-1], selection[:-1])
+    result.log(_logger)
