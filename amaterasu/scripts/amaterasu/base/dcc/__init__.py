@@ -37,6 +37,7 @@ from amaterasu.base.dcc import plugin
 from amaterasu.base.dcc import node
 from amaterasu.base.dcc import shape
 from amaterasu.base.dcc import attribute
+from amaterasu.base.dcc import selection
 
 __all__: list[str] = [
     "get_icon_path",
@@ -49,4 +50,5 @@ __all__: list[str] = [
     "node",
     "shape",
     "attribute",
+    "selection",
 ]
