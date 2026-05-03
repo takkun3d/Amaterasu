@@ -21,7 +21,7 @@
 
 from __future__ import annotations
 import pathlib
-from maya import mel
+from maya import mel, cmds
 from amaterasu.base import utils
 
 
@@ -47,6 +47,15 @@ def find_workspace(file_path: str | pathlib.Path) -> str:
             return str(parent)
 
     return ""
+
+
+def get_workspace() -> str:
+    """Gets the current Maya project root directory.
+
+    Returns:
+        str: The root directory path of the current project.
+    """
+    return cmds.workspace(query=True, rootDirectory=True)  # type: ignore
 
 
 def set_project(project_path: str) -> utils.Result:
