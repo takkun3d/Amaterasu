@@ -28,7 +28,7 @@ from __future__ import annotations
 from amaterasu.base import dcc, utils
 
 __product__: str = "Auto Set Project"
-__version__: str = "1.00"
+__version__: str = "1.10"
 _logger: utils.Logger = utils.get_logger(__product__)
 
 
