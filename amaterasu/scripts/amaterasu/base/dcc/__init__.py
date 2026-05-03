@@ -38,11 +38,13 @@ from amaterasu.base.dcc import node
 from amaterasu.base.dcc import shape
 from amaterasu.base.dcc import attribute
 from amaterasu.base.dcc import selection
+from amaterasu.base.dcc import viewport
 
 __all__: list[str] = [
     "get_icon_path",
     "undo",
     "get_maya_window",
+    #
     "project",
     "scene",
     "reference",
@@ -51,4 +53,5 @@ __all__: list[str] = [
     "shape",
     "attribute",
     "selection",
+    "viewport",
 ]
