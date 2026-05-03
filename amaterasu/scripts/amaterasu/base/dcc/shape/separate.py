@@ -17,10 +17,11 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Provides utilities for combining and managing Maya shape nodes.
+"""Provides utilities for separating Maya shape nodes.
 
-This module contains functions to extract shape nodes from multiple
-source transforms and consolidate them under a single target transform.
+This module contains functions to split multiple shape nodes that are
+parented under a single transform into their own individual transform
+nodes, while perfectly preserving their world-space transformations.
 """
 
 from __future__ import annotations
@@ -28,12 +29,11 @@ from maya import cmds
 from amaterasu.base import utils
 
 
-def combine(parent_node: str, source_nodes: list[str]) -> utils.Result:
-    """Combines shapes from multiple source transforms into a single target.
+def separate(source_nodes: list[str]) -> utils.Result:
+    """Separates multiple shapes under a transform into individual transforms.
 
     Args:
-        parent_node (str): The target transform node to receive the shapes.
-        source_nodes (list[str]): Source transforms whose shapes will be moved.
+        source_nodes (list[str]): Transforms containing multiple shapes.
 
     Returns:
         utils.Result: The result of the operation.
@@ -45,14 +45,35 @@ def combine(parent_node: str, source_nodes: list[str]) -> utils.Result:
             cmds.listRelatives(source_node, shapes=True, path=True) or []
         )
         if not shapes:
-            result.add_failure(source_node, "No shapes found to combine")
+            result.add_failure(source_node, "No shapes found")
+            continue
+        if len(shapes) <= 1:
+            result.add_failure(source_node, "Contains only one shape, skipping")
             continue
 
         try:
-            for shape in shapes:
-                cmds.parent(shape, parent_node, addObject=True, shape=True)
+            parent_nodes: list[str] = (
+                cmds.listRelatives(
+                    source_node, parent=True, shapes=False, path=True
+                )
+                or []
+            )
+            parent_node: str = parent_nodes[0] if parent_nodes else "|"
 
-            cmds.parent(source_node, removeObject=True)
+            for shape in shapes[1:]:
+                transform: str = cmds.createNode(
+                    "transform",
+                    name=shape.replace("Shape", ""),
+                    parent=parent_node,
+                )
+                matrix: list[float] = cmds.xform(
+                    source_node, query=True, matrix=True, worldSpace=True
+                )  # type: ignore
+                cmds.xform(
+                    transform, matrix=matrix, worldSpace=True  # type: ignore
+                )
+                cmds.parent(shape, transform, addObject=True, shape=True)
+                cmds.parent(shape, removeObject=True, shape=True)
 
         except RuntimeError as e:
             result.add_failure(source_node, str(e))
