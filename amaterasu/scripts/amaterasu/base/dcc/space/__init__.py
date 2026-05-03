@@ -17,43 +17,16 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Base DCC module for Amaterasu.
+"""Provides a hub for spatial, matrix, and bounding-box operations in Maya.
 
-This module provides common utilities and decorators for integrating
-Amaterasu tools with Digital Content Creation (DCC) applications like Maya.
-It serves as a central hub for accessing DCC-specific functions, such as
-path resolution and undo stack management.
+This subpackage acts as a facade, exposing spatial utility functions
+(such as bounding box evaluations, and future matrix/vector calculations)
+from its internal modules for convenient access.
 """
 
 from __future__ import annotations
-from amaterasu.base.dcc.paths import get_icon_path
-from amaterasu.base.dcc.decorators import undo
-from amaterasu.base.dcc.ui import get_maya_window
-
-from amaterasu.base.dcc import project
-from amaterasu.base.dcc import scene
-from amaterasu.base.dcc import reference
-from amaterasu.base.dcc import plugin
-from amaterasu.base.dcc import node
-from amaterasu.base.dcc import shape
-from amaterasu.base.dcc import attribute
-from amaterasu.base.dcc import selection
-from amaterasu.base.dcc import viewport
-from amaterasu.base.dcc import space
+from amaterasu.base.dcc.space.bounding_box import get_stacked_nodes
 
 __all__: list[str] = [
-    "get_icon_path",
-    "undo",
-    "get_maya_window",
-    #
-    "project",
-    "scene",
-    "reference",
-    "plugin",
-    "node",
-    "shape",
-    "attribute",
-    "selection",
-    "viewport",
-    "space",
+    "get_stacked_nodes",
 ]
