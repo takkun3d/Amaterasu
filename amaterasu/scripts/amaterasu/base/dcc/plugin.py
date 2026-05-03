@@ -17,36 +17,28 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Base DCC module for Amaterasu.
-
-This module provides common utilities and decorators for integrating
-Amaterasu tools with Digital Content Creation (DCC) applications like Maya.
-It serves as a central hub for accessing DCC-specific functions, such as
-path resolution and undo stack management.
-"""
+"""Provides utilities for managing Maya plugins."""
 
 from __future__ import annotations
-from amaterasu.base.dcc.paths import get_icon_path
-from amaterasu.base.dcc.decorators import undo
-from amaterasu.base.dcc.ui import get_maya_window
+from maya import cmds
+from amaterasu.base import utils
 
-from amaterasu.base.dcc import project
-from amaterasu.base.dcc import scene
-from amaterasu.base.dcc import reference
-from amaterasu.base.dcc import plugin
-from amaterasu.base.dcc import node
-from amaterasu.base.dcc import shape
-from amaterasu.base.dcc import attribute
 
-__all__: list[str] = [
-    "get_icon_path",
-    "undo",
-    "get_maya_window",
-    "project",
-    "scene",
-    "reference",
-    "plugin",
-    "node",
-    "shape",
-    "attribute",
-]
+def remove_unknown() -> utils.Result:
+    """Removes unknown plugin requirements from the current scene.
+
+    Returns:
+        utils.Result: The result of the operation.
+    """
+    result: utils.Result = utils.Result()
+    unknown_plugins: list[str] = cmds.unknownPlugin(query=True, list=True) or []  # type: ignore
+
+    for plugin in unknown_plugins:
+        try:
+            cmds.unknownPlugin(plugin, remove=True)
+            result.add_info(plugin, "Removed plugin")
+
+        except RuntimeError:
+            result.add_failure(plugin, "Cannot remove plugin")
+
+    return result

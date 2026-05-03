@@ -54,8 +54,26 @@ class Result:
 
     def __init__(self) -> None:
         """Initialize an empty Result object."""
+        self.__infos: dict[str, str] = {}
         self.__failures: dict[str, str] = {}
         self.__error: str = ""
+
+    def add_info(self, item: str, reason: str) -> None:
+        """Record an informational message for a specific item.
+
+        Args:
+            item (str): The name or identifier of the item.
+            info (str): The informational message to record.
+        """
+        self.__infos[item] = reason
+
+    def infos(self) -> dict[str, str]:
+        """Get the dictionary of items and their informational messages.
+
+        Returns:
+            dict[str, str]: A dictionary mapping item names to info messages.
+        """
+        return self.__infos
 
     def set_error(self, message: str) -> None:
         """Set a global error message.
@@ -101,6 +119,7 @@ class Result:
         Args:
             other (Result): Another Result object to merge.
         """
+        self.__infos.update(other.infos())
         self.__failures.update(other.failures())
         if other.error():
             self.set_error(other.error())
@@ -132,16 +151,21 @@ class Result:
                 or warning details.
         """
         current_status: ResultStatus = self.status()
+        lines: list[str] = []
 
         if current_status == ResultStatus.SUCCESS:
-            return success_msg
+            lines.append(success_msg)
+            for item, info in self.__infos.items():
+                lines.append(f"- {item}: {info}")
 
-        if current_status == ResultStatus.ERROR:
-            return self.__error
+        elif current_status == ResultStatus.ERROR:
+            lines.append(self.__error)
 
-        lines: list[str] = ["Completed with some errors:"]
-        for item, error in self.__failures.items():
-            lines.append(f"- {item}: {error}")
+        else:
+            lines.append("Completed with some errors:")
+            for item, error in self.__failures.items():
+                lines.append(f"- {item}: {error}")
+
         return "\n".join(lines)
 
     def log(self, _logger: logger.Logger, success_msg: str = "Done.") -> None:
