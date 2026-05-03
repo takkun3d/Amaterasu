@@ -32,6 +32,7 @@ from amaterasu.base.dcc.ui import get_maya_window
 
 from amaterasu.base.dcc import project
 from amaterasu.base.dcc import scene
+from amaterasu.base.dcc import reference
 from amaterasu.base.dcc import node
 from amaterasu.base.dcc import shape
 from amaterasu.base.dcc import attribute
@@ -42,6 +43,7 @@ __all__: list[str] = [
     "get_maya_window",
     "project",
     "scene",
+    "reference",
     "node",
     "shape",
     "attribute",

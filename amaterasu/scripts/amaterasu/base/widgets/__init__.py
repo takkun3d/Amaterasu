@@ -25,6 +25,7 @@ palettes, layouts, and sliders, ensuring a consistent interface across
 the application.
 """
 
+from amaterasu.base.widgets.browse_widget import BrowseWidget
 from amaterasu.base.widgets.color_button import ColorButton
 from amaterasu.base.widgets.color_palette import ColorPalette
 from amaterasu.base.widgets.color_select_button import ColorSelectButton
@@ -38,6 +39,7 @@ from amaterasu.base.widgets.toast import ToastWidget, ToastSignalEmitter
 from amaterasu.base.widgets.vertical_line import VerticalLine
 
 __all__: list[str] = [
+    "BrowseWidget",
     "ColorButton",
     "ColorPalette",
     "ColorSelectButton",

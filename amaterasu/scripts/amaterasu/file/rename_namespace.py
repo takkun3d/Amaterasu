@@ -1,55 +1,55 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Rename Namespace
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Renames the namespace of selected reference nodes to match their filenames.
+
+This tool updates the namespace of currently selected references (either
+in the viewport or the Reference Editor) to align with their respective
+source file names.
+"""
+
 from __future__ import annotations
-from maya import cmds
-from ..lib import logger
-from . import replace_reference
+from amaterasu.base import dcc, utils
+
+__product__: str = "Rename Namespace"
+__version__: str = "1.10"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Rename Reference'
-__version__: str = '1.00'
-__doc__ = 'Rename namespace from referenced file.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
-
-
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-
-
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
 def main() -> None:
-    '''Rename namespace from referenced file.'''
-    references: list[str] = replace_reference.get_selected_references()
-    if not references:
-        references = replace_reference.get_reference_nodes(
-            cmds.ls(selection=True)
-        )
+    """Executes the namespace renaming operation for selected references.
+
+    Retrieves the selected reference nodes and updates their namespaces
+    sequentially. Results and potential errors are accumulated and logged
+    at the end of the process.
+    """
+    references: list[str] = dcc.reference.get_selected_reference_nodes()
 
     if not references:
         _logger.error(
-            'Select node or Reference Editor item to rename namespace.'
+            "Select node or Reference Editor item to rename namespace."
         )
         return
 
+    result: utils.Result = utils.Result()
     for reference in references:
-        replace_reference.set_namespace_from_filename(reference)
+        r: utils.Result = dcc.reference.update_namespace(reference)
+        result.merge(r)
 
-    _logger.info('Done.')
+    result.log(_logger)
