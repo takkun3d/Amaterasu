@@ -17,33 +17,39 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Selects hard edges."""
+"""Provides a hub for polygon mesh and component operations in Maya.
+
+This subpackage acts as a facade, exposing component conversion utilities
+and edge/face/vertex evaluations from its internal modules for convenient access.
+"""
 
 from __future__ import annotations
-from maya import cmds, mel
-from amaterasu.base import dcc, utils
+from amaterasu.base.dcc.mesh.component import (
+    to_edge,
+    to_face,
+    group_by_node,
+    get_index,
+)
+from amaterasu.base.dcc.mesh.edge import (
+    get_crease_edges,
+    get_hard_edges,
+    get_nth_edges,
+)
+from amaterasu.base.dcc.mesh.face import get_hard_edge_shells
+from amaterasu.base.dcc.mesh.uv import get_inverted_uv_faces
 
-__product__: str = "Select Hard Edges"
-__version__: str = "1.10"
-_logger: utils.Logger = utils.get_logger(__product__)
-
-
-def main() -> None:
-    """Executes the select hard edges operation."""
-    selection: list[str] = cmds.ls(selection=True)
-    if not selection:
-        _logger.error("Select nodes or components to find hard edges.")
-        return
-
-    edges: list[str] = dcc.mesh.to_edge(selection)
-    if not edges:
-        return
-
-    hard_edges: list[str] = dcc.mesh.get_hard_edges(edges)
-    if not hard_edges:
-        _logger.info("There were no hard edges in this selection.")
-        return
-
-    mel.eval("SelectEdgeMask")
-    cmds.select(*hard_edges, replace=True)
-    _logger.info("Done.")
+__all__: list[str] = [
+    # component
+    "to_edge",
+    "to_face",
+    "group_by_node",
+    "get_index",
+    # edge
+    "get_crease_edges",
+    "get_hard_edges",
+    "get_nth_edges",
+    # facce
+    "get_hard_edge_shells",
+    # uv
+    "get_inverted_uv_faces",
+]

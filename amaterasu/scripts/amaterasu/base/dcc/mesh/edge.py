@@ -1,0 +1,118 @@
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Provides edge-related utilities for Maya meshes."""
+
+from __future__ import annotations
+from maya import cmds
+from amaterasu.base.dcc.mesh import component
+
+
+def get_crease_edges(edges: list[str]) -> list[str]:
+    """Finds edges that have a crease value greater than 0.0.
+
+    Args:
+        edges (list[str]): A list of edge components to evaluate.
+
+    Returns:
+        list[str]: A list of edges with crease values.
+    """
+    if not edges:
+        return []
+
+    crease_values: list[float] = cmds.polyCrease(edges, query=True, value=True)  # type: ignore
+    crease_edges: list[str] = [
+        edges[i] for i, val in enumerate(crease_values) if val > 0.0
+    ]
+
+    return crease_edges
+
+
+def get_hard_edges(edges: list[str]) -> list[str]:
+    """Finds hard edges from the given edge list.
+
+    Args:
+        edges (list[str]): A list of edge components to evaluate.
+
+    Returns:
+        list[str]: A list of hard edges.
+    """
+    if not edges:
+        return []
+
+    current_sel: list[str] = cmds.ls(selection=True)
+
+    cmds.select(*edges, replace=True)
+    cmds.polySelectConstraint(mode=3, type=0x8000, smoothness=1, where=2)
+    cmds.polySelectConstraint(mode=0)
+    all_hard_edges: list[str] = cmds.filterExpand(selectionMask=32) or []
+    hard_edges: list[str] = list(set(edges) & set(all_hard_edges))
+
+    if current_sel:
+        cmds.select(*current_sel, replace=True)
+    else:
+        cmds.select(clear=True)
+
+    return hard_edges
+
+
+def get_nth_edges(edges: list[str], nth: int = 1, mode: int = 1) -> list[str]:
+    """Finds every Nth edge along loops or rings from the given edges.
+
+    Args:
+        edges (list[str]): A list of starting edge components.
+        nth (int, optional): The skip interval. Defaults to 1.
+        mode (int, optional): 0 for Loop, 1 for Ring, 2 for Both. Defaults to 1.
+
+    Returns:
+        list[str]: A list of resulting nth edges.
+    """
+    if not edges:
+        return []
+
+    nth += 1
+    result_edges: list[str] = []
+    edge_dict: dict[str, list[str]] = component.group_by_node(edges)
+    for obj, items in edge_dict.items():
+        for edge_str in items:
+            edge_id: int = component.get_index(edge_str)
+            edge_loop_ids: list[int] = cmds.polySelect(
+                obj, noSelection=True, edgeLoop=edge_id
+            )  # type: ignore
+            edge_ring_ids: list[int] = cmds.polySelect(
+                obj, noSelection=True, edgeRing=edge_id
+            )  # type: ignore
+
+            if mode in (0, 2) and edge_id in edge_loop_ids:
+                first_idx: int = edge_loop_ids.index(edge_id)
+                for i in range(first_idx, len(edge_loop_ids), nth):
+                    result_edges.append(f"{obj}.e[{edge_loop_ids[i]}]")
+
+                for i in range(first_idx, 0, -nth):
+                    result_edges.append(f"{obj}.e[{edge_loop_ids[i]}]")
+
+            if mode in (1, 2) and edge_id in edge_ring_ids:
+                first_idx = edge_ring_ids.index(edge_id)
+                for i in range(first_idx, len(edge_ring_ids), nth):
+                    result_edges.append(f"{obj}.e[{edge_ring_ids[i]}]")
+
+                for i in range(first_idx, 0, -nth):
+                    result_edges.append(f"{obj}.e[{edge_ring_ids[i]}]")
+
+    return list(set(result_edges))

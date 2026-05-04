@@ -40,6 +40,7 @@ from amaterasu.base.dcc import attribute
 from amaterasu.base.dcc import selection
 from amaterasu.base.dcc import viewport
 from amaterasu.base.dcc import space
+from amaterasu.base.dcc import mesh
 
 __all__: list[str] = [
     "get_icon_path",
@@ -56,4 +57,5 @@ __all__: list[str] = [
     "selection",
     "viewport",
     "space",
+    "mesh",
 ]

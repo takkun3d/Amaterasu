@@ -1,172 +1,153 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Select Each Nth Edges
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Selects each Nth edges."""
+
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from maya import cmds, mel
+from amaterasu.base.qt import QtCore, QtWidgets
+from amaterasu.base import dcc, framework, utils, widgets
 
-try:
-    from PySide2.QtCore import Qt
-    from PySide2.QtWidgets import QWidget, QSpinBox
-
-except ImportError:
-    if not TYPE_CHECKING:
-        from PySide6.QtCore import Qt
-        from PySide6.QtWidgets import QWidget, QSpinBox
-from maya import cmds
-from ..lib import logger, parser, widgets, utility
+__product__: str = "Select Each Nth Edges"
+__version__: str = "1.20"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Select Each Nth Edges'
-__version__: str = '1.10'
-__doc__ = 'Select each Nth edges.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+class Settings(framework.ToolSettings):
+    """Settings for the Select Each Nth Edges tool.
+
+    Attributes:
+        window_geo (framework.Variant[str]): The saved window geometry data.
+        nth (framework.Variant[int]): The skip interval.
+        mode (framework.Variant[int]): The selection mode
+            (0: Loop, 1: Ring, 2: Both).
+    """
+
+    window_geo: framework.Variant[str] = framework.Variant("")
+    nth: framework.Variant[int] = framework.Variant(1)
+    mode: framework.Variant[int] = framework.Variant(1)
 
 
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-class Settings(parser.ToolSettings):
-    '''Settings for tool.'''
-
-    window_geo: parser.Variant[str] = parser.Variant('')
-    nth: parser.Variant[int] = parser.Variant(1)
-    mode: parser.Variant[int] = parser.Variant(1)
-
-
-class MainWindow(widgets.StandardToolWidget):
-    '''Tool main window'''
+class MainWindow(framework.StandardToolWindow[Settings]):
+    """Main window for the tool."""
 
     def __init__(
         self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-        unique_id: str = '',
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Widget,
+        unique_id: str = "",
     ) -> None:
-        '''Initialize widget.'''
+        """Initializes the MainWindow widget.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The window flags.
+                Defaults to QtCore.Qt.WindowType.Widget.
+            unique_id (str, optional): A unique string identifier for the window.
+                Defaults to "".
+        """
         super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
         self.resize(400, 200)
 
-        option_widget: QWidget = self.option_widget()
-        main_layout: widgets.FormLayout = widgets.FormLayout(option_widget)
-        main_layout.rowCount()
+    def create_ui(self, parent: QtWidgets.QWidget) -> None:
+        """Creates the tool-specific user interface and binds settings.
 
-        self.__nth = QSpinBox(self)
-        self.__nth.setRange(1, 99)
-        self.__nth.setButtonSymbols(QSpinBox.NoButtons)
-        self.__nth.setMinimumWidth(70)
-        main_layout.addRow(widgets.FormLabel('N th'), self.__nth)
+        Args:
+            parent (QtWidgets.QWidget): The parent widget for the UI layout.
+        """
+        main_layout: widgets.FormLayout = widgets.FormLayout(parent)
 
-        self.__mode: widgets.RadioButtons = widgets.RadioButtons(self)
-        self.__mode.set_labels(('Loop', 'Ring'))
-        main_layout.addRow(widgets.FormLabel('Mode'), self.__mode)
+        nth: QtWidgets.QSpinBox = QtWidgets.QSpinBox(parent)
+        nth.setRange(1, 99)
+        nth.setMinimumWidth(70)
+        main_layout.addRow(widgets.FormLabel("N th"), nth)
 
-    # override
-    def load_settings(self) -> None:
-        '''Load ui settings from file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.__nth.setValue(settings.nth.value())
-        self.__mode.set_check_id(settings.mode.value())
-        self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
+        mode: QtWidgets.QComboBox = QtWidgets.QComboBox(parent)
+        mode.addItems(["Loop", "Ring", "Both"])
+        main_layout.addRow(widgets.FormLabel("Mode"), mode)
 
-    # override
-    def save_settings(self) -> None:
-        '''Save ui settings to file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.nth.set_value(self.__nth.value())
-        settings.mode.set_value(self.__mode.check_id())
-        settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
-        settings.write()
-
-    # override
-    def reset_settings(self) -> None:
-        '''Reset ui settings.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
-
-    # override
-    def about(self) -> None:
-        '''Show a about dialog.[override]'''
-        widgets.AboutDialog.info(
-            self, __product__, __version__, __copyright__, __doc__
+        settings: Settings = self.tool_settings()
+        settings.window_geo.bind(
+            setter=self.restoreGeometry,
+            getter=self.saveGeometry,
+            encoder=utils.qt_to_ascii,
+            decoder=utils.ascii_to_qt,
+        )
+        settings.nth.bind(
+            setter=nth.setValue,
+            getter=nth.value,
+        )
+        settings.mode.bind(
+            setter=mode.setCurrentIndex,
+            getter=mode.currentIndex,
         )
 
-    @widgets.undo
     def apply(self) -> None:
-        '''Apply[override]'''
+        """Executes the tool's main logic by applying the configured settings."""
         self.save_settings()
-        main()
+        main(self.tool_settings())
 
 
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
-def apply(edges: list[str], nth: int = 1, mode: int = 1) -> bool:
-    '''Select each Nth edges.'''
-    nth += 1
-    edge_dict: dict[str, list[str]] = utility.to_each_geometry(edges)
-    result_edge_list: list[str] = []
-    for key, items in edge_dict.items():
-        for edge in items:
-            id_ = int(utility.component_id(edge)[0])
-            edge_loop_ids: list[int] = cmds.polySelect(
-                key, noSelection=True, edgeLoop=id_
-            )
-            edge_ring_ids: list[int] = cmds.polySelect(
-                key, noSelection=True, edgeRing=id_
-            )
+def option(unique_id: str = "") -> None:
+    """Shows the tool's option window.
 
-            first_loop_list_index: int = edge_loop_ids.index(id_)
-            first_ring_list_index: int = edge_ring_ids.index(id_)
-
-            if mode in (0, 2):
-                for i in range(first_loop_list_index, len(edge_loop_ids), nth):
-                    result_edge_list.append(f'{key}.e[{edge_loop_ids[i]}]')
-
-                for i in range(first_loop_list_index, 0, nth * -1):
-                    result_edge_list.append(f'{key}.e[{edge_loop_ids[i]}]')
-
-            if mode in (1, 2):
-                for i in range(first_ring_list_index, len(edge_ring_ids), nth):
-                    result_edge_list.append(f'{key}.e[{edge_ring_ids[i]}]')
-
-                for i in range(first_ring_list_index, 0, nth * -1):
-                    result_edge_list.append(f'{key}.e[{edge_ring_ids[i]}]')
-
-    result_edge_list = list(set(result_edge_list))
-    cmds.select(*result_edge_list, replace=True)
-    return True
-
-
-def option(unique_id: str = '') -> None:
-    '''Show window.'''
+    Args:
+        unique_id (str, optional): A unique string identifier for the window.
+            Defaults to "".
+    """
     window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()
 
 
-def main() -> None:
-    '''Apply according to the setting.'''
-    selection: list[str] = cmds.filterExpand(selectionMask=32) or []
+def main(settings: Settings | None = None) -> None:
+    """Executes the select each nth edges operation.
+
+    Args:
+        settings (Settings | None, optional): The tool settings to apply.
+            If None, the default settings will be loaded. Defaults to None.
+    """
+    selection: list[str] = cmds.ls(selection=True) or []
     if not selection:
-        _logger.error('Select polygon edges.')
+        _logger.error("Select polygon edges to execute.")
         return
 
-    settings: Settings = Settings.instance(__name__, True)
-    result: bool = apply(selection, settings.nth.value(), settings.mode.value())
-    if result:
-        _logger.info('Done.')
+    edges: list[str] = dcc.mesh.to_edge(selection)
+    if not edges:
+        _logger.error("Select polygon edges to execute.")
+        return
+
+    if settings is None:
+        settings = Settings.instance(__name__, True)
+        settings.read()
+
+    result_edges: list[str] = dcc.mesh.get_nth_edges(
+        edges,
+        settings.nth.value(),
+        settings.mode.value(),
+    )
+
+    if not result_edges:
+        _logger.info("There were no matching nth edges.")
+        return
+
+    mel.eval("SelectEdgeMask")
+    cmds.select(*result_edges, replace=True)
+    _logger.info("Done.")
