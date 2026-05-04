@@ -69,3 +69,20 @@ def get_hard_edges(edges: list[str]) -> list[str]:
         cmds.select(clear=True)
 
     return hard_edges
+
+
+def get_soft_edges(edges: list[str]) -> list[str]:
+    """Finds soft edges from the given edge list.
+
+    Args:
+        edges (list[str]): A list of edge components to evaluate.
+
+    Returns:
+        list[str]: A list of soft edges.
+    """
+    if not edges:
+        return []
+
+    hard_edges: list[str] = get_hard_edges(edges)
+    soft_edges: list[str] = list(set(edges) - set(hard_edges))
+    return soft_edges

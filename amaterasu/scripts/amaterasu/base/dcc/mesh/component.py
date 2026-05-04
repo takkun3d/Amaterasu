@@ -40,3 +40,22 @@ def to_edge(sources: str | list[str]) -> list[str]:
 
     edges: list[str] = cmds.polyListComponentConversion(*sources, toEdge=True)
     return cmds.filterExpand(*edges, selectionMask=32) or []
+
+
+def to_face(sources: str | list[str]) -> list[str]:
+    """Converts the given nodes or components to a face list.
+
+    Args:
+        nodes_or_components (str | list[str]): The nodes or components to convert.
+
+    Returns:
+        list[str]: A flat list of face components.
+    """
+    if not sources:
+        return []
+
+    if isinstance(sources, str):
+        sources = [sources]
+
+    faces: list[str] = cmds.polyListComponentConversion(*sources, toFace=True)
+    return cmds.filterExpand(*faces, selectionMask=34) or []
