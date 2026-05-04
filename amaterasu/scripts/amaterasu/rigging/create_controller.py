@@ -48,7 +48,6 @@ from ..edit import combine_shapes
 from ..modify import renamer
 from ..display import drawing_color, outliner_color
 
-
 # ==============================================================================
 #
 # Variables
@@ -1726,12 +1725,14 @@ class MainWindow(widgets.ToolWidget):
         self.__color_option = ModifyCvCurveOption(self)
         tab.addTab(self.__color_option, 'Modify CV Curve')
 
+        temp_widget = QWidget(self)
+        temp_layout = QVBoxLayout(temp_widget)
         self.__outliner_option = outliner_color.MainWindow(self)
         self.__outliner_option.menu_bar().hide()
-        self.__outliner_option.option_widget().layout().setContentsMargins(
-            10, 10, 10, 10
-        )
-        tab.addTab(self.__outliner_option, 'Outliner')
+        temp_layout.addWidget(self.__outliner_option)
+        temp_layout.addStretch(True)
+
+        tab.addTab(temp_widget, 'Outliner')
 
     # override
     def load_settings(self) -> None:

@@ -114,10 +114,14 @@ def lock(
 
     Args:
         nodes (list[str]): A list of Maya node names to process.
-        translate (bool, optional): If True, locks translate attributes. Defaults to False.
-        rotate (bool, optional): If True, locks rotate attributes. Defaults to False.
-        scale (bool, optional): If True, locks scale attributes. Defaults to False.
-        visibility (bool, optional): If True, locks the visibility attribute. Defaults to False.
+        translate (bool, optional): If True, locks translate attributes.
+            Defaults to False.
+        rotate (bool, optional): If True, locks rotate attributes.
+            Defaults to False.
+        scale (bool, optional): If True, locks scale attributes.
+            Defaults to False.
+        visibility (bool, optional): If True, locks the visibility attribute.
+            Defaults to False.
     """
     __set_lock(nodes, True, translate, rotate, scale, visibility)
 
@@ -133,10 +137,14 @@ def unlock(
 
     Args:
         nodes (list[str]): A list of Maya node names to process.
-        translate (bool, optional): If True, unlocks translate attributes. Defaults to False.
-        rotate (bool, optional): If True, unlocks rotate attributes. Defaults to False.
-        scale (bool, optional): If True, unlocks scale attributes. Defaults to False.
-        visibility (bool, optional): If True, unlocks the visibility attribute. Defaults to False.
+        translate (bool, optional): If True, unlocks translate attributes.
+            Defaults to False.
+        rotate (bool, optional): If True, unlocks rotate attributes.
+            Defaults to False.
+        scale (bool, optional): If True, unlocks scale attributes.
+            Defaults to False.
+        visibility (bool, optional): If True, unlocks the visibility attribute.
+            Defaults to False.
     """
     __set_lock(nodes, False, translate, rotate, scale, visibility)
 
