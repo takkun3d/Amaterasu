@@ -31,6 +31,7 @@ from amaterasu.base.dcc.mesh.edge import (
     get_soft_edges,
 )
 from amaterasu.base.dcc.mesh.face import get_hard_edge_shells
+from amaterasu.base.dcc.mesh.uv import get_inverted_uv_faces
 
 __all__: list[str] = [
     # component
@@ -42,4 +43,6 @@ __all__: list[str] = [
     "get_soft_edges",
     # facce
     "get_hard_edge_shells",
+    # uv
+    "get_inverted_uv_faces",
 ]
