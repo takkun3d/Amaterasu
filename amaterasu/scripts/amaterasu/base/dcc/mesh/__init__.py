@@ -24,11 +24,16 @@ and edge/face/vertex evaluations from its internal modules for convenient access
 """
 
 from __future__ import annotations
-from amaterasu.base.dcc.mesh.component import to_edge, to_face
+from amaterasu.base.dcc.mesh.component import (
+    to_edge,
+    to_face,
+    group_by_node,
+    get_index,
+)
 from amaterasu.base.dcc.mesh.edge import (
     get_crease_edges,
     get_hard_edges,
-    get_soft_edges,
+    get_nth_edges,
 )
 from amaterasu.base.dcc.mesh.face import get_hard_edge_shells
 from amaterasu.base.dcc.mesh.uv import get_inverted_uv_faces
@@ -37,10 +42,12 @@ __all__: list[str] = [
     # component
     "to_edge",
     "to_face",
+    "group_by_node",
+    "get_index",
     # edge
     "get_crease_edges",
     "get_hard_edges",
-    "get_soft_edges",
+    "get_nth_edges",
     # facce
     "get_hard_edge_shells",
     # uv

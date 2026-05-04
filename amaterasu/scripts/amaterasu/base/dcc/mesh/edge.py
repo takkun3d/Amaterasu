@@ -21,6 +21,7 @@
 
 from __future__ import annotations
 from maya import cmds
+from amaterasu.base.dcc.mesh import component
 
 
 def get_crease_edges(edges: list[str]) -> list[str]:
@@ -71,18 +72,47 @@ def get_hard_edges(edges: list[str]) -> list[str]:
     return hard_edges
 
 
-def get_soft_edges(edges: list[str]) -> list[str]:
-    """Finds soft edges from the given edge list.
+def get_nth_edges(edges: list[str], nth: int = 1, mode: int = 1) -> list[str]:
+    """Finds every Nth edge along loops or rings from the given edges.
 
     Args:
-        edges (list[str]): A list of edge components to evaluate.
+        edges (list[str]): A list of starting edge components.
+        nth (int, optional): The skip interval. Defaults to 1.
+        mode (int, optional): 0 for Loop, 1 for Ring, 2 for Both. Defaults to 1.
 
     Returns:
-        list[str]: A list of soft edges.
+        list[str]: A list of resulting nth edges.
     """
     if not edges:
         return []
 
-    hard_edges: list[str] = get_hard_edges(edges)
-    soft_edges: list[str] = list(set(edges) - set(hard_edges))
-    return soft_edges
+    nth += 1
+    result_edges: list[str] = []
+    edge_dict: dict[str, list[str]] = component.group_by_node(edges)
+    for obj, items in edge_dict.items():
+        for edge_str in items:
+            edge_id: int = component.get_index(edge_str)
+            edge_loop_ids: list[int] = cmds.polySelect(
+                obj, noSelection=True, edgeLoop=edge_id
+            )  # type: ignore
+            edge_ring_ids: list[int] = cmds.polySelect(
+                obj, noSelection=True, edgeRing=edge_id
+            )  # type: ignore
+
+            if mode in (0, 2) and edge_id in edge_loop_ids:
+                first_idx: int = edge_loop_ids.index(edge_id)
+                for i in range(first_idx, len(edge_loop_ids), nth):
+                    result_edges.append(f"{obj}.e[{edge_loop_ids[i]}]")
+
+                for i in range(first_idx, 0, -nth):
+                    result_edges.append(f"{obj}.e[{edge_loop_ids[i]}]")
+
+            if mode in (1, 2) and edge_id in edge_ring_ids:
+                first_idx = edge_ring_ids.index(edge_id)
+                for i in range(first_idx, len(edge_ring_ids), nth):
+                    result_edges.append(f"{obj}.e[{edge_ring_ids[i]}]")
+
+                for i in range(first_idx, 0, -nth):
+                    result_edges.append(f"{obj}.e[{edge_ring_ids[i]}]")
+
+    return list(set(result_edges))

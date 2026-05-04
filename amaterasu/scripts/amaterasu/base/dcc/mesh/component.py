@@ -20,6 +20,7 @@
 """Provides component conversion utilities for Maya meshes."""
 
 from __future__ import annotations
+import re
 from maya import cmds
 
 
@@ -59,3 +60,33 @@ def to_face(sources: str | list[str]) -> list[str]:
 
     faces: list[str] = cmds.polyListComponentConversion(*sources, toFace=True)
     return cmds.filterExpand(*faces, selectionMask=34) or []
+
+
+def group_by_node(components: list[str]) -> dict[str, list[str]]:
+    """Groups a list of components by their parent node.
+
+    Args:
+        components (list[str]): A list of component strings (e.g., ['pCube1.e[0]', 'pSphere1.vtx[1]']).
+
+    Returns:
+        dict[str, list[str]]: A dictionary mapping node names to their components.
+    """
+    result: dict[str, list[str]] = {}
+    for comp in components:
+        # pCube1.e[0] から pCube1 を抽出
+        node = comp.split(".")[0]
+        result.setdefault(node, []).append(comp)
+    return result
+
+
+def get_index(component_str: str) -> int:
+    """Extracts the integer index from a component string.
+
+    Args:
+        component_str (str): A component string (e.g., 'pCube1.e[10]').
+
+    Returns:
+        int: The extracted index, or -1 if no index is found.
+    """
+    match = re.search(r"\[(\d+)\]", component_str)
+    return int(match.group(1)) if match else -1
