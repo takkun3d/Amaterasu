@@ -17,45 +17,26 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Base DCC module for Amaterasu.
-
-This module provides common utilities and decorators for integrating
-Amaterasu tools with Digital Content Creation (DCC) applications like Maya.
-It serves as a central hub for accessing DCC-specific functions, such as
-path resolution and undo stack management.
-"""
+"""Provides component conversion utilities for Maya meshes."""
 
 from __future__ import annotations
-from amaterasu.base.dcc.paths import get_icon_path
-from amaterasu.base.dcc.decorators import undo
-from amaterasu.base.dcc.ui import get_maya_window
+from maya import cmds
 
-from amaterasu.base.dcc import project
-from amaterasu.base.dcc import scene
-from amaterasu.base.dcc import reference
-from amaterasu.base.dcc import plugin
-from amaterasu.base.dcc import node
-from amaterasu.base.dcc import shape
-from amaterasu.base.dcc import attribute
-from amaterasu.base.dcc import selection
-from amaterasu.base.dcc import viewport
-from amaterasu.base.dcc import space
-from amaterasu.base.dcc import mesh
 
-__all__: list[str] = [
-    "get_icon_path",
-    "undo",
-    "get_maya_window",
-    #
-    "project",
-    "scene",
-    "reference",
-    "plugin",
-    "node",
-    "shape",
-    "attribute",
-    "selection",
-    "viewport",
-    "space",
-    "mesh",
-]
+def to_edge(sources: str | list[str]) -> list[str]:
+    """Converts the given nodes or components to an edge list.
+
+    Args:
+        nodes_or_components (str | list[str]): The nodes or components to convert.
+
+    Returns:
+        list[str]: A flat list of edge components (e.g., ['pCube1.e[0]', ...]).
+    """
+    if not sources:
+        return []
+
+    if isinstance(sources, str):
+        sources = [sources]
+
+    edges: list[str] = cmds.polyListComponentConversion(*sources, toEdge=True)
+    return cmds.filterExpand(*edges, selectionMask=32) or []

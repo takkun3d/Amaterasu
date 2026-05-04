@@ -17,45 +17,27 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Base DCC module for Amaterasu.
-
-This module provides common utilities and decorators for integrating
-Amaterasu tools with Digital Content Creation (DCC) applications like Maya.
-It serves as a central hub for accessing DCC-specific functions, such as
-path resolution and undo stack management.
-"""
+"""Provides edge-related utilities for Maya meshes."""
 
 from __future__ import annotations
-from amaterasu.base.dcc.paths import get_icon_path
-from amaterasu.base.dcc.decorators import undo
-from amaterasu.base.dcc.ui import get_maya_window
+from maya import cmds
 
-from amaterasu.base.dcc import project
-from amaterasu.base.dcc import scene
-from amaterasu.base.dcc import reference
-from amaterasu.base.dcc import plugin
-from amaterasu.base.dcc import node
-from amaterasu.base.dcc import shape
-from amaterasu.base.dcc import attribute
-from amaterasu.base.dcc import selection
-from amaterasu.base.dcc import viewport
-from amaterasu.base.dcc import space
-from amaterasu.base.dcc import mesh
 
-__all__: list[str] = [
-    "get_icon_path",
-    "undo",
-    "get_maya_window",
-    #
-    "project",
-    "scene",
-    "reference",
-    "plugin",
-    "node",
-    "shape",
-    "attribute",
-    "selection",
-    "viewport",
-    "space",
-    "mesh",
-]
+def get_crease_edges(edges: list[str]) -> list[str]:
+    """Finds edges that have a crease value greater than 0.0.
+
+    Args:
+        edges (list[str]): A list of edge components to evaluate.
+
+    Returns:
+        list[str]: A list of edges with crease values.
+    """
+    if not edges:
+        return []
+
+    crease_values: list[float] = cmds.polyCrease(edges, query=True, value=True)  # type: ignore
+    crease_edges: list[str] = [
+        edges[i] for i, val in enumerate(crease_values) if val > 0.0
+    ]
+
+    return crease_edges
