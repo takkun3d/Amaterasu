@@ -41,3 +41,31 @@ def get_crease_edges(edges: list[str]) -> list[str]:
     ]
 
     return crease_edges
+
+
+def get_hard_edges(edges: list[str]) -> list[str]:
+    """Finds hard edges from the given edge list.
+
+    Args:
+        edges (list[str]): A list of edge components to evaluate.
+
+    Returns:
+        list[str]: A list of hard edges.
+    """
+    if not edges:
+        return []
+
+    current_sel: list[str] = cmds.ls(selection=True)
+
+    cmds.select(*edges, replace=True)
+    cmds.polySelectConstraint(mode=3, type=0x8000, smoothness=1, where=2)
+    cmds.polySelectConstraint(mode=0)
+    all_hard_edges: list[str] = cmds.filterExpand(selectionMask=32) or []
+    hard_edges: list[str] = list(set(edges) & set(all_hard_edges))
+
+    if current_sel:
+        cmds.select(*current_sel, replace=True)
+    else:
+        cmds.select(clear=True)
+
+    return hard_edges
