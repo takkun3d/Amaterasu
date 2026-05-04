@@ -91,7 +91,7 @@ def __set_lock_and_hide(
                     f"{node}.{attr}{axis}",
                     lock=state,
                     keyable=not state,
-                    channelBox=not state,
+                    # channelBox=not state,
                 )
 
         if visibility:
@@ -99,7 +99,7 @@ def __set_lock_and_hide(
                 f"{node}.v",
                 lock=state,
                 keyable=not state,
-                channelBox=not state,
+                # channelBox=not state,
             )
 
 
