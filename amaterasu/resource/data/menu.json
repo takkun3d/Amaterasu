@@ -64,8 +64,8 @@
         {"label": "Show Node History", "module": "amaterasu.modify.history_visibility", "main_func": "show()"},
         {"label": "Hide Node History", "module": "amaterasu.modify.history_visibility", "main_func": "hide()"},
         {"divider": "Utility"},
-        {"label": "Lock Node", "module": "amaterasu.modify.lock_node", "main_func": "lock()"},
-        {"label": "Unlock Node", "module": "amaterasu.modify.lock_node", "main_func": "unlock()"}
+        {"label": "Lock Node", "module": "amaterasu.modify.lock_node", "main_func": "main(True)"},
+        {"label": "Unlock Node", "module": "amaterasu.modify.lock_node", "main_func": "main(False)"}
       ]
     },
     {
