@@ -1,72 +1,61 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# History Visibility
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Toggles the visibility of history in the Channel Box.
+
+This tool modifies the `isHistoricallyInteresting` attribute of the
+history nodes for the selected objects and forces a selection update
+to refresh the Channel Box display.
+"""
+
 from __future__ import annotations
 from maya import cmds
-from ..lib import logger
+from amaterasu.base import dcc, utils
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'History Visibility'
-__version__: str = '1.00'
-__doc__ = 'Toggles the visibility of history in the Channel Box.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+__product__: str = "History Visibility"
+__version__: str = "1.10"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
+def main(is_show: bool = True) -> None:
+    """Shows or hides the history in the Channel Box for selected nodes.
 
+    Args:
+        is_show (bool, optional): True to show history, False to hide.
+            Defaults to True.
+    """
+    selection: list[str] = cmds.ls(selection=True) or []
+    if not selection:
+        if is_show:
+            _logger.error("Select node(s) to show the history in Channel Box.")
 
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
-def show(nodes: list[str] | None = None) -> None:
-    '''Shows the history in the Channel Box.'''
-    if not nodes:
-        nodes = cmds.ls(selection=True)
-
-    if not nodes:
-        _logger.error('Select node(s) to show the history in Channel Box.')
+        else:
+            _logger.error("Select node(s) to hide the history in Channel Box.")
         return
 
-    main(nodes, 2)
-    cmds.select(*nodes, replace=True)  # Updates the Channel Box information.
-    _logger.info('Done.')
+    shapes: list[str] = cmds.listRelatives(*selection, shapes=True) or []
+    target_nodes: list[str] = list(set(selection + shapes))
+    if is_show:
+        dcc.node.show_history(target_nodes)
 
+    else:
+        dcc.node.hide_history(target_nodes)
 
-def hide(nodes: list[str] | None = None) -> None:
-    '''Hides the history in the Channel Box.'''
-    if not nodes:
-        nodes = cmds.ls(selection=True)
-
-    if not nodes:
-        _logger.error('Select node(s) to hide the history in Channel Box.')
-        return
-
-    main(nodes, 0)
-    cmds.select(*nodes, replace=True)  # Updates the Channel Box information.
-    _logger.info('Done.')
-
-
-def main(nodes: list[str] | None = None, visibility: int = 0) -> None:
-    '''Toggles the visibility of history in the Channel Box.'''
-    if not nodes:
-        nodes = []
-
-    for node in nodes:
-        histories: list[str] = cmds.listHistory(node, leaf=False) or []
-        for history in histories:
-            cmds.setAttr(f'{history}.isHistoricallyInteresting', visibility)
+    cmds.select(*selection, replace=True)
+    _logger.info("Done.")

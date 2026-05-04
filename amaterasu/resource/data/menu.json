@@ -61,8 +61,8 @@
         {"label": "Attribute Reorder", "module": "amaterasu.modify.attribute_reorder", "is_window_only": true},
         {"label": "Transfer User Defined Attr", "module": "amaterasu.modify.transfer_user_defined_attr", "is_window_only": true},
         {"divider": "Connection"},
-        {"label": "Show Node History", "module": "amaterasu.modify.history_visibility", "main_func": "show()"},
-        {"label": "Hide Node History", "module": "amaterasu.modify.history_visibility", "main_func": "hide()"},
+        {"label": "Show Node History", "module": "amaterasu.modify.history_visibility", "main_func": "main(True)"},
+        {"label": "Hide Node History", "module": "amaterasu.modify.history_visibility", "main_func": "main(False)"},
         {"divider": "Utility"},
         {"label": "Lock Node", "module": "amaterasu.modify.lock_node", "main_func": "main(True)"},
         {"label": "Unlock Node", "module": "amaterasu.modify.lock_node", "main_func": "main(False)"}
