@@ -66,15 +66,16 @@ def group_by_node(components: list[str]) -> dict[str, list[str]]:
     """Groups a list of components by their parent node.
 
     Args:
-        components (list[str]): A list of component strings (e.g., ['pCube1.e[0]', 'pSphere1.vtx[1]']).
+        components (list[str]): A list of component strings.
+            (e.g., ['pCube1.e[0]', 'pSphere1.vtx[1]'])
 
     Returns:
-        dict[str, list[str]]: A dictionary mapping node names to their components.
+        dict[str, list[str]]: A dictionary mapping node names to
+            their components.
     """
     result: dict[str, list[str]] = {}
     for comp in components:
-        # pCube1.e[0] から pCube1 を抽出
-        node = comp.split(".")[0]
+        node: str = comp.split(".")[0]
         result.setdefault(node, []).append(comp)
     return result
 
@@ -88,5 +89,5 @@ def get_index(component_str: str) -> int:
     Returns:
         int: The extracted index, or -1 if no index is found.
     """
-    match = re.search(r"\[(\d+)\]", component_str)
+    match: re.Match[str] | None = re.search(r"\[(\d+)\]", component_str)
     return int(match.group(1)) if match else -1
