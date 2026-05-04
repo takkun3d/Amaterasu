@@ -95,6 +95,8 @@ class ToolWindow(
                 id(self),
             ),
         )
+
+        self.__menu_bar: QtWidgets.QMenuBar
         self.__init_ui()
 
     def __init_ui(self) -> None:
@@ -139,11 +141,11 @@ class ToolWindow(
         Args:
             layout (QtWidgets.QVBoxLayout): The main vertical layout of the window.
         """
-        menu_bar: QtWidgets.QMenuBar = QtWidgets.QMenuBar(self)
-        layout.addWidget(menu_bar)
+        self.__menu_bar = QtWidgets.QMenuBar(self)
+        layout.addWidget(self.__menu_bar)
 
         file_menu: QtWidgets.QMenu = QtWidgets.QMenu("File", self)
-        menu_bar.addMenu(file_menu)
+        self.__menu_bar.addMenu(file_menu)
 
         action: QtGui.QAction = file_menu.addAction("Save Settings")
         action.triggered.connect(self.save_settings)
@@ -156,10 +158,10 @@ class ToolWindow(
         action: QtGui.QAction = file_menu.addAction("Exit")
         action.triggered.connect(self.close)
 
-        self.create_custom_menu(menu_bar)
+        self.create_custom_menu(self.__menu_bar)
 
         help_menu: QtWidgets.QMenu = QtWidgets.QMenu("Help", self)
-        menu_bar.addMenu(help_menu)
+        self.__menu_bar.addMenu(help_menu)
 
         action: QtGui.QAction = help_menu.addAction("About")
         action.triggered.connect(self.about)
@@ -175,6 +177,18 @@ class ToolWindow(
             menu_bar (QtWidgets.QMenuBar): The main menu bar widget where
                 the custom menus should be added.
         """
+
+    def menu_bar(self) -> QtWidgets.QMenuBar:
+        """Gets the main menu bar widget of the tool window.
+
+        This allows subclasses or external callers to access the menu bar
+        for dynamic visibility control (e.g., hiding it when embedded as a
+        sub-widget) or advanced customization.
+
+        Returns:
+            QtWidgets.QMenuBar: The main menu bar instance.
+        """
+        return self.__menu_bar
 
     @abc.abstractmethod
     def create_ui(self, parent: QtWidgets.QWidget) -> None:
