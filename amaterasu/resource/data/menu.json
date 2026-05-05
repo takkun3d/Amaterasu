@@ -46,8 +46,8 @@
       "label": "Modify",
       "items": [
         {"divider": "Transform"},
-        {"label": "Lock & Hide Transform", "module": "amaterasu.modify.lock_hide_transform", "main_func": "main(True)"},
-        {"label": "Unlock & Show Transform", "module": "amaterasu.modify.lock_hide_transform", "main_func": "main(False)"},
+        {"label": "Lock & Hide Transform", "module": "amaterasu.modify.lock_hide_transform", "main_func": "lock()"},
+        {"label": "Unlock & Show Transform", "module": "amaterasu.modify.lock_hide_transform", "main_func": "unlock()"},
         {"label": "Unfreeze Transformations", "module": "amaterasu.modify.unfreeze_transformations", "is_window_only": true},
         {"divider": "Naming"},
         {"label": "Renamer", "module": "amaterasu.modify.renamer", "is_window_only": true},
@@ -61,11 +61,11 @@
         {"label": "Attribute Reorder", "module": "amaterasu.modify.attribute_reorder", "is_window_only": true},
         {"label": "Transfer User Defined Attr", "module": "amaterasu.modify.transfer_user_defined_attr", "is_window_only": true},
         {"divider": "Connection"},
-        {"label": "Show Node History", "module": "amaterasu.modify.history_visibility", "main_func": "main(True)"},
-        {"label": "Hide Node History", "module": "amaterasu.modify.history_visibility", "main_func": "main(False)"},
+        {"label": "Show Node History", "module": "amaterasu.modify.history_visibility", "main_func": "show()"},
+        {"label": "Hide Node History", "module": "amaterasu.modify.history_visibility", "main_func": "hide()"},
         {"divider": "Utility"},
-        {"label": "Lock Node", "module": "amaterasu.modify.lock_node", "main_func": "main(True)"},
-        {"label": "Unlock Node", "module": "amaterasu.modify.lock_node", "main_func": "main(False)"}
+        {"label": "Lock Node", "module": "amaterasu.modify.lock_node", "main_func": "lock()"},
+        {"label": "Unlock Node", "module": "amaterasu.modify.lock_node", "main_func": "unlock()"}
       ]
     },
     {
@@ -231,8 +231,8 @@
   ],
   "CHANNEL_BOX_MENU": [
     {"divider": "Transform"},
-    {"label": "Lock && Hide Transform", "module": "amaterasu.modify.lock_hide_transform", "main_func": "main(True)"},
-    {"label": "Unlock && Show Transform", "module": "amaterasu.modify.lock_hide_transform", "main_func": "main(False)"},
+    {"label": "Lock && Hide Transform", "module": "amaterasu.modify.lock_hide_transform", "main_func": "lock()"},
+    {"label": "Unlock && Show Transform", "module": "amaterasu.modify.lock_hide_transform", "main_func": "unlock()"},
     {"label": "Unfreeze Transformations", "module": "amaterasu.modify.unfreeze_transformations", "is_window_only": true},
     {"divider": "Attribute"},
     {"label": "Add Attribute", "module": "amaterasu.modify.add_attribute", "option_func": "option()"},

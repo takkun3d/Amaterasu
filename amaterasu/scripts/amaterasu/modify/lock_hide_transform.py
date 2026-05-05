@@ -35,30 +35,27 @@ __version__: str = "1.10"
 _logger: utils.Logger = utils.get_logger(__product__)
 
 
-def main(is_lock: bool = True) -> None:
-    """Locks and hides, or unlocks and shows transform attributes of selected nodes.
-
-    Args:
-        is_lock (bool, optional): True to lock/hide, False to unlock/show.
-            Defaults to True.
-    """
+def lock() -> None:
+    """Locks and hides transform attributes of selected nodes."""
     selection: list[str] = cmds.ls(selection=True, type="transform")
     if not selection:
-        if is_lock:
-            _logger.error("Select node(s) to lock and hide attributes.")
-
-        else:
-            _logger.error("Select node(s) to unlock and show attributes.")
+        _logger.error("Select node(s) to lock and hide attributes.")
         return
 
-    if is_lock:
-        dcc.attribute.lock_and_hide(
-            selection, translate=True, rotate=True, scale=True, visibility=True
-        )
+    dcc.attribute.lock_and_hide(
+        selection, translate=True, rotate=True, scale=True, visibility=True
+    )
+    _logger.info("Done.")
 
-    else:
-        dcc.attribute.unlock_and_show(
-            selection, translate=True, rotate=True, scale=True, visibility=True
-        )
 
+def unlock() -> None:
+    """Unlocks and shows transform attributes of selected nodes."""
+    selection: list[str] = cmds.ls(selection=True, type="transform")
+    if not selection:
+        _logger.error("Select node(s) to unlock and show attributes.")
+        return
+
+    dcc.attribute.unlock_and_show(
+        selection, translate=True, rotate=True, scale=True, visibility=True
+    )
     _logger.info("Done.")

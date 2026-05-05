@@ -34,21 +34,23 @@ __version__: str = "1.10"
 _logger: utils.Logger = utils.get_logger(__product__)
 
 
-def main(is_lock: bool = True) -> None:
-    """Locks or unlocks the selected nodes.
-
-    Args:
-        is_lock (bool, optional): True to lock, False to unlock.
-            Defaults to True.
-    """
+def lock() -> None:
+    """Locks the selected nodes."""
     selection: list[str] = cmds.ls(selection=True)
     if not selection:
-        if is_lock:
-            _logger.error("Select node(s) to lock state.")
-
-        else:
-            _logger.error("Select node(s) to unlock state.")
+        _logger.error("Select node(s) to lock state.")
         return
 
-    cmds.lockNode(*selection, lock=is_lock)
+    cmds.lockNode(*selection, lock=True)
+    _logger.info("Done.")
+
+
+def unlock() -> None:
+    """Unlocks the selected nodes."""
+    selection: list[str] = cmds.ls(selection=True)
+    if not selection:
+        _logger.error("Select node(s) to unlock state.")
+        return
+
+    cmds.lockNode(*selection, lock=False)
     _logger.info("Done.")

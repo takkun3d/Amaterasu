@@ -33,29 +33,31 @@ __version__: str = "1.10"
 _logger: utils.Logger = utils.get_logger(__product__)
 
 
-def main(is_show: bool = True) -> None:
-    """Shows or hides the history in the Channel Box for selected nodes.
-
-    Args:
-        is_show (bool, optional): True to show history, False to hide.
-            Defaults to True.
-    """
+def show() -> None:
+    """Shows the history in the Channel Box for selected nodes."""
     selection: list[str] = cmds.ls(selection=True) or []
     if not selection:
-        if is_show:
-            _logger.error("Select node(s) to show the history in Channel Box.")
-
-        else:
-            _logger.error("Select node(s) to hide the history in Channel Box.")
+        _logger.error("Select node(s) to show the history in Channel Box.")
         return
 
     shapes: list[str] = cmds.listRelatives(*selection, shapes=True) or []
     target_nodes: list[str] = list(set(selection + shapes))
-    if is_show:
-        dcc.node.show_history(target_nodes)
+    dcc.node.show_history(target_nodes)
 
-    else:
-        dcc.node.hide_history(target_nodes)
+    cmds.select(*selection, replace=True)
+    _logger.info("Done.")
+
+
+def hide() -> None:
+    """Hides the history in the Channel Box for selected nodes."""
+    selection: list[str] = cmds.ls(selection=True) or []
+    if not selection:
+        _logger.error("Select node(s) to hide the history in Channel Box.")
+        return
+
+    shapes: list[str] = cmds.listRelatives(*selection, shapes=True) or []
+    target_nodes: list[str] = list(set(selection + shapes))
+    dcc.node.hide_history(target_nodes)
 
     cmds.select(*selection, replace=True)
     _logger.info("Done.")
