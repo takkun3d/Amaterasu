@@ -27,7 +27,7 @@ and decoupled from direct DCC API calls.
 """
 
 from __future__ import annotations
-from amaterasu.base.dcc.attribute.default import get_default_value
+from amaterasu.base.dcc.attribute.query import get_default_value, get_range
 from amaterasu.base.dcc.attribute.lock import (
     lock,
     unlock,
@@ -36,8 +36,9 @@ from amaterasu.base.dcc.attribute.lock import (
 )
 
 __all__: list[str] = [
-    # default
+    # query
     "get_default_value",
+    "get_range",
     # lock
     "lock",
     "unlock",

@@ -69,3 +69,26 @@ def get_default_value(node: str, attribute: str) -> Any | None:
 
     except RuntimeError:
         return None
+
+
+def get_range(node: str, attribute: str) -> list[float | None]:
+    """Gets the minimum and maximum values of a specified attribute.
+
+    Returns:
+        list[float | None]: A list containing (min_value, max_value).
+            Returns None for bounds that do not exist.
+    """
+    min_val: float | None = None
+    max_val: float | None = None
+
+    try:
+        if cmds.attributeQuery(attribute, node=node, minExists=True):
+            min_val = cmds.attributeQuery(attribute, node=node, minimum=True)[0]  # type: ignore
+
+        if cmds.attributeQuery(attribute, node=node, maxExists=True):
+            max_val = cmds.attributeQuery(attribute, node=node, maximum=True)[0]  # type: ignore
+
+    except RuntimeError:
+        pass
+
+    return [min_val, max_val]

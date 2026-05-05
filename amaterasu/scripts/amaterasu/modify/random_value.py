@@ -1,341 +1,272 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Random Value
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Sets random values for attributes selected in the Maya Channel Box.
+
+This module provides a tool to assign random values to selected attributes.
+It supports absolute and relative value generation, custom or attribute-based
+value ranges, and uniform scaling.
+"""
+
 from __future__ import annotations
-from typing import TYPE_CHECKING
 from itertools import product
 import random
+from maya import cmds
+from amaterasu.base.qt import QtCore, QtWidgets
+from amaterasu.base import dcc, framework, utils, widgets
 
-try:
-    from PySide2.QtCore import Qt, Slot
-    from PySide2.QtWidgets import (
-        QWidget,
-        QHBoxLayout,
-        QLabel,
-        QDoubleSpinBox,
-        QCheckBox,
-        QSpinBox,
-        QMessageBox,
-    )
-
-except ImportError:
-    if not TYPE_CHECKING:
-        from PySide6.QtCore import Qt, Slot
-        from PySide6.QtWidgets import (
-            QWidget,
-            QHBoxLayout,
-            QLabel,
-            QDoubleSpinBox,
-            QCheckBox,
-            QSpinBox,
-            QMessageBox,
-        )
-from maya import cmds, mel
-from ..lib import logger, parser, widgets
+__product__: str = "Random Value"
+__version__: str = "1.20"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Random Value'
-__version__: str = '1.10'
-__doc__ = 'Set random value for attribute selected in Channel Box.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+class Settings(framework.ToolSettings):
+    """Settings for the Random Value tool.
+
+    Attributes:
+        window_geo (framework.Variant[str]): The saved window geometry data.
+        seed (framework.Variant[int]): The random seed value. 0 means unseeded.
+        method (framework.Variant[int]): The mode of application
+            (0: Absolute, 1: Relatives).
+        range (framework.Variant[int]): The range mode
+            (0: Custom, 1: Attribute Min/Max).
+        random_min (framework.Variant[float]): The custom minimum random value.
+        random_max (framework.Variant[float]): The custom maximum random value.
+        uniform_scale (framework.Variant[bool]): Whether to apply the same random value to XYZ scales.
+    """
+
+    window_geo: framework.Variant[str] = framework.Variant("")
+    seed: framework.Variant[int] = framework.Variant(0)
+    method: framework.Variant[int] = framework.Variant(1)
+    range: framework.Variant[int] = framework.Variant(1)
+    random_min: framework.Variant[float] = framework.Variant(-10.0)
+    random_max: framework.Variant[float] = framework.Variant(10.0)
+    uniform_scale: framework.Variant[bool] = framework.Variant(True)
 
 
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-class Settings(parser.ToolSettings):
-    '''Settings for tool.'''
+class MainWindow(framework.StandardToolWindow[Settings]):
+    """Main window for the Random Value tool.
 
-    window_geo: parser.Variant[str] = parser.Variant('')
-    seed: parser.Variant[int] = parser.Variant(0)
-    method: parser.Variant[int] = parser.Variant(1)
-    range: parser.Variant[int] = parser.Variant(1)
-    random_min: parser.Variant[float] = parser.Variant(-10.0)
-    random_max: parser.Variant[float] = parser.Variant(10.0)
-    uniform_scale: parser.Variant[bool] = parser.Variant(True)
-
-
-class MainWindow(widgets.StandardToolWidget):
-    '''Tool main window'''
+    This window provides a UI for configuring random value generation parameters
+    and applying them to the selected attributes in the Channel Box.
+    """
 
     def __init__(
         self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-        unique_id: str = '',
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Widget,
+        unique_id: str = "",
     ) -> None:
-        '''Initialize widget.'''
+        """Initializes the MainWindow widget.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The window flags.
+                Defaults to QtCore.Qt.WindowType.Widget.
+            unique_id (str, optional): A unique identifier for the window instance.
+                Defaults to "".
+        """
         super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
         self.resize(400, 200)
 
-        self.__main_layout = widgets.FormLayout(self.option_widget())
+    def create_ui(self, parent: QtWidgets.QWidget) -> None:
+        """Creates the tool-specific user interface and binds settings.
 
-        seed_layout = QHBoxLayout(self)
-        self.__main_layout.addRow(widgets.FormLabel('Seed'), seed_layout)
+        Args:
+            parent (QtWidgets.QWidget): The parent widget to attach the UI elements to.
+        """
+        main_layout: widgets.FormLayout = widgets.FormLayout(parent)
 
-        self.__seed = QSpinBox(self)
-        self.__seed.setRange(-999999, 999999)
-        self.__seed.setMaximumWidth(80)
-        self.__seed.setButtonSymbols(QSpinBox.NoButtons)
-        self.__seed.setToolTip('If set to 0, result changes every time.')
-        seed_layout.addWidget(self.__seed)
+        seed_spin = QtWidgets.QSpinBox(self)
+        seed_spin.setRange(-999999, 999999)
+        seed_spin.setMaximumWidth(80)
+        seed_spin.setToolTip("If set to 0, result changes every time.")
+        main_layout.addRow(widgets.FormLabel("Seed"), seed_spin)
 
-        self.__method: widgets.RadioButtons = widgets.RadioButtons(self)
-        self.__method.set_labels(('Absolute', 'Relatives'))
-        self.__main_layout.addRow(widgets.FormLabel('Method'), self.__method)
+        method = QtWidgets.QComboBox(self)
+        method.addItems(["Absolute", "Relatives"])
+        main_layout.addRow(widgets.FormLabel("Method"), method)
 
-        self.__main_layout.addRow(widgets.HorizontalLine(self))
+        main_layout.addRow(widgets.HorizontalLine(parent))
 
-        self.__range: widgets.RadioButtons = widgets.RadioButtons(self)
-        self.__range.set_labels(('Custom', 'Attribute Min/Max'))
-        self.__range.button_group().buttonClicked.connect(
-            self.set_valid_options
-        )
-        self.__main_layout.addRow(widgets.FormLabel('Range'), self.__range)
+        range_mode = QtWidgets.QComboBox(self)
+        range_mode.addItems(["Custom", "Attribute Min/Max"])
+        main_layout.addRow(widgets.FormLabel("Range"), range_mode)
 
-        custom_range_layout = QHBoxLayout(self)
-        self.__main_layout.addRow('', custom_range_layout)
-        self.__custom_range_id = self.__main_layout.row_id()
+        range_value = widgets.DoubleRangeWidget(parent)
+        main_layout.addRow("", range_value)
 
-        custom_range_layout.addWidget(QLabel('Min : '))
+        main_layout.addRow(widgets.HorizontalLine(parent))
 
-        self.__min = QDoubleSpinBox(self)
-        self.__min.setRange(-999999, 999999)
-        self.__min.setDecimals(5)
-        self.__min.setMaximumWidth(80)
-        self.__min.setButtonSymbols(QDoubleSpinBox.NoButtons)
-        self.__min.setToolTip(
-            'If attribute has no maximum value, Random range is setting to this.'
-        )
-        custom_range_layout.addWidget(self.__min)
+        uniform_scale_check = QtWidgets.QCheckBox("Uniform Scale", parent)
+        main_layout.addWidget(uniform_scale_check)
 
-        custom_range_layout.addWidget(QLabel('Max : '))
-
-        self.__max = QDoubleSpinBox(self)
-        self.__max.setRange(-999999, 999999)
-        self.__max.setDecimals(5)
-        self.__max.setMaximumWidth(80)
-        self.__max.setButtonSymbols(QDoubleSpinBox.NoButtons)
-        self.__max.setToolTip(
-            'If attribute has no maximum value, Random range is setting to this.'
-        )
-        custom_range_layout.addWidget(self.__max)
-
-        self.__main_layout.addRow(widgets.HorizontalLine(self))
-
-        self.__uniform_scale = QCheckBox('Uniform Scale', self)
-        self.__main_layout.addWidget(self.__uniform_scale)
-
-    # override
-    def load_settings(self) -> None:
-        '''Load ui settings from file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
-        self.__seed.setValue(settings.seed.value())
-        self.__method.set_check_id(settings.method.value())
-        self.__range.set_check_id(settings.range.value())
-        self.__min.setValue(settings.random_min.value())
-        self.__max.setValue(settings.random_max.value())
-        self.__uniform_scale.setChecked(settings.uniform_scale.value())
-        self.set_valid_options()
-
-    # override
-    def save_settings(self) -> None:
-        '''Save ui settings to file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
-        settings.seed.set_value(self.__seed.value())
-        settings.method.set_value(self.__method.check_id())
-        settings.range.set_value(self.__range.check_id())
-        settings.random_min.set_value(self.__min.value())
-        settings.random_max.set_value(self.__max.value())
-        settings.uniform_scale.set_value(self.__uniform_scale.isChecked())
-        settings.write()
-
-    # override
-    def reset_settings(self) -> None:
-        '''Reset ui settings.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
-
-    # override
-    def about(self) -> None:
-        '''Show a about dialog.[override]'''
-        widgets.AboutDialog.info(
-            self, __product__, __version__, __copyright__, __doc__
+        range_mode.currentIndexChanged.connect(
+            lambda index: range_value.setEnabled(index == 0)
         )
 
-    @Slot()
-    def set_valid_options(self) -> None:
-        '''Synchronize with valid options.'''
-        # self.__main_layout.set_row_enabled(
-        #     self.__custom_range_id, (self.__range.check_id() == 0)
-        # )
+        settings: Settings = self.tool_settings()
+        settings.window_geo.bind(
+            setter=self.restoreGeometry,
+            getter=self.saveGeometry,
+            encoder=utils.qt_to_ascii,
+            decoder=utils.ascii_to_qt,
+        )
+        settings.seed.bind(setter=seed_spin.setValue, getter=seed_spin.value)
+        settings.method.bind(
+            setter=method.setCurrentIndex,
+            getter=method.currentIndex,
+        )
+        settings.range.bind(
+            setter=range_mode.setCurrentIndex,
+            getter=range_mode.currentIndex,
+        )
+        settings.random_min.bind(
+            setter=range_value.set_min_value,
+            getter=range_value.min_value,
+        )
+        settings.random_max.bind(
+            setter=range_value.set_max_value,
+            getter=range_value.max_value,
+        )
+        settings.uniform_scale.bind(
+            setter=uniform_scale_check.setChecked,
+            getter=uniform_scale_check.isChecked,
+        )
 
-    @widgets.undo
+    @dcc.undo
     def apply(self) -> None:
-        '''Apply'''
+        """Executes the tool's main logic by applying the configured settings."""
         self.save_settings()
-
-        selection: list[str] = cmds.ls(selection=True)
-        if not selection:
-            QMessageBox.critical(
-                self, 'Error', 'Select node to set random value.'
-            )
-            return
-
-        main()
+        main(self.tool_settings())
 
 
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
-def apply(
+def _set_random_values(
     plugs: list[str],
     seed: int = 0,
     method: int = 0,
-    range: int = 1,
+    range_mode: int = 1,
     min_value: float = -10,
     max_value: float = 10,
     uniform_scale: bool = False,
-) -> bool:
-    '''
-    Random value to plugs.
-    method = 0:Absolute / 1:Relatives
-    range = 0:Custom / 1:Attribute[min-max]
-    '''
+) -> utils.Result:
+    """Core logic to calculate and assign random values to the specified plugs.
+
+    Args:
+        plugs (list[str]): A list of attribute plugs (e.g., 'pCube1.tx').
+        seed (int, optional): The random seed. Defaults to 0 (unseeded).
+        method (int, optional): 0 for Absolute assignment,
+            1 for Relative addition. Defaults to 0.
+        range_mode (int, optional): 0 for Custom range,
+            1 for Attribute Min/Max. Defaults to 1.
+        min_value (float, optional): Custom minimum limit. Defaults to -10.
+        max_value (float, optional): Custom maximum limit. Defaults to 10.
+        uniform_scale (bool, optional): If True, sx, sy, sz will receive identical values.
+            Defaults to False.
+
+    Returns:
+        utils.Result: An object containing the success status and
+            execution details/errors.
+    """
+    result = utils.Result()
     if seed != 0:
         random.seed(seed)
 
     scale_cache: dict[str, float] = {}
-    scale_attrs: list[str] = ['sx', 'sy', 'sz']
+    scale_attrs: list[str] = ["sx", "sy", "sz"]
 
     for plug in plugs:
         temp: list[str] = plug.split('.')
         node: str = temp[0]
         attr: str = '.'.join(temp[1:])
 
-        min_exists: bool = cmds.attributeQuery(attr, node=node, minExists=True)
-        max_exists: bool = cmds.attributeQuery(attr, node=node, maxExists=True)
-        attr_min: float = (
-            cmds.attributeQuery(attr, node=node, minimum=True)[0]
-            if min_exists
-            else 0.0
-        )
-        attr_max: float = (
-            cmds.attributeQuery(attr, node=node, maximum=True)[0]
-            if max_exists
-            else 0.0
-        )
+        attr_min: float | None
+        attr_max: float | None
+        attr_min, attr_max = dcc.attribute.get_range(node, attr)
 
-        if range == 1:
-            min_value = attr_min if min_exists else min_value
-            max_value = attr_max if max_exists else max_value
+        range_min: float = attr_min if attr_min is not None else min_value
+        range_max: float = attr_max if attr_max is not None else max_value
+        if range_mode == 0:  # Custom
+            range_min = min_value
+            range_max = max_value
 
-        value: float = random.uniform(min_value, max_value)
-
-        if method == 1:
+        value: float = random.uniform(range_min, range_max)
+        if method == 1:  # Relatives
             value += float(cmds.getAttr(plug))
 
-            # Clamp
-            value = min(max_value, value) if min_exists else value
-            value = max(min_value, value) if max_exists else value
+        # Clamp the value if min/max attributes are defined.
+        value = max(attr_min, value) if attr_min is not None else value
+        value = min(attr_max, value) if attr_max is not None else value
 
         if uniform_scale and attr in scale_attrs and node not in scale_cache:
-            # Uniform scale settings are done using cache.
             scale_cache[node] = value
+            continue
 
-        else:
-            try:
-                cmds.setAttr(plug, value)
+        try:
+            cmds.setAttr(plug, value)
 
-            except RuntimeError:
-                _logger.error('Failed to set %s.', plug)
+        except RuntimeError as e:
+            result.add_failure(plug, f"Failed to set value: {e}")
 
-    # Uniform scale
     if uniform_scale:
         for node, attr in product(scale_cache.keys(), scale_attrs):
+            plug = f"{node}.{attr}"
             try:
-                cmds.setAttr(f'{node}.{attr}', scale_cache[node])
-            except RuntimeError:
-                _logger.error('Failed to set %s.', f'{node}.{attr}')
+                cmds.setAttr(plug, scale_cache[node])
 
-    return True
+            except RuntimeError as e:
+                result.add_failure(plug, f"Failed to set uniform scale: {e}")
+
+    return result
 
 
-def option(unique_id: str = '') -> None:
-    '''Show window.'''
+def option(unique_id: str = "") -> None:
+    """Shows the tool's option window.
+
+    Args:
+        unique_id (str, optional): A unique identifier for the window instance.
+            Defaults to "".
+    """
     window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()
 
 
-def main() -> None:
-    '''Apply according to the setting.'''
+def main(settings: Settings | None = None) -> None:
+    """Executes the random value operation on the attributes selected in
+    the Channel Box.
 
-    def create_plug_list(nodes: list[str], attrs: list[str]) -> list[str]:
-        '''Create plug list'''
-        result: list[str] = []
-        for node, attr in product(nodes, attrs):
-            result.append(f'{node}.{attr}')
-
-        return result
-
-    selection: list[str] = cmds.ls(selection=True)
-    if not selection:
-        _logger.error('Select node to set random value.')
-        return
-
-    plugs: list[str] = []
-    cb_name: str = mel.eval('$gChannelBoxName=$gChannelBoxName;')
-    plugs.extend(
-        create_plug_list(
-            cmds.channelBox(cb_name, query=True, mainObjectList=True) or [],
-            cmds.channelBox(cb_name, query=True, selectedMainAttributes=True)
-            or [],
-        )
-    )
-    plugs.extend(
-        create_plug_list(
-            cmds.channelBox(cb_name, query=True, shapeObjectList=True) or [],
-            cmds.channelBox(cb_name, query=True, selectedShapeAttributes=True)
-            or [],
-        )
-    )
-    plugs.extend(
-        create_plug_list(
-            cmds.channelBox(cb_name, query=True, historyObjectList=True) or [],
-            cmds.channelBox(cb_name, query=True, selectedHistoryAttributes=True)
-            or [],
-        )
-    )
+    Args:
+        settings (Settings | None, optional): The settings instance to use.
+            If None, reads from disk. Defaults to None.
+    """
+    plugs: list[str] = dcc.selection.get_selected_channel_box_plugs()
     if not plugs:
-        _logger.error('In Channel Box, Select attribute to set random value.')
+        _logger.error("Select attribute to set random value in Channel Box.")
         return
 
-    settings: Settings = Settings.instance(__name__, True)
-    settings.seed.value()
-    settings.method.value()
-    settings.range.value()
-    settings.random_min.value()
-    settings.random_max.value()
-    settings.uniform_scale.value()
-    result: bool = apply(
+    if settings is None:
+        settings = Settings.instance(__name__, True)
+        settings.read()
+
+    result: utils.Result = _set_random_values(
         plugs,
         settings.seed.value(),
         settings.method.value(),
@@ -344,5 +275,4 @@ def main() -> None:
         settings.random_max.value(),
         settings.uniform_scale.value(),
     )
-    if result:
-        _logger.info('Done.')
+    result.log(_logger)
