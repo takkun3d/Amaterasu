@@ -27,6 +27,16 @@ and decoupled from direct DCC API calls.
 """
 
 from __future__ import annotations
+from amaterasu.base.dcc.attribute.create import (
+    add_integer,
+    add_float,
+    add_string,
+    add_boolean,
+    add_enum,
+    add_vector,
+    add_color,
+    add_separator,
+)
 from amaterasu.base.dcc.attribute.query import get_default_value, get_range
 from amaterasu.base.dcc.attribute.lock import (
     lock,
@@ -36,6 +46,15 @@ from amaterasu.base.dcc.attribute.lock import (
 )
 
 __all__: list[str] = [
+    # create
+    "add_integer",
+    "add_float",
+    "add_string",
+    "add_boolean",
+    "add_enum",
+    "add_vector",
+    "add_color",
+    "add_separator",
     # query
     "get_default_value",
     "get_range",
