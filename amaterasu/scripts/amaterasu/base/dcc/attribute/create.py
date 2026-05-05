@@ -186,7 +186,7 @@ def add_vector(node: str, name: str, **kwargs: Any) -> None:
 
     for xyz in VECTOR_ATTR_TYPE:
         if kwargs:
-            cmds.setAttr(f"{node}.{xyz}", edit=True, **kwargs)
+            cmds.setAttr(f"{node}.{name}{xyz}", edit=True, **kwargs)
 
 
 def add_color(node: str, name: str, **kwargs: Any) -> None:
@@ -211,7 +211,7 @@ def add_color(node: str, name: str, **kwargs: Any) -> None:
 
     for rgb in COLOR_ATTR_TYPE:
         if kwargs:
-            cmds.setAttr(f"{node}.{rgb}", edit=True, **kwargs)
+            cmds.setAttr(f"{node}.{name}{rgb}", edit=True, **kwargs)
 
 
 def add_separator(node: str, name: str, **kwargs: Any) -> None:
