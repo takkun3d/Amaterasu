@@ -87,11 +87,11 @@ class MainWindow(framework.ToolWindow[Settings]):
         main_layout: QtWidgets.QGridLayout = QtWidgets.QGridLayout(parent)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.__node = QtWidgets.QLineEdit(parent)
+        self.__node = QtWidgets.QLineEdit(self)
         self.__node.setEnabled(False)
         main_layout.addWidget(self.__node, 0, 0, 1, 2)
 
-        self.__list = widgets.ListWidget(parent)
+        self.__list = widgets.ListWidget(self)
         self.__list.set_placeholder_text("Select a node and click 'Analyze'")
         self.__list.setSelectionMode(
             QtWidgets.QAbstractItemView.SelectionMode.SingleSelection
@@ -105,11 +105,11 @@ class MainWindow(framework.ToolWindow[Settings]):
         self.__list.setStyleSheet(LIST_VIEW_QSS)
         main_layout.addWidget(self.__list, 1, 0, 1, 2)
 
-        button: QtWidgets.QPushButton = QtWidgets.QPushButton("Analyze", parent)
+        button: QtWidgets.QPushButton = QtWidgets.QPushButton("Analyze", self)
         button.clicked.connect(self.analyze)
         main_layout.addWidget(button, 2, 0)
 
-        button = QtWidgets.QPushButton("Apply", parent)
+        button = QtWidgets.QPushButton("Apply", self)
         button.clicked.connect(self.apply)
         main_layout.addWidget(button, 2, 1)
 

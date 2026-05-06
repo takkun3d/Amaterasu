@@ -105,18 +105,18 @@ class MainWindow(framework.StandardToolWindow[Settings]):
         method.addItems(["Absolute", "Relatives"])
         main_layout.addRow(widgets.FormLabel("Method"), method)
 
-        main_layout.addRow(widgets.HorizontalLine(parent))
+        main_layout.addRow(widgets.HorizontalLine(self))
 
         range_mode = QtWidgets.QComboBox(self)
         range_mode.addItems(["Custom", "Attribute Min/Max"])
         main_layout.addRow(widgets.FormLabel("Range"), range_mode)
 
-        range_value = widgets.DoubleRangeWidget(parent)
+        range_value = widgets.DoubleRangeWidget(self)
         main_layout.addRow("", range_value)
 
-        main_layout.addRow(widgets.HorizontalLine(parent))
+        main_layout.addRow(widgets.HorizontalLine(self))
 
-        uniform_scale_check = QtWidgets.QCheckBox("Uniform Scale", parent)
+        uniform_scale_check = QtWidgets.QCheckBox("Uniform Scale", self)
         main_layout.addWidget(uniform_scale_check)
 
         range_mode.currentIndexChanged.connect(
