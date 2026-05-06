@@ -1,207 +1,208 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Attribute Reorder
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Reorders the user-defined attributes on the selected node."""
+
 from __future__ import annotations
-from typing import TYPE_CHECKING
-
-try:
-    from PySide2.QtCore import Qt, QItemSelectionModel
-    from PySide2.QtGui import QStandardItemModel, QStandardItem
-    from PySide2.QtWidgets import (
-        QWidget,
-        QGridLayout,
-        QListView,
-        QLineEdit,
-        QPushButton,
-        QMessageBox,
-    )
-
-except ImportError:
-    if not TYPE_CHECKING:
-        from PySide6.QtCore import Qt, QItemSelectionModel
-        from PySide6.QtGui import QStandardItemModel, QLineEdit, QStandardItem
-        from PySide6.QtWidgets import (
-            QWidget,
-            QGridLayout,
-            QListView,
-            QPushButton,
-            QMessageBox,
-        )
 from maya import cmds
-from ..lib import logger, parser, widgets
+
+from amaterasu.base.qt import QtCore, QtWidgets
+from amaterasu.base import dcc, framework, utils, widgets
+
+__product__: str = "Attribute Reorder"
+__version__: str = "1.20"
+_logger: utils.Logger = utils.get_logger(__product__)
+
+LIST_VIEW_QSS: str = """
+QListWidget {
+    outline: none;
+}
+QListWidget::item {
+    padding: 3px;
+    border-bottom: 1px solid #3a3a3a;
+}
+QListWidget::item:hover {
+    background-color: #4a4a4a;
+}
+"""
 
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Attribute Reorder'
-__version__: str = '1.10'
-__doc__ = 'Reorders the user-defined attributes on the selected node.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+class Settings(framework.ToolSettings):
+    """Settings for the Attribute Reorder tool.
+
+    Attributes:
+        window_geo (framework.Variant[str]): The saved window geometry data.
+    """
+
+    window_geo: framework.Variant[str] = framework.Variant("")
 
 
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-class Settings(parser.ToolSettings):
-    '''Settings for tool.'''
-
-    window_geo: parser.Variant[str] = parser.Variant('')
-
-
-class MainWindow(widgets.ToolWidget):
-    '''Tool main window'''
+class MainWindow(framework.ToolWindow[Settings]):
+    """Main window for the Attribute Reorder tool."""
 
     def __init__(
         self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-        unique_id: str = '',
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Widget,
+        unique_id: str = "",
     ) -> None:
-        '''Initialize widget.'''
+        """Initializes the MainWindow widget.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The window flags.
+                Defaults to QtCore.Qt.WindowType.Widget.
+            unique_id (str, optional): A unique identifier for the window instance.
+                Defaults to "".
+        """
         super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
-        self.resize(400, 200)
+        self.resize(400, 300)
+        self.__node: QtWidgets.QLineEdit
+        self.__list: widgets.ListWidget
 
-        option_widget: QWidget = self.option_widget()
+    def create_ui(self, parent: QtWidgets.QWidget) -> None:
+        """Creates the tool-specific user interface and binds settings.
 
-        main_layout: QGridLayout = QGridLayout(option_widget)
+        Args:
+            parent (QtWidgets.QWidget): The parent widget to attach the UI elements to.
+        """
+        main_layout: QtWidgets.QGridLayout = QtWidgets.QGridLayout(parent)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.__node: QLineEdit = QLineEdit(self)
+        self.__node = QtWidgets.QLineEdit(parent)
         self.__node.setEnabled(False)
         main_layout.addWidget(self.__node, 0, 0, 1, 2)
 
-        self.__model = QStandardItemModel(0, 1, self)
-        self.__selection_model = QItemSelectionModel(self.__model)
+        self.__list = widgets.ListWidget(parent)
+        self.__list.set_placeholder_text("Select a node and click 'Analyze'")
+        self.__list.setSelectionMode(
+            QtWidgets.QAbstractItemView.SelectionMode.SingleSelection
+        )
+        self.__list.setDragEnabled(True)
+        self.__list.setAcceptDrops(True)
+        self.__list.setDragDropMode(
+            QtWidgets.QAbstractItemView.DragDropMode.InternalMove
+        )
+        self.__list.setDefaultDropAction(QtCore.Qt.DropAction.MoveAction)
+        self.__list.setStyleSheet(LIST_VIEW_QSS)
+        main_layout.addWidget(self.__list, 1, 0, 1, 2)
 
-        self.__view = QListView(self)
-        self.__view.setModel(self.__model)
-        self.__view.setSelectionModel(self.__selection_model)
-        self.__view.setFocusPolicy(Qt.NoFocus)
-        self.__view.setSelectionMode(QListView.SingleSelection)
-        self.__view.setDragEnabled(True)
-        self.__view.setAcceptDrops(True)
-        self.__view.setDragDropMode(QListView.InternalMove)
-        self.__view.setDefaultDropAction(Qt.MoveAction)
-        main_layout.addWidget(self.__view, 1, 0, 1, 2)
+        button: QtWidgets.QPushButton = QtWidgets.QPushButton("Analyze", parent)
+        button.clicked.connect(self.analyze)
+        main_layout.addWidget(button, 2, 0)
 
-        analyze_btn: QPushButton = QPushButton('Analyze', self)
-        analyze_btn.clicked.connect(self.analyze)
-        main_layout.addWidget(analyze_btn, 2, 0)
+        button = QtWidgets.QPushButton("Apply", parent)
+        button.clicked.connect(self.apply)
+        main_layout.addWidget(button, 2, 1)
 
-        apply_btn: QPushButton = QPushButton('Apply', self)
-        apply_btn.clicked.connect(self.apply)
-        main_layout.addWidget(apply_btn, 2, 1)
-
-    # override
-    def load_settings(self) -> None:
-        '''Load ui settings from file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
-
-    # override
-    def save_settings(self) -> None:
-        '''Save ui settings to file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
-        settings.write()
-
-    # override
-    def reset_settings(self) -> None:
-        '''Reset ui settings.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
-
-    # override
-    def about(self) -> None:
-        '''Show a about dialog.[override]'''
-        widgets.AboutDialog.info(
-            self, __product__, __version__, __copyright__, __doc__
+        settings: Settings = self.tool_settings()
+        settings.window_geo.bind(
+            setter=self.restoreGeometry,
+            getter=self.saveGeometry,
+            encoder=utils.qt_to_ascii,
+            decoder=utils.ascii_to_qt,
         )
 
-    @widgets.undo
     def analyze(self) -> None:
-        '''Analyze attribute from selection.'''
-        self.__node.setText('')
-        self.__model.removeRows(0, self.__model.rowCount())
+        """Analyzes the selected node and populates the list with its user-defined attributes."""
+        self.__node.clear()
+        self.__list.clear()
 
-        selection: list[str] = cmds.ls(selection=True)
+        selection: list[str] = cmds.ls(selection=True) or []
         if not selection:
-            _logger.error('Select a node to reorder attributes.')
+            _logger.warning("Select a node to reorder attributes.")
             return
 
         if len(selection) > 1:
-            _logger.error('Select a node to reorder attributes.')
+            _logger.warning("Please select only one node.")
             return
 
-        attributes: list[str] = cmds.listAttr(selection[0], userDefined=True)
+        node: str = selection[0]
+        attributes: list[str] = cmds.listAttr(node, userDefined=True) or []
         if not attributes:
-            _logger.error('The selected node has no user-defined attributes.')
+            _logger.warning(
+                "The selected node '%s' has no user-defined attributes.",
+                node,
+            )
             return
 
-        self.__node.setText(selection[0])
-        for attribute in attributes:
-            item: QStandardItem = QStandardItem(attribute)
-            item.setEditable(False)
-            item.setDropEnabled(False)
-            self.__model.appendRow(item)
+        attributes = [f":: {attr}" for attr in attributes]
+        self.__node.setText(node)
+        self.__list.addItems(attributes)
 
-    @widgets.undo
     def apply(self) -> None:
-        '''Apply'''
-        self.save_settings()
-        order: list[str] = []
-        for i in range(self.__model.rowCount()):
-            item: QStandardItem = self.__model.item(i, 0)
-            order.append(item.text())
+        """Applies the new attribute order to the node."""
+        node: str = self.__node.text()
+        if not node:
+            return
 
-        anser: QMessageBox.StandardButton = QMessageBox.warning(
+        order: list[str] = [
+            self.__list.item(i).text().removeprefix(":: ")
+            for i in range(self.__list.count())
+        ]
+        answer: int = QtWidgets.QMessageBox.warning(
             self,
             __product__,
-            'This action cannot be undo.\nDo you want to continue?',
-            QMessageBox.Yes,
-            QMessageBox.No,
+            "This action relies on Maya's Undo queue and cannot be undone once completed.\n"
+            "Maya's Undo history will be flushed.\n\nDo you want to continue?",
+            QtWidgets.QMessageBox.StandardButton.Yes
+            | QtWidgets.QMessageBox.StandardButton.No,
+            QtWidgets.QMessageBox.StandardButton.No,
         )
-        if anser == QMessageBox.No:
+        if answer == QtWidgets.QMessageBox.StandardButton.No:
             return
 
-        apply(self.__node.text(), order)
+        self.save_settings()
+
+        result: utils.Result = _execute_reorder(node, order)
+        result.log(_logger)
 
 
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
-def apply(node: str = '', attr_orders: list[str] | None = None) -> bool:
-    '''Reorder attributes.'''
-    if not attr_orders:
-        return False
+def _execute_reorder(node: str, attr_orders: list[str]) -> utils.Result:
+    """Wraps the core reordering logic with Result logging.
 
-    attr_orders.reverse()
-    for attr in attr_orders:
-        cmds.deleteAttr(f'{node}.{attr}')
+    Args:
+        node (str): The name of the Maya node.
+        attr_orders (list[str]): The desired order of the attribute names.
 
-    for i in range(len(attr_orders)):
-        cmds.undo()
+    Returns:
+        utils.Result: An object containing execution details and error logs.
+    """
+    result: utils.Result = utils.Result()
 
-    cmds.flushUndo()
-    _logger.info('Done.')
-    return True
+    try:
+        dcc.attribute.reorder_user_attributes(node, attr_orders)
+
+    except RuntimeError as e:
+        result.add_failure(node, f"Failed to reorder attributes: {e}")
+
+    return result
 
 
-def main(unique_id: str = '') -> None:
-    '''Show window.'''
+def main(unique_id: str = "") -> None:
+    """Shows the tool's option window.
+
+    Args:
+        unique_id (str, optional): A unique identifier for the window instance.
+            Defaults to "".
+    """
     window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()

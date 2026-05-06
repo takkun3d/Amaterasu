@@ -44,6 +44,7 @@ from amaterasu.base.dcc.attribute.lock import (
     lock_and_hide,
     unlock_and_show,
 )
+from amaterasu.base.dcc.attribute.sort import reorder_user_attributes
 
 __all__: list[str] = [
     # create
@@ -63,4 +64,6 @@ __all__: list[str] = [
     "unlock",
     "lock_and_hide",
     "unlock_and_show",
+    # sort
+    "reorder_user_attributes",
 ]
