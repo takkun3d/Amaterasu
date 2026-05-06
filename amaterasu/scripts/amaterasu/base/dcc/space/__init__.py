@@ -26,7 +26,17 @@ from its internal modules for convenient access.
 
 from __future__ import annotations
 from amaterasu.base.dcc.space.bounding_box import get_stacked_nodes
+from amaterasu.base.dcc.space.unfreeze import (
+    apply_affine_transformation,
+    apply_align_to_components,
+    apply_triangle_transformation,
+)
 
 __all__: list[str] = [
+    # bounding_box
     "get_stacked_nodes",
+    # unfreeze
+    "apply_affine_transformation",
+    "apply_align_to_components",
+    "apply_triangle_transformation",
 ]
