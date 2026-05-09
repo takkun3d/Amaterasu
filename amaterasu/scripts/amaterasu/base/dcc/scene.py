@@ -22,6 +22,7 @@
 from __future__ import annotations
 from typing import Any
 from maya import cmds, mel
+from maya.api import OpenMaya
 from amaterasu.base import utils
 
 
@@ -217,5 +218,29 @@ def remove_unknown_nodes() -> utils.Result:
 
         except ValueError:
             pass
+
+    return result
+
+
+def find_duplicate_name_nodes() -> list[str]:
+    """Finds all nodes in the scene that have non-unique names (long paths).
+
+    Returns:
+        list[str]: A list of full DAG paths for nodes with duplicate short names.
+    """
+    result: list[str] = []
+    iter_dag: OpenMaya.MItDag = OpenMaya.MItDag(
+        OpenMaya.MItDag.kDepthFirst, OpenMaya.MFn.kBase
+    )
+    dag_fn: OpenMaya.MFnDagNode = OpenMaya.MFnDagNode()
+    while not iter_dag.isDone():
+        dag_fn.setObject(iter_dag.currentItem())
+        if not dag_fn.isInstanced():
+            path: OpenMaya.MDagPath = dag_fn.getPath()
+            node_name: str = path.partialPathName()
+            if len(node_name.split('|')) >= 2:
+                result.append(node_name)
+
+        iter_dag.next()
 
     return result

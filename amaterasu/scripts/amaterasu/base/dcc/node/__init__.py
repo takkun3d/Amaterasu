@@ -34,6 +34,11 @@ from amaterasu.base.dcc.node.drawing import (
     clear_drawing_color,
 )
 from amaterasu.base.dcc.node.hide_history import show_history, hide_history
+from amaterasu.base.dcc.node.name import (
+    normalize_shape_name,
+    normalize_shading_engine_name,
+    remove_pasted_prefixes,
+)
 from amaterasu.base.dcc.node.outliner import (
     set_outliner_color,
     clear_outliner_color,
@@ -41,13 +46,21 @@ from amaterasu.base.dcc.node.outliner import (
 )
 
 __all__: list[str] = [
+    # display
     "set_xray",
     "set_display_local_axis",
+    # drawing
     "set_drawing_index_color",
     "set_drawing_rgb_color",
     "clear_drawing_color",
+    # hide_history
     "show_history",
     "hide_history",
+    # name
+    "normalize_shape_name",
+    "normalize_shading_engine_name",
+    "remove_pasted_prefixes",
+    # outliner
     "set_outliner_color",
     "clear_outliner_color",
     "sort",
