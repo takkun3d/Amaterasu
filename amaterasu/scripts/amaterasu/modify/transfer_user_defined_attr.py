@@ -1,622 +1,375 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Transfer User Defined Attr
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Tool for transferring and managing user-defined attributes in Maya.
+
+This module provides a UI tool to copy user-defined attributes from one node
+and paste them to others. It supports maintaining multiple attribute 'stocks'
+via tabs and exporting/importing these stocks as JSON files.
+"""
+
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any
+from typing import Any
+from itertools import product
 import json
-
-try:
-    from PySide2.QtCore import (
-        Qt,
-        Slot,
-        QMimeData,
-        QByteArray,
-        QItemSelectionModel,
-        QModelIndex,
-    )
-    from PySide2.QtGui import (
-        QStandardItemModel,
-        QStandardItem,
-        QKeyEvent,
-        QKeySequence,
-        QClipboard,
-    )
-    from PySide2.QtWidgets import (
-        QWidget,
-        QTreeView,
-        QApplication,
-        QGridLayout,
-        QPushButton,
-        QVBoxLayout,
-    )
-
-except ImportError:
-    if not TYPE_CHECKING:
-        from PySide6.QtCore import (
-            Qt,
-            Slot,
-            QMimeData,
-            QByteArray,
-            QItemSelectionModel,
-            QModelIndex,
-        )
-        from PySide6.QtGui import (
-            QStandardItemModel,
-            QStandardItem,
-            QKeyEvent,
-            QKeySequence,
-            QClipboard,
-        )
-        from PySide6.QtWidgets import (
-            QWidget,
-            QTreeView,
-            QApplication,
-            QGridLayout,
-            QPushButton,
-            QVBoxLayout,
-        )
 from maya import cmds
-from ..lib import logger, parser, widgets
+from amaterasu.base.qt import QtCore, QtWidgets, QtGui
+from amaterasu.base import dcc, framework, utils, widgets
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Transfer User Defined Attr'
-__version__: str = '1.10'
-__doc__ = 'This tool transfer user defined attribute from specific nodes.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+__product__: str = "Transfer User Defined Attr"
+__version__: str = "1.20"
+_logger: utils.Logger = utils.get_logger(__product__)
 
-MIME_TYPE: str = 'application/x-amaterasu-tuda-data'
+MIME_TYPE: str = "application/x-amaterasu-tuda-data"
 
 
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-class Settings(parser.ToolSettings):
-    '''Settings for tool.'''
+class Settings(framework.ToolSettings):
+    """Settings for the Transfer User Defined Attr tool.
 
-    window_geo: parser.Variant[str] = parser.Variant('')
+    Attributes:
+        window_geo (framework.Variant[str]): The saved window geometry data.
+    """
 
-
-class ClipboardData(QMimeData):
-    '''Clipboad data as json'''
-
-    def set_json_data(self, mime_type: str, json_data: list[Any]) -> None:
-        '''Set json from data.'''
-        json_byte_data: bytes = bytes(json.dumps(json_data), 'utf-8')
-        self.setData(mime_type, QByteArray(json_byte_data))
+    window_geo: framework.Variant[str] = framework.Variant("")
 
 
-class StockerItemModel(QStandardItemModel):
-    '''Item model for Stocker.'''
+class AttributePage(QtWidgets.QWidget):
+    """A single page widget holding a list of stored attributes."""
 
-    def __init__(self, parent: QWidget | None = None) -> None:
-        headers: list[str] = [
-            'Name',
-            'Type',
-            'Value',
-            'Default',
-            'Enum',
-            'Color',
-            'Parent',
-            'Keyable',
-            'ChannelBox',
-            'Min Value',
-            'Max Value',
-        ]
-        super().__init__(0, len(headers), parent)
-        for i, header in enumerate(headers):
-            self.setHeaderData(i, Qt.Horizontal, header)
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        """Initializes the AttributePage widget.
 
-    def append_item_from_node(self, node_name: str) -> None:
-        '''Append item from specific node.'''
-        user_defined_attrs: list[str] = (
-            cmds.listAttr(node_name, userDefined=True) or []
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+        """
+        super().__init__(parent)
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(4, 4, 4, 4)
+
+        self.__list = widgets.ListWidget(self)
+        self.__list.set_placeholder_text("Select a node and click 'Copy'")
+        self.__list.setSelectionMode(
+            QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection
         )
-        if not user_defined_attrs:
+        self.__list.setAlternatingRowColors(True)
+        self.__list.setContextMenuPolicy(
+            QtCore.Qt.ContextMenuPolicy.CustomContextMenu
+        )
+        self.__list.customContextMenuRequested.connect(self.show_context_menu)
+        layout.addWidget(self.__list)
+
+        btn_layout = QtWidgets.QHBoxLayout()
+        layout.addLayout(btn_layout)
+
+        copy = QtWidgets.QPushButton("Copy", self)
+        copy.clicked.connect(self.copy_from_maya)
+        btn_layout.addWidget(copy)
+
+        paste = QtWidgets.QPushButton("Paste", self)
+        paste.clicked.connect(self.paste_to_maya)
+        btn_layout.addWidget(paste)
+
+        self.__context_menu: QtWidgets.QMenu = QtWidgets.QMenu(self.__list)
+        self.__action_copy = QtGui.QAction("Copy to Clipboard", self)
+        self.__action_copy.setShortcut(QtGui.QKeySequence.StandardKey.Copy)
+        self.__action_copy.triggered.connect(self.copy_to_clipboard)
+        self.__list.addAction(self.__action_copy)
+        self.__context_menu.addAction(self.__action_copy)
+
+        self.__action_paste = QtGui.QAction("Paste from Clipboard", self)
+        self.__action_paste.setShortcut(QtGui.QKeySequence.StandardKey.Paste)
+        self.__action_paste.triggered.connect(self.paste_from_clipboard)
+        self.__list.addAction(self.__action_paste)
+        self.__context_menu.addAction(self.__action_paste)
+
+        self.__context_menu.addSeparator()
+
+        self.__action_delete = QtGui.QAction("Delete Selected", self)
+        self.__action_delete.setShortcut(QtGui.QKeySequence.StandardKey.Delete)
+        self.__action_delete.triggered.connect(self.__list.delete_selected_item)
+        self.__list.addAction(self.__action_delete)
+        self.__context_menu.addAction(self.__action_delete)
+
+    @QtCore.Slot(QtCore.QPoint)
+    def show_context_menu(self, pos: QtCore.QPoint) -> None:
+        """Shows the right-click context menu for the list.
+
+        Args:
+            pos (QtCore.QPoint): The local position where the right-click occurred.
+        """
+        has_selection: bool = bool(self.__list.selectedItems())
+        self.__action_copy.setEnabled(has_selection)
+        self.__action_delete.setEnabled(has_selection)
+
+        clipboard: QtGui.QClipboard = QtWidgets.QApplication.clipboard()
+        mime_data: QtCore.QMimeData = clipboard.mimeData()
+        has_clipboard_data: bool = mime_data.hasFormat(MIME_TYPE)
+        self.__action_paste.setEnabled(has_clipboard_data)
+
+        global_pos: QtCore.QPoint = self.__list.mapToGlobal(pos)
+        self.__context_menu.exec_(global_pos)
+
+    def _add_list_item(self, data: dcc.attribute.TransferBuffer) -> None:
+        """Helper to create a list item containing hidden AttributeData.
+
+        Args:
+            data (dcc.attribute.AttributeData): The attribute data object.
+        """
+        item = QtWidgets.QListWidgetItem(f"{data.name}  [{data.attr_type}]")
+        item.setData(QtCore.Qt.ItemDataRole.UserRole, data)
+        self.__list.addItem(item)
+
+    @QtCore.Slot()
+    def copy_from_maya(self) -> None:
+        """Copies user-defined attributes from the selected Maya node into the UI list."""
+        selection: list[str] = cmds.ls(selection=True)
+        if not selection:
+            _logger.warning("Select a node to copy attributes from.")
             return
 
-        for user_defined_attr in user_defined_attrs:
-            plug: str = f'{node_name}.{user_defined_attr}'
-            attr_type: str = cmds.getAttr(plug, type=True)
-
-            value: Any = cmds.getAttr(plug)
-            if attr_type in ('float3', 'double3'):
-                value = value[0]
-
-            default_value: Any = ''
-            if attr_type != 'string':
-                default_value = cmds.attributeQuery(
-                    user_defined_attr, node=node_name, listDefault=True
-                )[0]
-
-            enum_value: str = ''
-            if attr_type == 'enum':
-                enum_value = cmds.attributeQuery(
-                    user_defined_attr, node=node_name, listEnum=True
-                )[0]
-
-            color: bool = cmds.attributeQuery(
-                user_defined_attr, node=node_name, usedAsColor=True
-            )
-            check_parent: list[str] | None = cmds.attributeQuery(
-                user_defined_attr, node=node_name, listParent=True
-            )
-            parent_attr: str = ''
-            if check_parent:
-                parent_attr = check_parent[0]
-
-            keyable: bool = cmds.getAttr(plug, keyable=True)
-            channelbox: bool = cmds.getAttr(plug, channelBox=True)
-
-            has_min: bool = cmds.attributeQuery(
-                user_defined_attr, node=node_name, minExists=True
-            )
-            minimum: int | float | None = None
-            if attr_type in ('long', 'float') and has_min:
-                minimum = cmds.attributeQuery(
-                    user_defined_attr, node=node_name, minimum=True
-                )[0]
-
-            has_max: bool = cmds.attributeQuery(
-                user_defined_attr, node=node_name, maxExists=True
-            )
-            maximum: int | float | None = None
-            if attr_type in ('long', 'float') and has_max:
-                maximum = cmds.attributeQuery(
-                    user_defined_attr, node=node_name, maximum=True
-                )[0]
-
-            self.append_item(
-                user_defined_attr,
-                attr_type,
-                value,
-                default_value,
-                enum_value,
-                color,
-                parent_attr,
-                keyable,
-                channelbox,
-                minimum,
-                maximum,
-            )
-
-    def append_item(
-        self,
-        attr_name: str,
-        attr_type: str,
-        value: Any,
-        default_value: Any,
-        enum_value: str,
-        color: bool,
-        parent_attr: str,
-        keyable: bool,
-        channelbox: bool,
-        minimum: int | float | None,
-        maximum: int | float | None,
-    ) -> None:
-        '''Append data to item model.'''
-
-        attr_item: QStandardItem = QStandardItem()
-        attr_item.setData(attr_name)
-        attr_item.setText(attr_name)
-
-        attr_type_item: QStandardItem = QStandardItem()
-        attr_type_item.setData(attr_type)
-        attr_type_item.setText(attr_type)
-        attr_type_item.setEditable(False)
-
-        value_item: QStandardItem = QStandardItem()
-        value_item.setData(value)
-        value_item.setText(f'{value}')
-        value_item.setEditable(False)
-        if attr_type == 'enum':
-            value_item.setText(enum_value.split(':')[value])
-
-        defalut_value_item: QStandardItem = QStandardItem()
-        defalut_value_item.setData(default_value)
-        defalut_value_item.setText(f'{default_value}')
-        defalut_value_item.setEditable(False)
-
-        enum_value_item: QStandardItem = QStandardItem()
-        enum_value_item.setData(enum_value)
-        enum_value_item.setText(enum_value)
-        enum_value_item.setEditable(False)
-
-        color_item: QStandardItem = QStandardItem()
-        color_item.setData(color)
-        color_item.setText(f'{color}' if color else '')
-        color_item.setEditable(False)
-
-        parent_attr_item: QStandardItem = QStandardItem()
-        parent_attr_item.setData(parent_attr)
-        parent_attr_item.setText(parent_attr)
-        parent_attr_item.setEditable(False)
-
-        keyable_item: QStandardItem = QStandardItem()
-        keyable_item.setData(keyable)
-        keyable_item.setText(f'{keyable}' if keyable else '')
-        keyable_item.setEditable(False)
-
-        channelbox_item: QStandardItem = QStandardItem()
-        channelbox_item.setData(channelbox)
-        channelbox_item.setText(f'{channelbox}' if channelbox else '')
-        channelbox_item.setEditable(False)
-
-        minimum_item: QStandardItem = QStandardItem()
-        minimum_item.setData(minimum)
-        minimum_item.setText(f'{minimum}' if minimum is not None else '')
-        minimum_item.setEditable(False)
-
-        maximum_item: QStandardItem = QStandardItem()
-        maximum_item.setData(maximum)
-        maximum_item.setText(f'{maximum}' if maximum is not None else '')
-        maximum_item.setEditable(False)
-
-        self.appendRow(
-            [
-                attr_item,
-                attr_type_item,
-                value_item,
-                defalut_value_item,
-                enum_value_item,
-                color_item,
-                parent_attr_item,
-                keyable_item,
-                channelbox_item,
-                minimum_item,
-                maximum_item,
-            ]
+        self.__list.clear()
+        attrs_data: list[dcc.attribute.TransferBuffer] = (
+            dcc.attribute.extract_transfer_buffers(selection[0])
         )
+        for data in attrs_data:
+            self._add_list_item(data)
 
-    def row_data(self, index: int) -> tuple[
-        str,
-        str,
-        Any,
-        Any,
-        str,
-        bool,
-        str,
-        bool,
-        bool,
-        int | float | None,
-        int | float | None,
-    ]:
-        '''Return row data from item model.'''
-        return (
-            self.item(index, 0).data(),  # Name
-            self.item(index, 1).data(),  # Type
-            self.item(index, 2).data(),  # Value
-            self.item(index, 3).data(),  # Default
-            self.item(index, 4).data(),  # Enum
-            self.item(index, 5).data(),  # Color
-            self.item(index, 6).data(),  # Parent
-            self.item(index, 7).data(),  # Keyable
-            self.item(index, 8).data(),  # Channel Box
-            self.item(index, 9).data(),  # Min Value
-            self.item(index, 10).data(),  # Max Value
-        )
+    @dcc.undo
+    def paste_to_maya(self) -> None:
+        """Pastes the selected attributes from the UI list to the selected Maya nodes."""
+        selection: list[str] = cmds.ls(selection=True)
+        if not selection:
+            _logger.warning("Select node(s) to paste attributes to.")
+            return
 
+        items: list[
+            QtWidgets.QListWidgetItem
+        ] = self.__list.selectedItems() or [
+            self.__list.item(i) for i in range(self.__list.count())
+        ]
+        if not items:
+            return
 
-class StockerViewWidget(QTreeView):
-    '''Tree view for Stocker.'''
+        result: utils.Result = utils.Result()
+        for node, item in product(selection, items):
+            data: dcc.attribute.TransferBuffer = item.data(
+                QtCore.Qt.ItemDataRole.UserRole
+            )
+            r: utils.Result = dcc.attribute.apply_transfer_buffer(node, data)
+            result.merge(r)
 
-    def __init__(self, parent: QWidget | None = None) -> None:
-        '''Initialize'''
-        super().__init__(parent)
-        model: StockerItemModel = StockerItemModel(self)
-        selection_model: QItemSelectionModel = QItemSelectionModel()
-        self.setModel(model)
-        self.setSelectionModel(selection_model)
-        self.setSelectionMode(QTreeView.ExtendedSelection)
-        self.setAlternatingRowColors(True)
-        self.setRootIsDecorated(False)
+        result.log(_logger)
 
-    # override
-    def keyPressEvent(self, event: QKeyEvent) -> None:
-        '''keyPressEvent[override]'''
-        if event.matches(QKeySequence.Copy):
-            self.copy_to_clipboard()
-        elif event.matches(QKeySequence.Paste):
-            self.paste_from_clipboard()
-        elif event.key() == Qt.Key_Delete:
-            self.remove_selected_item()
-        else:
-            super().keyPressEvent(event)
+    def get_export_data(self) -> list[dict[str, Any]]:
+        """Gets all attributes in the list as dictionaries for exporting.
 
+        Returns:
+            list[dict[str, Any]]: A list of dictionaries representing the attribute data.
+        """
+        items: list[QtWidgets.QListWidgetItem] = [
+            self.__list.item(i) for i in range(self.__list.count())
+        ]
+        return [
+            item.data(QtCore.Qt.ItemDataRole.UserRole).to_dict()
+            for item in items
+        ]
+
+    def load_import_data(self, raw_list: list[dict[str, Any]]) -> None:
+        """Loads attributes from a list of dictionaries.
+
+        Args:
+            raw_list (list[dict[str, Any]]): A list of dictionaries representing the attribute data.
+        """
+        for raw_dict in raw_list:
+            data: dcc.attribute.TransferBuffer = (
+                dcc.attribute.TransferBuffer.from_dict(raw_dict)
+            )
+            self._add_list_item(data)
+
+    @QtCore.Slot()
     def copy_to_clipboard(self) -> None:
-        '''Copy data to clipboard.'''
-        data: list[Any] = []
-        model: StockerItemModel = self.model()
-        selection_model: QItemSelectionModel = self.selectionModel()
-        indexes: list[QModelIndex] = selection_model.selectedIndexes()
-        if not indexes:
-            row: int = model.rowCount()
-            indexes = []
-            for i in range(row):
-                indexes.append(model.index(i, 0))
+        """Copies selected items to the system clipboard as JSON."""
+        items: list[
+            QtWidgets.QListWidgetItem
+        ] = self.__list.selectedItems() or [
+            self.__list.item(i) for i in range(self.__list.count())
+        ]
+        json_data: list[Any] = [
+            item.data(QtCore.Qt.ItemDataRole.UserRole).to_dict()
+            for item in items
+        ]
 
-        for index in indexes:
-            if index.column() != 0:
-                continue
-            data.append(model.row_data(index.row()))
+        mime_data = QtCore.QMimeData()
+        mime_data.setData(
+            MIME_TYPE, QtCore.QByteArray(json.dumps(json_data).encode("utf-8"))
+        )
+        QtWidgets.QApplication.clipboard().setMimeData(mime_data)
 
-        mime_data: ClipboardData = ClipboardData()
-        mime_data.set_json_data(MIME_TYPE, data)
-
-        clipboard: QClipboard = QApplication.clipboard()
-        clipboard.setMimeData(mime_data)
-
+    @QtCore.Slot()
     def paste_from_clipboard(self) -> None:
-        '''Paste data from clipboard'''
-        clipboard: QClipboard = QApplication.clipboard()
-        mime_data: QMimeData = clipboard.mimeData()
+        """Pastes JSON attributes from the system clipboard into the UI list."""
+        mime_data: QtCore.QMimeData = (
+            QtWidgets.QApplication.clipboard().mimeData()
+        )
         if not mime_data.hasFormat(MIME_TYPE):
             return
 
-        data_bytes: QByteArray = mime_data.data(MIME_TYPE)
-        datas: list[Any] = json.loads(str(data_bytes.data(), 'utf-8'))
-        model: StockerItemModel = self.model()
-        for data in datas:
-            model.append_item(*data)
-
-    def remove_selected_item(self) -> None:
-        '''Remove data from selected rows.'''
-        model: StockerItemModel = self.model()
-        selection_model: QItemSelectionModel = self.selectionModel()
-        while True:
-            indexes: list[QModelIndex] = selection_model.selectedIndexes()
-            if not indexes:
-                break
-
-            model.removeRow(indexes[0].row())
-            if len(indexes) == 1:
-                selection_model.clear()
-
-    @Slot()
-    def copy(self) -> None:
-        '''Copy data from selected attribute in Channel Box.'''
-        selection: list[str] = cmds.ls(selection=True)
-        if not selection:
-            return
-
-        model: StockerItemModel = self.model()
-        model.removeRows(0, model.rowCount())
-        model.append_item_from_node(selection[0])
-
-    @Slot()
-    def paste(self) -> None:
-        '''Paste value to selected node from Stocker.'''
-        model: StockerItemModel = self.model()
-        selection_model: QItemSelectionModel = self.selectionModel()
-        indexes: list[QModelIndex] = selection_model.selectedIndexes()
-        if not indexes:
-            row: int = model.rowCount()
-            indexes = []
-            for i in range(row):
-                indexes.append(model.index(i, 0))
-
-        selection: list[str] = cmds.ls(selection=True)
-
-        # ======================================================================
-        # Add attributes
-        # ======================================================================
-        for node in selection:
-            for index in indexes:
-                if index.column() != 0:
-                    continue
-
-                (
-                    attr_name,
-                    attr_type,
-                    value,
-                    default_value,
-                    enum_value,
-                    color,
-                    parent_attr,
-                    keyable,
-                    channelbox,
-                    minimum,
-                    maximum,
-                ) = model.row_data(index.row())
-
-                add_option: dict[str, Any] = {}
-                if parent_attr:
-                    add_option['parent'] = parent_attr
-                if default_value:
-                    add_option['defaultValue'] = default_value
-                if minimum is not None:
-                    add_option['minValue'] = minimum
-                if maximum is not None:
-                    add_option['maxValue'] = maximum
-                if color:
-                    add_option['usedAsColor'] = color
-
-                try:
-                    if attr_type == 'enum':
-                        cmds.addAttr(
-                            node,
-                            longName=attr_name,
-                            attributeType='enum',
-                            enumName=enum_value,
-                            **add_option,
-                        )
-                    elif attr_type == 'string':
-                        cmds.addAttr(
-                            node,
-                            longName=attr_name,
-                            dataType=attr_type,
-                        )
-                    else:
-                        cmds.addAttr(
-                            node,
-                            longName=attr_name,
-                            attributeType=attr_type,
-                            **add_option,
-                        )
-                except RuntimeError:
-                    logging.warning('Attributes already exist : %s', attr_name)
-
-        # ======================================================================
-        # Set decoration attributes
-        # ======================================================================
-        for node in selection:
-            for index in indexes:
-                if index.column() != 0:
-                    continue
-
-                (
-                    attr_name,
-                    attr_type,
-                    value,
-                    default_value,
-                    enum_value,
-                    color,
-                    parent_attr,
-                    keyable,
-                    channelbox,
-                    minimum,
-                    maximum,
-                ) = model.row_data(index.row())
-
-                set_arg: dict[str, Any] = {}
-                set_arg['keyable'] = keyable
-                set_arg['channelBox'] = channelbox
-
-                cmds.setAttr(f'{node}.{attr_name}', edit=True, **set_arg)
-
-                if attr_type == 'string':
-                    cmds.setAttr(f'{node}.{attr_name}', value, type='string')
-                elif attr_type == 'float3':
-                    cmds.setAttr(
-                        f'{node}.{attr_name}', value[0], value[1], value[2]
-                    )
-                elif attr_type == 'double3':
-                    cmds.setAttr(
-                        f'{node}.{attr_name}', value[0], value[1], value[2]
-                    )
-                else:
-                    cmds.setAttr(f'{node}.{attr_name}', value)
+        json_bytes: QtCore.QByteArray = mime_data.data(MIME_TYPE)
+        raw_list: Any = json.loads(bytes(json_bytes).decode("utf-8"))  # type: ignore
+        self.load_import_data(raw_list)
+        mime_data.clear()
 
 
-class Stock(QWidget):
-    '''Stock widget for Stocker'''
+class MainWindow(framework.ToolWindow[Settings]):
+    """Main window for the Transfer User Defined Attr tool."""
 
     def __init__(
         self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Widget,
+        unique_id: str = "",
     ) -> None:
-        '''Initialize'''
-        super().__init__(parent, flag)
-        main_layout: QGridLayout = QGridLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
+        """Initializes the MainWindow widget.
 
-        self.__viewer: StockerViewWidget = StockerViewWidget(self)
-        main_layout.addWidget(self.__viewer, 0, 0, 1, 2)
-
-        copy_button: QPushButton = QPushButton('Copy', self)
-        copy_button.clicked.connect(self.copy_callback)
-        main_layout.addWidget(copy_button, 3, 0)
-
-        paste_button: QPushButton = QPushButton('Paste', self)
-        paste_button.clicked.connect(self.paste_callback)
-        main_layout.addWidget(paste_button, 3, 1)
-
-    @widgets.undo
-    def copy_callback(self) -> None:
-        '''Copy Callback'''
-        self.__viewer.copy()
-
-    @widgets.undo
-    def paste_callback(self) -> None:
-        '''Paste Callback'''
-        self.__viewer.paste()
-
-
-class StockerTab(widgets.TabWidget):
-    '''Tab for Stocker.'''
-
-    default_tab_name = 'Tab'
-    title = __product__
-
-    # override
-    def add_tab(self, label: str = '') -> None:
-        '''Add tab[override]'''
-        if not label:
-            label = StockerTab.default_tab_name
-
-        stock: Stock = Stock(self)
-        self.addTab(stock, label)
-        self.setCurrentIndex(self.count() - 1)
-
-
-class MainWindow(widgets.ToolWidget):
-    '''Tool main window'''
-
-    def __init__(
-        self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-        unique_id: str = '',
-    ) -> None:
-        '''Initialize widget.'''
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The window flags.
+                Defaults to QtCore.Qt.WindowType.Widget.
+            unique_id (str, optional): A unique identifier for the window instance.
+                Defaults to "".
+        """
         super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
-        self.resize(400, 200)
+        self.resize(350, 450)
+        self.__tab: widgets.TabWidget
 
-        option_widget: QWidget = self.option_widget()
-        main_layout: QVBoxLayout = QVBoxLayout(option_widget)
+    def create_custom_menu(self, menu_bar: QtWidgets.QMenuBar) -> None:
+        """Creates custom menus for data import/export.
+
+        Args:
+            menu_bar (QtWidgets.QMenuBar): The main menu bar widget.
+        """
+        data_menu = QtWidgets.QMenu("Data", self)
+        menu_bar.addMenu(data_menu)
+
+        action_import = QtGui.QAction("Import JSON...", self)
+        action_import.triggered.connect(self.import_json)
+        data_menu.addAction(action_import)
+
+        action_export = QtGui.QAction("Export JSON...", self)
+        action_export.triggered.connect(self.export_json)
+        data_menu.addAction(action_export)
+
+    def create_ui(self, parent: QtWidgets.QWidget) -> None:
+        """Creates the tool-specific user interface.
+
+        Args:
+            parent (QtWidgets.QWidget): The parent widget to attach the UI elements to.
+        """
+        main_layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(parent)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
-        tab: StockerTab = StockerTab(self)
-        tab.setDocumentMode(True)
-        tab.add_tab()
-        main_layout.addWidget(tab)
+        self.__tab = widgets.TabWidget(
+            self, default_tab_name="Buffer", title=__product__
+        )
+        self.__tab.setDocumentMode(True)
+        self.__tab.add_requested.connect(self.add_tab)
+        self.add_tab("Buffer")
+        main_layout.addWidget(self.__tab)
 
-    # override
-    def load_settings(self) -> None:
-        '''Load ui settings from file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
-
-    # override
-    def save_settings(self) -> None:
-        '''Save ui settings to file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
-        settings.write()
-
-    # override
-    def reset_settings(self) -> None:
-        '''Reset ui settings.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
-
-    # override
-    def about(self) -> None:
-        '''Show a about dialog.[override]'''
-        widgets.AboutDialog.info(
-            self, __product__, __version__, __copyright__, __doc__
+        settings: Settings = self.tool_settings()
+        settings.window_geo.bind(
+            setter=self.restoreGeometry,
+            getter=self.saveGeometry,
+            encoder=utils.qt_to_ascii,
+            decoder=utils.ascii_to_qt,
         )
 
+    def add_tab(self, label: str) -> None:
+        """Adds a new Stock tab to the tool window.
 
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
-def main(unique_id: str = '') -> None:
-    '''Show window.'''
+        Args:
+            label (str): The label for the new tab.
+        """
+        page_widget = AttributePage(self)
+        self.__tab.add_custom_tab(page_widget, label)
+
+    @QtCore.Slot()
+    def import_json(self) -> None:
+        """Imports a JSON file into the current stock tab."""
+        current_tab: QtWidgets.QWidget = self.__tab.currentWidget()
+        if not isinstance(current_tab, AttributePage):
+            _logger.warning("No active stock tab found.")
+            return
+
+        file_path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Import JSON", "", "JSON Files (*.json);;All Files (*)"
+        )
+        if not file_path:
+            return
+
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                raw_list: Any = json.load(f)
+
+            current_tab.load_import_data(raw_list)
+
+        except json.JSONDecodeError as e:
+            _logger.error("Invalid JSON format in file %s: %s", file_path, e)
+
+        except OSError as e:
+            _logger.error("File access error '%s': %s", file_path, e)
+
+    @QtCore.Slot()
+    def export_json(self) -> None:
+        """Exports the current stock tab to a JSON file."""
+        current_tab: QtWidgets.QWidget = self.__tab.currentWidget()
+        if not isinstance(current_tab, AttributePage):
+            _logger.warning("No active stock tab found.")
+            return
+
+        file_path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "Export JSON", "", "JSON Files (*.json);;All Files (*)"
+        )
+        if not file_path:
+            return
+
+        try:
+            json_data: list[dict[str, Any]] = current_tab.get_export_data()
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(json_data, f, indent=4, ensure_ascii=False)
+
+        except OSError as e:
+            _logger.error("File write error for %s: %s", file_path, e)
+
+        except TypeError as e:
+            _logger.error("JSON serialization error: %s", e)
+
+
+def main(unique_id: str = "") -> None:
+    """Shows the tool's main window.
+
+    Args:
+        unique_id (str, optional): A unique identifier for the window instance.
+            Defaults to "".
+    """
     window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()

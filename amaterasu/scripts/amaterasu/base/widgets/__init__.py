@@ -38,6 +38,7 @@ from amaterasu.base.widgets.index_color_palette import IndexColorPalette
 from amaterasu.base.widgets.list_view_widget import ListWidget
 from amaterasu.base.widgets.node_picker import NodePicker
 from amaterasu.base.widgets.range_slider import RangeSlider
+from amaterasu.base.widgets.tab_widget import TabBarPlus, TabWidget
 from amaterasu.base.widgets.toast import ToastWidget, ToastSignalEmitter
 from amaterasu.base.widgets.vertical_line import VerticalLine
 
@@ -55,6 +56,8 @@ __all__: list[str] = [
     "ListWidget",
     "NodePicker",
     "RangeSlider",
+    "TabBarPlus",
+    "TabWidget",
     "ToastWidget",
     "ToastSignalEmitter",
     "VerticalLine",
