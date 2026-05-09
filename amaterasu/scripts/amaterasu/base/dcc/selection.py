@@ -119,4 +119,13 @@ def get_selected_channel_box_plugs() -> list[str]:
         )
     )
 
+    plugs.extend(
+        _get_plugs(
+            cmds.channelBox(cb_name, query=True, outputObjectList=True),  # type: ignore
+            cmds.channelBox(
+                cb_name, query=True, selectedOutputAttributes=True
+            ),  # type: ignore
+        )
+    )
+
     return plugs

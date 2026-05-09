@@ -40,6 +40,7 @@ from amaterasu.base.widgets.node_picker import NodePicker
 from amaterasu.base.widgets.range_slider import RangeSlider
 from amaterasu.base.widgets.tab_widget import TabBarPlus, TabWidget
 from amaterasu.base.widgets.toast import ToastWidget, ToastSignalEmitter
+from amaterasu.base.widgets.tree_widget import TreeWidget
 from amaterasu.base.widgets.vertical_line import VerticalLine
 
 __all__: list[str] = [
@@ -60,5 +61,6 @@ __all__: list[str] = [
     "TabWidget",
     "ToastWidget",
     "ToastSignalEmitter",
+    "TreeWidget",
     "VerticalLine",
 ]

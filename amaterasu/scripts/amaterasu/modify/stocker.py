@@ -1,496 +1,559 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Stocker
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Tool for stocking and transferring attribute values in Maya.
+
+This tool stocks the values of attributes and allows you to copy and paste
+them across different nodes using search and replace functionality.
+"""
+
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any
+from typing import Any, cast
 import json
-import itertools
+from maya import cmds
+from amaterasu.base.qt import QtCore, QtWidgets, QtGui
+from amaterasu.base import dcc, framework, utils, widgets
 
-try:
-    from PySide2.QtCore import (
-        Qt,
-        Slot,
-        QMimeData,
-        QByteArray,
-        QItemSelectionModel,
-        QModelIndex,
-    )
-    from PySide2.QtGui import (
-        QStandardItemModel,
-        QStandardItem,
-        QKeyEvent,
-        QKeySequence,
-        QClipboard,
-    )
-    from PySide2.QtWidgets import (
-        QWidget,
-        QTreeView,
-        QApplication,
-        QGridLayout,
-        QHBoxLayout,
-        QPushButton,
-        QVBoxLayout,
-        QLineEdit,
-        QLabel,
-    )
+__product__: str = "Stocker"
+__version__: str = "1.30"
+_logger: utils.Logger = utils.get_logger(__product__)
 
-except ImportError:
-    if not TYPE_CHECKING:
-        from PySide6.QtCore import (
-            Qt,
-            Slot,
-            QMimeData,
-            QByteArray,
-            QItemSelectionModel,
-            QModelIndex,
-        )
-        from PySide6.QtGui import (
-            QStandardItemModel,
-            QStandardItem,
-            QKeyEvent,
-            QKeySequence,
-            QClipboard,
-        )
-        from PySide6.QtWidgets import (
-            QWidget,
-            QTreeView,
-            QApplication,
-            QGridLayout,
-            QHBoxLayout,
-            QPushButton,
-            QVBoxLayout,
-            QLineEdit,
-            QLabel,
-        )
-from maya import cmds, mel
-from ..lib import logger, parser, widgets, utility
+MIME_TYPE: str = "application/x-amaterasu-stocker-data"
 
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Stocker'
-__version__: str = '1.20'
-__doc__ = 'This tool stocks the values of attributes and can be copy and paste.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+class Settings(framework.ToolSettings):
+    """Settings for the Stocker tool.
 
-MIME_TYPE: str = 'application/x-amaterasu-stocker-data'
+    Attributes:
+        window_geo (framework.Variant[str]): The saved window geometry data.
+        search (framework.Variant[str]): The saved search string.
+        replace (framework.Variant[str]): The saved replace string.
+    """
+
+    window_geo: framework.Variant[str] = framework.Variant("")
+    search: framework.Variant[str] = framework.Variant("")
+    replace: framework.Variant[str] = framework.Variant("")
 
 
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-class Settings(parser.ToolSettings):
-    '''Settings for tool.'''
+class StockerViewWidget(widgets.TreeWidget):
+    """Tree view for Stocker utilizing the simplified QTreeWidget."""
 
-    window_geo: parser.Variant[str] = parser.Variant('')
-    search: parser.Variant[str] = parser.Variant('_L_')
-    replace: parser.Variant[str] = parser.Variant('_R_')
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        """Initializes the StockerViewWidget.
 
-
-class ClipboardData(QMimeData):
-    '''Clipboad data as json'''
-
-    def set_json_data(self, mime_type: str, json_data: list[Any]) -> None:
-        '''Set json from data.'''
-        json_byte_data: bytes = bytes(json.dumps(json_data), 'utf-8')
-        self.setData(mime_type, QByteArray(json_byte_data))
-
-
-class StockerItemModel(QStandardItemModel):
-    '''Item model for Stocker.'''
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(0, 3, parent)
-        self.setHeaderData(0, Qt.Horizontal, 'Node')
-        self.setHeaderData(1, Qt.Horizontal, 'Attribute')
-        self.setHeaderData(2, Qt.Horizontal, 'Value')
-
-    def append_item(self, node_name: str, attr_name: str, value: Any) -> None:
-        '''Apend data to item model.'''
-        plug: str = f'{node_name}.{attr_name}'
-        node_item: QStandardItem = QStandardItem()
-        node_item.setText(node_name)
-        node_item.setEditable(False)
-
-        attr_item: QStandardItem = QStandardItem()
-        try:
-            attr_item.setData(cmds.attributeName(plug, long=True))
-            attr_item.setText(cmds.attributeName(plug, long=True))
-        except RuntimeError:
-            attr_item.setData(attr_name)
-            attr_item.setText(attr_name)
-
-        value_item: QStandardItem = QStandardItem()
-        value_item.setData(type(value))
-        value_item.setText(str(value))
-        self.appendRow([node_item, attr_item, value_item])
-
-    def row_data(self, index: int) -> tuple[str, str, Any]:
-        '''Return row data from item model.'''
-        node_name: str = self.item(index, 0).text()
-        attr_name: str = self.item(index, 1).text()
-        data_type: Any = self.item(index, 2).data()
-        value: Any = self.item(index, 2).text()
-        if data_type is bool:
-            value = utility.str_to_bool(value)
-        else:
-            value = data_type(value)
-
-        return (node_name, attr_name, value)
-
-
-class StockerViewWidget(QTreeView):
-    '''Tree view for Stocker.'''
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        '''Initialize'''
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+        """
         super().__init__(parent)
-        model: StockerItemModel = StockerItemModel(self)
-        selection_model: QItemSelectionModel = QItemSelectionModel()
-        self.setModel(model)
-        self.setSelectionModel(selection_model)
-        self.setSelectionMode(QTreeView.ExtendedSelection)
+        self.setHeaderLabels(["Node", "Attribute", "Value"])
+        self.setSelectionMode(
+            QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection
+        )
         self.setAlternatingRowColors(True)
         self.setRootIsDecorated(False)
+        self.set_placeholder_text(
+            "Select attributes in Channel Box and click 'Copy'"
+        )
 
-    # override
-    def keyPressEvent(self, event: QKeyEvent) -> None:
-        '''keyPressEvent[override]'''
-        if event.matches(QKeySequence.Copy):
-            self.copy_to_clipboard()
-        elif event.matches(QKeySequence.Paste):
-            self.paste_from_clipboard()
-        elif event.key() == Qt.Key_Delete:
-            self.remove_selected_item()
+        self.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
+
+        self.__action_copy = QtGui.QAction("Copy to Clipboard", self)
+        self.__action_copy.setShortcut(QtGui.QKeySequence.StandardKey.Copy)
+        self.__action_copy.setShortcutContext(
+            QtCore.Qt.ShortcutContext.WidgetWithChildrenShortcut
+        )
+        self.__action_copy.triggered.connect(self.copy_to_clipboard)
+        self.addAction(self.__action_copy)
+
+        self.__action_paste = QtGui.QAction("Paste from Clipboard", self)
+        self.__action_paste.setShortcut(QtGui.QKeySequence.StandardKey.Paste)
+        self.__action_paste.setShortcutContext(
+            QtCore.Qt.ShortcutContext.WidgetWithChildrenShortcut
+        )
+        self.__action_paste.triggered.connect(self.paste_from_clipboard)
+        self.addAction(self.__action_paste)
+
+        self.__action_delete = QtGui.QAction("Delete Selected", self)
+        self.__action_delete.setShortcut(QtGui.QKeySequence.StandardKey.Delete)
+        self.__action_delete.setShortcutContext(
+            QtCore.Qt.ShortcutContext.WidgetWithChildrenShortcut
+        )
+        self.__action_delete.triggered.connect(self.delete_selected_items)
+        self.addAction(self.__action_delete)
+
+        self.__context_menu = QtWidgets.QMenu(self)
+        self.__context_menu.addAction(self.__action_copy)
+        self.__context_menu.addAction(self.__action_paste)
+        self.__context_menu.addSeparator()
+        self.__context_menu.addAction(self.__action_delete)
+
+    @QtCore.Slot(QtCore.QPoint)
+    def show_context_menu(self, pos: QtCore.QPoint) -> None:
+        """Shows the right-click context menu.
+
+        Args:
+            pos (QtCore.QPoint): The local position where the right-click occurred.
+        """
+        has_selection: bool = bool(self.selectedItems())
+        self.__action_copy.setEnabled(has_selection)
+        self.__action_delete.setEnabled(has_selection)
+
+        clipboard: QtGui.QClipboard = QtWidgets.QApplication.clipboard()
+        self.__action_paste.setEnabled(
+            clipboard.mimeData().hasFormat(MIME_TYPE)
+        )
+
+        global_pos: QtCore.QPoint = self.viewport().mapToGlobal(pos)
+        self.__context_menu.exec_(global_pos)
+
+    def append_item(self, node_name: str, attr_name: str, value: Any) -> None:
+        """Appends a new attribute item to the tree.
+
+        Args:
+            node_name (str): The name of the Maya node.
+            attr_name (str): The name of the attribute.
+            value (Any): The value of the attribute.
+        """
+        plug: str = f"{node_name}.{attr_name}"
+        try:
+            nice_name: str = cmds.attributeName(plug, long=True)
+        except RuntimeError:
+            nice_name = attr_name
+
+        item = QtWidgets.QTreeWidgetItem([node_name, nice_name, str(value)])
+        item.setData(1, QtCore.Qt.ItemDataRole.UserRole, attr_name)
+        item.setData(2, QtCore.Qt.ItemDataRole.UserRole, type(value))
+        self.addTopLevelItem(item)
+
+    def get_item_data(
+        self, item: QtWidgets.QTreeWidgetItem
+    ) -> tuple[str, str, Any]:
+        """Extracts node, attribute, and formatted value from a tree item.
+
+        Args:
+            item (QtWidgets.QTreeWidgetItem): The tree widget item to extract data from.
+
+        Returns:
+            tuple[str, str, Any]: A tuple containing the node name, attribute name,
+                and its formatted value.
+        """
+        node_name: str = item.text(0)
+        attr_name: str = item.data(1, QtCore.Qt.ItemDataRole.UserRole)
+        attr_type: type = item.data(2, QtCore.Qt.ItemDataRole.UserRole)
+        value_str: str = item.text(2)
+
+        value: Any = value_str
+        if attr_type is bool:
+            value = value_str.lower() in ("true", "1")
+
         else:
-            super().keyPressEvent(event)
+            try:
+                value = attr_type(value_str)
 
+            except ValueError:
+                pass
+
+        return node_name, attr_name, value
+
+    def get_export_data(self) -> list[list[Any]]:
+        """Gets all items in the tree for JSON exporting.
+
+        Returns:
+            list[list[Any]]: A list containing all rows of data formatted for export.
+        """
+        items: list[QtWidgets.QTreeWidgetItem] = [
+            self.topLevelItem(i) for i in range(self.topLevelItemCount())
+        ]
+        return [list(self.get_item_data(item)) for item in items]
+
+    def load_import_data(self, datas: list[list[Any]]) -> None:
+        """Loads items from imported JSON data.
+
+        Args:
+            datas (list[list[Any]]): A list of data rows to import and display.
+        """
+        for data in datas:
+            if len(data) >= 3:
+                self.append_item(data[0], data[1], data[2])
+
+    @QtCore.Slot()
     def copy_to_clipboard(self) -> None:
-        '''Copy data to clipboard.'''
-        data: list[Any] = []
-        model: StockerItemModel = self.model()
-        selection_model: QItemSelectionModel = self.selectionModel()
-        indexes: list[QModelIndex] = selection_model.selectedIndexes()
-        if not indexes:
-            row: int = model.rowCount()
-            indexes = []
-            for i in range(row):
-                indexes.append(model.index(i, 0))
+        """Copies the selected items to the system clipboard as JSON."""
+        items: list[QtWidgets.QTreeWidgetItem] = self.selectedItems() or [
+            self.topLevelItem(i) for i in range(self.topLevelItemCount())
+        ]
+        data: list[tuple[str, str, Any]] = [
+            self.get_item_data(item) for item in items
+        ]
 
-        for index in indexes:
-            if index.column() != 0:
-                continue
-            data.append(model.row_data(index.row()))
+        mime_data = QtCore.QMimeData()
+        mime_data.setData(
+            MIME_TYPE, QtCore.QByteArray(json.dumps(data).encode("utf-8"))
+        )
+        QtWidgets.QApplication.clipboard().setMimeData(mime_data)
 
-        mime_data: ClipboardData = ClipboardData()
-        mime_data.set_json_data(MIME_TYPE, data)
-
-        clipboard: QClipboard = QApplication.clipboard()
-        clipboard.setMimeData(mime_data)
-
+    @QtCore.Slot()
     def paste_from_clipboard(self) -> None:
-        '''Paste data from clipboard'''
-        clipboard: QClipboard = QApplication.clipboard()
-        mime_data: QMimeData = clipboard.mimeData()
+        """Pastes items from the system clipboard JSON into the tree."""
+        mime_data: QtCore.QMimeData = (
+            QtWidgets.QApplication.clipboard().mimeData()
+        )
         if not mime_data.hasFormat(MIME_TYPE):
             return
 
-        data_bytes: QByteArray = mime_data.data(MIME_TYPE)
-        datas: list[Any] = json.loads(str(data_bytes.data(), 'utf-8'))
-        model: StockerItemModel = self.model()
+        json_bytes: QtCore.QByteArray = mime_data.data(MIME_TYPE)
+        datas: Any = json.loads(bytes(json_bytes).decode("utf-8"))  # type: ignore
         for data in datas:
-            model.append_item(data[0], data[1], data[2])
+            self.append_item(data[0], data[1], data[2])
 
-    def remove_selected_item(self) -> None:
-        '''Remove data from selected rows.'''
-        model: StockerItemModel = self.model()
-        selection_model: QItemSelectionModel = self.selectionModel()
-        while True:
-            indexes: list[QModelIndex] = selection_model.selectedIndexes()
-            if not indexes:
-                break
+        mime_data.clear()
 
-            model.removeRow(indexes[0].row())
-            if len(indexes) == 1:
-                selection_model.clear()
-
-    @Slot()
+    @QtCore.Slot()
     def copy(self) -> None:
-        '''Copy data from selected attribute in Channel Box.'''
+        """Copies attribute data from selected nodes in the Channel Box to the tree."""
+        self.clear()
+        plugs: list[str] = dcc.selection.get_selected_channel_box_plugs()
+        for plug in plugs:
+            node: str
+            attr: str
+            node, attr = plug.split(".", 1)
+            value: Any = cmds.getAttr(plug)
+            self.append_item(node, attr, value)
 
-        def append_item(
-            model: StockerItemModel, nodes: list[str], attrs: list[str]
-        ) -> None:
-            if not nodes or not attrs:
-                return
-
-            for node, attr in itertools.product(nodes, attrs):
-                value: Any = cmds.getAttr(f'{node}.{attr}')
-                model.append_item(node, attr, value)
-
-        model: StockerItemModel = self.model()
-        model.removeRows(0, model.rowCount())
-
-        cb_name: str = mel.eval('$gChannelBoxName=$gChannelBoxName;')
-        append_item(
-            model,
-            cmds.channelBox(cb_name, query=True, mainObjectList=True),
-            cmds.channelBox(cb_name, query=True, selectedMainAttributes=True),
-        )
-        append_item(
-            model,
-            cmds.channelBox(cb_name, query=True, shapeObjectList=True),
-            cmds.channelBox(cb_name, query=True, selectedShapeAttributes=True),
-        )
-        append_item(
-            model,
-            cmds.channelBox(cb_name, query=True, historyObjectList=True),
-            cmds.channelBox(
-                cb_name, query=True, selectedHistoryAttributes=True
-            ),
-        )
-        append_item(
-            model,
-            cmds.channelBox(cb_name, query=True, outputObjectList=True),
-            cmds.channelBox(cb_name, query=True, selectedOutputAttributes=True),
-        )
-
-        if model.rowCount() != 0:
+        if self.topLevelItemCount() != 0:
             return
 
         selection: list[str] = cmds.ls(selection=True)
-        if not selection:
-            return
-
         for node in selection:
             attrs: list[str] = cmds.listAttr(node) or []
-            result: list[str] = []
             for attr in attrs:
                 try:
-                    plug: str = f'{node}.{attr}'
-                    is_cb: bool = cmds.getAttr(plug, channelBox=True)
-                    is_key: bool = cmds.getAttr(plug, keyable=True)
-                    if is_cb or is_key:
-                        result.append(attr)
-                except RuntimeError:
+                    plug = f"{node}.{attr}"
+                    attr_type: str = cmds.getAttr(plug, type=True)
+                    if attr_type in ("float3", "double3", "long3"):
+                        continue
+
+                    if cmds.getAttr(plug, channelBox=True) or cmds.getAttr(
+                        plug, keyable=True
+                    ):
+                        value = cmds.getAttr(plug)
+                        self.append_item(node, attr, value)
+
+                except (RuntimeError, ValueError):
                     pass
-                except ValueError:
-                    pass
 
-            append_item(model, [node], result)
+    @QtCore.Slot(str, str)
+    def paste(self, search: str = "", replace: str = "") -> None:
+        """Pastes the tree's attribute values to the selected nodes in Maya.
 
-    @Slot(str, str)
-    def paste(self, search: str = '', replace: str = '') -> None:
-        '''Paste value to selected node from Stocker.'''
-        model: StockerItemModel = self.model()
-        selection_model: QItemSelectionModel = self.selectionModel()
-        indexes: list[QModelIndex] = selection_model.selectedIndexes()
-        if not indexes:
-            row: int = model.rowCount()
-            indexes = []
-            for i in range(row):
-                indexes.append(model.index(i, 0))
-
+        Args:
+            search (str, optional): The string to search for in node names.
+                Defaults to "".
+            replace (str, optional): The string to replace the search string with.
+                Defaults to "".
+        """
+        items: list[QtWidgets.QTreeWidgetItem] = self.selectedItems() or [
+            self.topLevelItem(i) for i in range(self.topLevelItemCount())
+        ]
         selection: list[str] = cmds.ls(selection=True)
-        is_selection: bool = True if selection else False
-        for index in indexes:
-            if index.column() != 0:
-                continue
+        is_selection: bool = bool(selection)
 
-            node, attr, value = model.row_data(index.row())
-            if not is_selection:  # and cmds.objExists(node):
-                node = node.replace(search, replace)
-                selection = [node]
+        for item in items:
+            node: str
+            attr: str
+            value: Any
+            node, attr, value = self.get_item_data(item)
 
-            for dst_node in selection:
-                plug: str = f'{dst_node}.{attr}'
-                if not cmds.attributeQuery(attr, node=dst_node, exists=True):
-                    _logger.error('Does not exists plug. : %s', plug)
-                    continue
+            target_nodes: list[str] = selection
+            if not is_selection:
+                target_node: str = node.replace(search, replace)
+                if cmds.objExists(target_node):
+                    target_nodes = [target_node]
 
+            for dst_node in target_nodes:
+                plug: str = f"{dst_node}.{attr}"
                 try:
-                    cmds.setAttr(plug, value)
+                    if cmds.attributeQuery(attr, node=dst_node, exists=True):
+                        cmds.setAttr(plug, value)
+
                 except RuntimeError:
-                    _logger.error('Failed to set value. : %s', plug)
-                    continue
+                    _logger.error("Failed to set value. : %s", plug)
 
 
-class Stock(QWidget):
-    '''Stock widget for Stocker'''
+class Stock(QtWidgets.QWidget):
+    """The main widget containing the Stocker tree view and controls."""
 
-    def __init__(
-        self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-    ) -> None:
-        '''Initialize'''
-        super().__init__(parent, flag)
-        main_layout: QGridLayout = QGridLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        """Initializes the Stock widget.
 
-        self.__viewer: StockerViewWidget = StockerViewWidget(self)
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+        """
+        super().__init__(parent)
+        main_layout = QtWidgets.QGridLayout(self)
+        main_layout.setContentsMargins(4, 4, 4, 4)
+
+        self.__viewer = StockerViewWidget(self)
         main_layout.addWidget(self.__viewer, 0, 0, 1, 2)
 
-        layout: QHBoxLayout = QHBoxLayout(self)
+        layout = QtWidgets.QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         main_layout.addLayout(layout, 1, 0, 1, 2)
 
-        layout.addWidget(QLabel('Search & Replace :', self), False)
+        layout.addWidget(QtWidgets.QLabel("Find & Replace :", self))
 
-        self.__search = QLineEdit(self)
-        layout.addWidget(self.__search)
+        self.search = QtWidgets.QLineEdit(self)
+        layout.addWidget(self.search)
 
-        self.__replace = QLineEdit(self)
-        layout.addWidget(self.__replace)
+        self.replace = QtWidgets.QLineEdit(self)
+        layout.addWidget(self.replace)
 
-        clear_button: QPushButton = QPushButton('Clear', self)
-        clear_button.clicked.connect(self.clear_callback)
+        clear_button = QtWidgets.QPushButton("Clear", self)
+        clear_button.clicked.connect(self.clear)
         layout.addWidget(clear_button)
 
-        copy_button: QPushButton = QPushButton('Copy', self)
-        copy_button.clicked.connect(self.copy_callback)
+        copy_button = QtWidgets.QPushButton("Copy", self)
+        copy_button.clicked.connect(self.copy)
         main_layout.addWidget(copy_button, 3, 0)
 
-        paste_button: QPushButton = QPushButton('Paste', self)
-        paste_button.clicked.connect(self.paste_callback)
+        paste_button = QtWidgets.QPushButton("Paste", self)
+        paste_button.clicked.connect(self.paste)
         main_layout.addWidget(paste_button, 3, 1)
 
-    def load_settings(self) -> None:
-        '''Load ui settings from file.'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.__search.setText(settings.search.value())
-        self.__replace.setText(settings.replace.value())
+    @QtCore.Slot()
+    def clear(self) -> None:
+        """Clears the search and replace line edits."""
+        self.search.setText("")
+        self.replace.setText("")
 
-    def save_settings(self) -> None:
-        '''Save ui settings to file.'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.search.set_value(self.__search.text())
-        settings.replace.set_value(self.__replace.text())
-        settings.write()
-
-    def reset_settings(self) -> None:
-        '''Reset ui settings.'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
-
-    def search(self) -> QLineEdit:
-        '''Return search widget.'''
-        return self.__search
-
-    def replace(self) -> QLineEdit:
-        '''Return replace widget.'''
-        return self.__replace
-
-    @Slot()
-    def clear_callback(self) -> None:
-        '''Clear search and replace'''
-        self.__search.setText('')
-        self.__replace.setText('')
-
-    @widgets.undo
-    def copy_callback(self) -> None:
-        '''Copy Callback'''
+    @QtCore.Slot()
+    def copy(self) -> None:
+        """Triggers the copy action on the viewer."""
         self.__viewer.copy()
 
-    @widgets.undo
-    def paste_callback(self) -> None:
-        '''Paste Callback'''
-        self.save_settings()
+    @QtCore.Slot()
+    @dcc.undo
+    def paste(self) -> None:
+        """Triggers the paste action on the viewer and applies undo chunk."""
         selection: list[str] = cmds.ls(selection=True)
-        if self.__search.text() or self.__replace.text():
+        if self.search.text() or self.replace.text():
             cmds.select(clear=True)
 
-        self.__viewer.paste(self.__search.text(), self.__replace.text())
+        self.__viewer.paste(self.search.text(), self.replace.text())
+
         if selection:
             cmds.select(*selection)
 
+    def viewer(self) -> StockerViewWidget:
+        """Returns the internal tree viewer widget.
 
-class StockerTab(widgets.TabWidget):
-    '''Tab for Stocker.'''
-
-    default_tab_name = 'Stock'
-    title = __product__
-
-    # override
-    def add_tab(self, label: str = '') -> None:
-        '''Add tab[override]'''
-        if not label:
-            label = StockerTab.default_tab_name
-
-        stock: Stock = Stock(self)
-        stock.load_settings()
-        self.addTab(stock, label)
-        self.setCurrentIndex(self.count() - 1)
+        Returns:
+            StockerViewWidget: The internal tree view widget.
+        """
+        return self.__viewer
 
 
-class MainWindow(widgets.ToolWidget):
-    '''Tool main window'''
+class MainWindow(framework.ToolWindow[Settings]):
+    """Main window for the Stocker tool."""
 
     def __init__(
         self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-        unique_id: str = '',
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Widget,
+        unique_id: str = "",
     ) -> None:
-        '''Initialize widget.'''
+        """Initializes the MainWindow.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The window flags.
+                Defaults to QtCore.Qt.WindowType.Widget.
+            unique_id (str, optional): A unique identifier for the window instance.
+                Defaults to "".
+        """
         super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
-        self.resize(400, 200)
+        self.resize(400, 300)
+        self.__tab: widgets.TabWidget
 
-        option_widget: QWidget = self.option_widget()
-        main_layout: QVBoxLayout = QVBoxLayout(option_widget)
+    def create_custom_menu(self, menu_bar: QtWidgets.QMenuBar) -> None:
+        """Creates custom menus for data import/export.
+
+        Args:
+            menu_bar (QtWidgets.QMenuBar): The main menu bar widget.
+        """
+        data_menu = QtWidgets.QMenu("Data", self)
+        menu_bar.addMenu(data_menu)
+
+        action_import = QtGui.QAction("Import JSON...", self)
+        action_import.triggered.connect(self.import_json)
+        data_menu.addAction(action_import)
+
+        action_export = QtGui.QAction("Export JSON...", self)
+        action_export.triggered.connect(self.export_json)
+        data_menu.addAction(action_export)
+
+    def create_ui(self, parent: QtWidgets.QWidget) -> None:
+        """Creates the tool-specific user interface.
+
+        Args:
+            parent (QtWidgets.QWidget): The parent widget to attach the UI elements to.
+        """
+        main_layout = QtWidgets.QVBoxLayout(parent)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
-        tab: StockerTab = StockerTab(self)
-        tab.setDocumentMode(True)
-        tab.add_tab()
-        main_layout.addWidget(tab)
+        self.__tab = widgets.TabWidget(
+            self, default_tab_name="Stock", title=__product__
+        )
+        self.__tab.setDocumentMode(True)
+        self.__tab.add_requested.connect(self.add_tab)
 
-    # override
-    def load_settings(self) -> None:
-        '''Load ui settings from file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
+        self.add_tab("Stock")
+        main_layout.addWidget(self.__tab)
 
-    # override
-    def save_settings(self) -> None:
-        '''Save ui settings to file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
-        settings.write()
-
-    # override
-    def reset_settings(self) -> None:
-        '''Reset ui settings.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
-
-    # override
-    def about(self) -> None:
-        '''Show a about dialog.[override]'''
-        widgets.AboutDialog.info(
-            self, __product__, __version__, __copyright__, __doc__
+        settings: Settings = self.tool_settings()
+        settings.window_geo.bind(
+            setter=self.restoreGeometry,
+            getter=self.saveGeometry,
+            encoder=utils.qt_to_ascii,
+            decoder=utils.ascii_to_qt,
+        )
+        settings.search.bind(
+            setter=self.set_current_search_text,
+            getter=self.current_search_text,
+        )
+        settings.replace.bind(
+            setter=self.set_current_replace_text,
+            getter=self.current_replace_text,
         )
 
+    def current_search_text(self) -> str:
+        """Gets the search text from the active tab.
 
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
-def main(unique_id: str = '') -> None:
-    '''Show window.'''
+        Returns:
+            str: The current search text.
+        """
+        current: Stock = cast(Stock, self.__tab.currentWidget())
+        return current.search.text()
+
+    def set_current_search_text(self, value: str) -> None:
+        """Sets the search text to the active tab.
+
+        Args:
+            value (str): The text to set.
+        """
+        current: Stock = cast(Stock, self.__tab.currentWidget())
+        current.search.setText(value)
+
+    def current_replace_text(self) -> str:
+        """Gets the replace text from the active tab.
+
+        Returns:
+            str: The current replace text.
+        """
+        current: Stock = cast(Stock, self.__tab.currentWidget())
+        return current.replace.text()
+
+    def set_current_replace_text(self, value: str) -> None:
+        """Sets the replace text to the active tab.
+
+        Args:
+            value (str): The text to set.
+        """
+        current: Stock = cast(Stock, self.__tab.currentWidget())
+        current.replace.setText(value)
+
+    def add_tab(self, label: str) -> None:
+        """Adds a new Stock tab to the tool window.
+
+        Args:
+            label (str): The label for the new tab.
+        """
+        page_widget = Stock(self)
+        self.__tab.add_custom_tab(page_widget, label)
+
+        settings: Settings = self.tool_settings()
+        page_widget.search.setText(settings.search.value())
+        page_widget.replace.setText(settings.replace.value())
+
+    @QtCore.Slot()
+    def import_json(self) -> None:
+        """Imports a JSON file into the current stock tab."""
+        stock_widget: Stock = cast(Stock, self.__tab.currentWidget())
+        if not stock_widget:
+            _logger.warning("No active stock tab found.")
+            return
+
+        file_path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Import JSON", "", "JSON Files (*.json);;All Files (*)"
+        )
+        if not file_path:
+            return
+
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                raw_list = json.load(f)
+
+            stock_widget.viewer().load_import_data(raw_list)
+
+        except json.JSONDecodeError as e:
+            _logger.error("Invalid JSON format in file %s: %s", file_path, e)
+
+        except OSError as e:
+            _logger.error("File access error %s: %s", file_path, e)
+
+    @QtCore.Slot()
+    def export_json(self) -> None:
+        """Exports the current stock tab to a JSON file."""
+        stock_widget: Stock = cast(Stock, self.__tab.currentWidget())
+        if not stock_widget:
+            _logger.warning("No active stock tab found.")
+            return
+
+        file_path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "Export JSON", "", "JSON Files (*.json);;All Files (*)"
+        )
+        if not file_path:
+            return
+
+        try:
+            json_data: list[list[Any]] = stock_widget.viewer().get_export_data()
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(json_data, f, indent=4, ensure_ascii=False)
+
+        except OSError as e:
+            _logger.error("File write error for %s: %s", file_path, e)
+
+        except TypeError as e:
+            _logger.error("JSON serialization error : %s", e)
+
+
+def main(unique_id: str = "") -> None:
+    """Shows the tool's main window.
+
+    Args:
+        unique_id (str, optional): A unique identifier for the window instance.
+            Defaults to "".
+    """
     window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()
