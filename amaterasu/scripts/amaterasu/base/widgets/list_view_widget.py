@@ -22,6 +22,26 @@
 from __future__ import annotations
 from amaterasu.base.qt import QtCore, QtWidgets, QtGui
 
+QSS: str = """
+QListWidget {
+    outline: none;
+}
+QListWidget::item {
+    padding: 6px;
+    border-bottom: 1px solid #3a3a3a;
+}
+QListWidget::item:hover {
+    background-color: #3d3d3d;
+}
+QListWidget::item:selected {
+    background-color: #5285a6;
+    color: white;
+}
+QListWidget::item:selected:!active {
+    background-color: #405060;
+}
+"""
+
 
 class ListWidget(QtWidgets.QListWidget):
     """A QListWidget that displays a placeholder text when empty."""
@@ -34,6 +54,7 @@ class ListWidget(QtWidgets.QListWidget):
                 Defaults to None.
         """
         super().__init__(parent)
+        self.setStyleSheet(QSS)
         self.__placeholder_text: str = ""
 
     def set_placeholder_text(self, text: str) -> None:
@@ -68,3 +89,8 @@ class ListWidget(QtWidgets.QListWidget):
                 self.__placeholder_text,
             )
             painter.end()
+
+    def delete_selected_item(self) -> None:
+        """Deletes all currently selected items from the list widget."""
+        for item in self.selectedItems():
+            self.takeItem(self.row(item))

@@ -29,19 +29,6 @@ __product__: str = "Attribute Reorder"
 __version__: str = "1.20"
 _logger: utils.Logger = utils.get_logger(__product__)
 
-LIST_VIEW_QSS: str = """
-QListWidget {
-    outline: none;
-}
-QListWidget::item {
-    padding: 3px;
-    border-bottom: 1px solid #3a3a3a;
-}
-QListWidget::item:hover {
-    background-color: #4a4a4a;
-}
-"""
-
 
 class Settings(framework.ToolSettings):
     """Settings for the Attribute Reorder tool.
@@ -102,7 +89,6 @@ class MainWindow(framework.ToolWindow[Settings]):
             QtWidgets.QAbstractItemView.DragDropMode.InternalMove
         )
         self.__list.setDefaultDropAction(QtCore.Qt.DropAction.MoveAction)
-        self.__list.setStyleSheet(LIST_VIEW_QSS)
         main_layout.addWidget(self.__list, 1, 0, 1, 2)
 
         button: QtWidgets.QPushButton = QtWidgets.QPushButton("Analyze", self)
