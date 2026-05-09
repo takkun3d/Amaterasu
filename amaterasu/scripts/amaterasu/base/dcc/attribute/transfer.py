@@ -32,6 +32,7 @@ class TransferBuffer:
 
     Attributes:
         name (str): The long name of the attribute.
+        nice_name (str): The nice name (display name) of the attribute.
         attr_type (str): The type of the attribute
             (e.g., 'string', 'enum', 'float').
         value (Any): The current value of the attribute.
@@ -47,6 +48,7 @@ class TransferBuffer:
     """
 
     name: str
+    nice_name: str
     attr_type: str
     value: Any
     default_value: Any
@@ -96,11 +98,13 @@ def extract_transfer_buffers(node: str) -> list[TransferBuffer]:
         plug: str = f"{node}.{attr}"
         attr_type: str = cmds.getAttr(plug, type=True)
 
+        nice_name: str = cmds.attributeQuery(attr, node=node, niceName=True)  # type: ignore
+
         value: Any = cmds.getAttr(plug)
         if attr_type in ("float3", "double3") and isinstance(value, list):
             value = value[0]  # unwraps [(x, y, z)]
 
-        default_value: Any = ""
+        default_value: Any = None
         if attr_type != "string":
             default_value = cmds.attributeQuery(
                 attr, node=node, listDefault=True
@@ -139,6 +143,7 @@ def extract_transfer_buffers(node: str) -> list[TransferBuffer]:
         data_list.append(
             TransferBuffer(
                 name=attr,
+                nice_name=nice_name,
                 attr_type=attr_type,
                 value=value,
                 default_value=default_value,
@@ -154,71 +159,93 @@ def extract_transfer_buffers(node: str) -> list[TransferBuffer]:
     return data_list
 
 
-def apply_transfer_buffer(node: str, data: TransferBuffer) -> utils.Result:
-    """Applies an AttributeData object to a destination Maya node.
+def apply_transfer_buffer(
+    node: str, datas: list[TransferBuffer]
+) -> utils.Result:
+    """Applies a list of TransferBuffer objects to a destination Maya node.
 
-    This function creates the attribute on the target node if it doesn't exist,
-    and then sets its value, keyable state, and channel box visibility according
-    to the provided data.
+    This function uses a two-step approach:
+    1. Creates all attributes first to ensure compound children exist.
+    2. Sets values, keyable states, and channel box visibility.
 
     Args:
         node (str): The name of the destination Maya node.
-        data (AttributeData): The attribute data to apply.
+        datas (list[TransferBuffer]): A list of attribute data buffers to apply.
 
     Returns:
-        utils.Result: An object containing the execution result, including any
-            failure logs if the attribute creation fails.
+        utils.Result: An object containing the execution result.
     """
     result: utils.Result = utils.Result()
-    add_kwargs: dict[str, Any] = {}
-    if data.parent_attr:
-        add_kwargs["parent"] = data.parent_attr
 
-    if data.default_value:
-        add_kwargs["defaultValue"] = data.default_value
+    for data in datas:
+        add_kwargs: dict[str, Any] = {}
+        if data.parent_attr:
+            add_kwargs["parent"] = data.parent_attr
 
-    if data.minimum is not None:
-        add_kwargs["minValue"] = data.minimum
+        is_compound: bool = data.attr_type in ("float3", "double3", "long3")
+        if not is_compound:
+            if data.default_value is not None:
+                add_kwargs["defaultValue"] = data.default_value
 
-    if data.maximum is not None:
-        add_kwargs["maxValue"] = data.maximum
+            if data.minimum is not None:
+                add_kwargs["minValue"] = data.minimum
 
-    if data.color:
-        add_kwargs["usedAsColor"] = data.color
+            if data.maximum is not None:
+                add_kwargs["maxValue"] = data.maximum
 
-    plug: str = f"{node}.{data.name}"
-    try:
-        if data.attr_type == "enum":
-            cmds.addAttr(
-                node,
-                longName=data.name,
-                attributeType="enum",
-                enumName=data.enum_value,
-                **add_kwargs,
-            )
-        elif data.attr_type == "string":
-            cmds.addAttr(node, longName=data.name, dataType=data.attr_type)
-        else:
-            cmds.addAttr(
-                node,
-                longName=data.name,
-                attributeType=data.attr_type,
-                **add_kwargs,
-            )
-    except RuntimeError:
-        result.add_failure(plug, "Attribute already exists")
+        if data.color:
+            add_kwargs["usedAsColor"] = data.color
 
-    cmds.setAttr(
-        plug, edit=True, keyable=data.keyable, channelBox=data.channelbox
-    )
+        add_kwargs["longName"] = data.name
+        add_kwargs["niceName"] = data.nice_name
 
-    if data.attr_type == "string":
-        cmds.setAttr(plug, data.value, type="string")
+        plug: str = f"{node}.{data.name}"
+        try:
+            if not cmds.attributeQuery(data.name, node=node, exists=True):
+                if data.attr_type == "enum":
+                    cmds.addAttr(
+                        node,
+                        attributeType="enum",
+                        enumName=data.enum_value,
+                        **add_kwargs,
+                    )
+                elif data.attr_type == "string":
+                    cmds.addAttr(
+                        node,
+                        dataType=data.attr_type,
+                        **add_kwargs,
+                    )
+                else:
+                    cmds.addAttr(
+                        node,
+                        attributeType=data.attr_type,
+                        **add_kwargs,
+                    )
 
-    elif data.attr_type in ("float3", "double3"):
-        cmds.setAttr(plug, data.value[0], data.value[1], data.value[2])
+            else:
+                result.add_failure(plug, "Attribute already exists.")
+                continue
 
-    else:
-        cmds.setAttr(plug, data.value)
+        except RuntimeError as e:
+            result.add_failure(plug, f"AddAttr Error: {e}")
+            continue
+
+    for data in datas:
+        plug = f"{node}.{data.name}"
+        is_compound = data.attr_type in ("float3", "double3", "long3")
+
+        cmds.setAttr(
+            plug,
+            edit=True,
+            keyable=data.keyable,
+            channelBox=data.channelbox,
+        )
+
+        if not is_compound:
+            if data.attr_type == "string":
+                cmds.setAttr(plug, data.value, type="string")
+
+            else:
+                cmds.setAttr(plug, data.value)
 
     return result

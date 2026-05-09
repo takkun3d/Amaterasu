@@ -26,7 +26,6 @@ via tabs and exporting/importing these stocks as JSON files.
 
 from __future__ import annotations
 from typing import Any
-from itertools import product
 import json
 from maya import cmds
 from amaterasu.base.qt import QtCore, QtWidgets, QtGui
@@ -167,12 +166,12 @@ class AttributePage(QtWidgets.QWidget):
         if not items:
             return
 
+        datas: list[dcc.attribute.TransferBuffer] = [
+            item.data(QtCore.Qt.ItemDataRole.UserRole) for item in items
+        ]
         result: utils.Result = utils.Result()
-        for node, item in product(selection, items):
-            data: dcc.attribute.TransferBuffer = item.data(
-                QtCore.Qt.ItemDataRole.UserRole
-            )
-            r: utils.Result = dcc.attribute.apply_transfer_buffer(node, data)
+        for node in selection:
+            r: utils.Result = dcc.attribute.apply_transfer_buffer(node, datas)
             result.merge(r)
 
         result.log(_logger)
