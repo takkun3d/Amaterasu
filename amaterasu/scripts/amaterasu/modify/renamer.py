@@ -316,7 +316,7 @@ class FindAndReplace(QtWidgets.QWidget):
         button: QtWidgets.QPushButton = QtWidgets.QPushButton(
             "+ Add Rules", self
         )
-        button.clicked.connect(self.add_rule)
+        button.clicked.connect(lambda: self.add_rule())
         ctrl_layout.addWidget(button)
 
         btn_layout: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout()
