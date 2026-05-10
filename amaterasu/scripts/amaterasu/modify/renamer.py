@@ -29,7 +29,6 @@ on what matters: creating.
 from __future__ import annotations
 from typing import Any
 import re
-import json
 from maya import cmds
 from maya.api import OpenMaya
 from maya.app.renderSetup.model import utils as rs_utils
@@ -148,20 +147,20 @@ class StringAndNumber(QtWidgets.QWidget):
         form_layout: widgets.FormLayout = widgets.FormLayout()
         main_layout.addLayout(form_layout)
 
-        self.base_name: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
-        form_layout.addRow(widgets.FormLabel("Base Name"), self.base_name)
+        self.__base_name: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
+        form_layout.addRow(widgets.FormLabel("Base Name"), self.__base_name)
 
-        self.start_number: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
-        self.start_number.setToolTip("Can be input string : [A-Z][a-z][0-9]")
-        form_layout.addRow(widgets.FormLabel("Start"), self.start_number)
+        self.__start_number: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
+        self.__start_number.setToolTip("Can be input string : [A-Z][a-z][0-9]")
+        form_layout.addRow(widgets.FormLabel("Start"), self.__start_number)
 
-        self.padding: QtWidgets.QSpinBox = QtWidgets.QSpinBox(self)
-        self.padding.setRange(1, 256)
-        self.padding.setMinimumWidth(70)
-        form_layout.addRow(widgets.FormLabel("Padding"), self.padding)
+        self.__padding: QtWidgets.QSpinBox = QtWidgets.QSpinBox(self)
+        self.__padding.setRange(1, 256)
+        self.__padding.setMinimumWidth(70)
+        form_layout.addRow(widgets.FormLabel("Padding"), self.__padding)
 
-        self.suffix: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
-        form_layout.addRow(widgets.FormLabel("Suffix"), self.suffix)
+        self.__suffix: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
+        form_layout.addRow(widgets.FormLabel("Suffix"), self.__suffix)
 
         btn_layout: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout()
         main_layout.addLayout(btn_layout)
@@ -173,6 +172,70 @@ class StringAndNumber(QtWidgets.QWidget):
         button = QtWidgets.QPushButton("Apply", self)
         button.clicked.connect(lambda: self.applied.emit(False))
         btn_layout.addWidget(button)
+
+    def base_name(self) -> str:
+        """Gets the base name string.
+
+        Returns:
+            str: The current base name.
+        """
+        return self.__base_name.text()
+
+    def set_base_name(self, value: str) -> None:
+        """Sets the base name string.
+
+        Args:
+            value (str): The new base name to set.
+        """
+        self.__base_name.setText(value)
+
+    def start_number(self) -> str:
+        """Gets the start number or character sequence.
+
+        Returns:
+            str: The current start sequence.
+        """
+        return self.__start_number.text()
+
+    def set_start_number(self, value: str) -> None:
+        """Sets the start number or character sequence.
+
+        Args:
+            value (str): The new start sequence to set.
+        """
+        self.__start_number.setText(value)
+
+    def padding(self) -> int:
+        """Gets the padding value.
+
+        Returns:
+            int: The current padding value.
+        """
+        return self.__padding.value()
+
+    def set_padding(self, value: int) -> None:
+        """Sets the padding value.
+
+        Args:
+            value (int): The new padding value to set.
+        """
+        self.__padding.setValue(value)
+
+    def suffix(self) -> str:
+        """Gets the suffix string.
+
+        Returns:
+            str: The current suffix.
+        """
+        return self.__suffix.text()
+
+    def set_suffix(self, value: str) -> None:
+        """Sets the suffix string.
+
+        Args:
+            value (str): The new suffix to set.
+        """
+        self.__suffix.setText(value)
 
 
 class InsertStringTo(QtWidgets.QWidget):
@@ -200,12 +263,12 @@ class InsertStringTo(QtWidgets.QWidget):
         form_layout: widgets.FormLayout = widgets.FormLayout()
         main_layout.addLayout(form_layout)
 
-        self.insert: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
-        form_layout.addRow(widgets.FormLabel("String"), self.insert)
+        self.__insert: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
+        form_layout.addRow(widgets.FormLabel("String"), self.__insert)
 
-        self.insert_to: QtWidgets.QComboBox = QtWidgets.QComboBox(self)
-        self.insert_to.addItems(["First", "Last"])
-        form_layout.addRow(widgets.FormLabel("Insert to"), self.insert_to)
+        self.__insert_to: QtWidgets.QComboBox = QtWidgets.QComboBox(self)
+        self.__insert_to.addItems(["First", "Last"])
+        form_layout.addRow(widgets.FormLabel("Insert to"), self.__insert_to)
 
         btn_layout: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout()
         main_layout.addLayout(btn_layout)
@@ -217,6 +280,38 @@ class InsertStringTo(QtWidgets.QWidget):
         button = QtWidgets.QPushButton("Apply", self)
         button.clicked.connect(lambda: self.applied.emit(False))
         btn_layout.addWidget(button)
+
+    def insert(self) -> str:
+        """Gets the string to be inserted.
+
+        Returns:
+            str: The current insert string.
+        """
+        return self.__insert.text()
+
+    def set_insert(self, value: str) -> None:
+        """Sets the string to be inserted.
+
+        Args:
+            value (str): The new insert string to set.
+        """
+        self.__insert.setText(value)
+
+    def insert_to(self) -> int:
+        """Gets the insertion position index.
+
+        Returns:
+            int: The current index (0 for First, 1 for Last).
+        """
+        return self.__insert_to.currentIndex()
+
+    def set_insert_to(self, value: int) -> None:
+        """Sets the insertion position index.
+
+        Args:
+            value (int): The new index to set (0 for First, 1 for Last).
+        """
+        self.__insert_to.setCurrentIndex(value)
 
 
 class FindReplaceRuleWidget(QtWidgets.QWidget):
@@ -247,17 +342,17 @@ class FindReplaceRuleWidget(QtWidgets.QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
 
-        self.search: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
-        self.search.setPlaceholderText("Find")
-        self.search.setText(find_str)
-        layout.addWidget(self.search)
+        self.__search: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
+        self.__search.setPlaceholderText("Find")
+        self.__search.setText(find_str)
+        layout.addWidget(self.__search)
 
         layout.addWidget(QtWidgets.QLabel("->", self))
 
-        self.replace: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
-        self.replace.setPlaceholderText("Replace")
-        self.replace.setText(replace_str)
-        layout.addWidget(self.replace)
+        self.__replace: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
+        self.__replace.setPlaceholderText("Replace")
+        self.__replace.setText(replace_str)
+        layout.addWidget(self.__replace)
 
         button = widgets.IconButton(self)
         button.set_icon(dcc.get_icon_path("a_close.png"))
@@ -271,7 +366,7 @@ class FindReplaceRuleWidget(QtWidgets.QWidget):
         Returns:
             tuple[str, str]: A tuple containing the find and replace strings.
         """
-        return self.search.text(), self.replace.text()
+        return self.__search.text(), self.__replace.text()
 
 
 class FindAndReplace(QtWidgets.QWidget):
@@ -304,9 +399,9 @@ class FindAndReplace(QtWidgets.QWidget):
         self.rules_container: QtWidgets.QWidget = QtWidgets.QWidget(self)
         scroll_area.setWidget(self.rules_container)
 
-        self.rules_layout = QtWidgets.QVBoxLayout(self.rules_container)
-        self.rules_layout.setContentsMargins(0, 0, 0, 0)
-        self.rules_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
+        self.__rules_layout = QtWidgets.QVBoxLayout(self.rules_container)
+        self.__rules_layout.setContentsMargins(0, 0, 0, 0)
+        self.__rules_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
 
         ctrl_layout: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout()
         main_layout.addLayout(ctrl_layout)
@@ -342,7 +437,7 @@ class FindAndReplace(QtWidgets.QWidget):
             find, replace, self.rules_container
         )
         rule_widget.removed.connect(self.remove_rule)
-        self.rules_layout.addWidget(rule_widget)
+        self.__rules_layout.addWidget(rule_widget)
 
     @QtCore.Slot(QtWidgets.QWidget)
     def remove_rule(self, widget: QtWidgets.QWidget) -> None:
@@ -351,9 +446,9 @@ class FindAndReplace(QtWidgets.QWidget):
         Args:
             widget (QtWidgets.QWidget): The rule widget to be removed.
         """
-        self.rules_layout.removeWidget(widget)
+        self.__rules_layout.removeWidget(widget)
         widget.deleteLater()
-        if self.rules_layout.count() == 0:
+        if self.__rules_layout.count() == 0:
             self.add_rule()
 
     def rules(self) -> list[tuple[str, str]]:
@@ -363,8 +458,8 @@ class FindAndReplace(QtWidgets.QWidget):
             list[tuple[str, str]]: A list of (find, replace) tuples.
         """
         rules: list[tuple[str, str]] = []
-        for i in range(self.rules_layout.count()):
-            item: QtWidgets.QLayoutItem = self.rules_layout.itemAt(i)
+        for i in range(self.__rules_layout.count()):
+            item: QtWidgets.QLayoutItem = self.__rules_layout.itemAt(i)
             if item and item.widget():
                 widget: QtWidgets.QWidget = item.widget()
                 if isinstance(widget, FindReplaceRuleWidget):
@@ -379,8 +474,8 @@ class FindAndReplace(QtWidgets.QWidget):
             rules (list[list[str]]): A list of rule pairs
                 (e.g., [["find1", "replace1"], ...]).
         """
-        while self.rules_layout.count():
-            item: QtWidgets.QLayoutItem = self.rules_layout.takeAt(0)
+        while self.__rules_layout.count():
+            item: QtWidgets.QLayoutItem = self.__rules_layout.takeAt(0)
             if item and item.widget():
                 item.widget().deleteLater()
 
@@ -388,7 +483,7 @@ class FindAndReplace(QtWidgets.QWidget):
             if len(rule) == 2:
                 self.add_rule(rule[0], rule[1])
 
-        if self.rules_layout.count() == 0:
+        if self.__rules_layout.count() == 0:
             self.add_rule()
 
 
@@ -450,49 +545,32 @@ class MainWindow(framework.ToolWindow[Settings]):
             decoder=utils.ascii_to_qt,
         )
         settings.base_name.bind(
-            setter=string_and_number.base_name.setText,
-            getter=string_and_number.base_name.text,
+            setter=string_and_number.set_base_name,
+            getter=string_and_number.base_name,
         )
         settings.start_number.bind(
-            setter=string_and_number.start_number.setText,
-            getter=string_and_number.start_number.text,
+            setter=string_and_number.set_start_number,
+            getter=string_and_number.start_number,
         )
         settings.padding.bind(
-            setter=string_and_number.padding.setValue,
-            getter=string_and_number.padding.value,
+            setter=string_and_number.set_padding,
+            getter=string_and_number.padding,
         )
         settings.suffix.bind(
-            setter=string_and_number.suffix.setText,
-            getter=string_and_number.suffix.text,
+            setter=string_and_number.set_suffix,
+            getter=string_and_number.suffix,
         )
         settings.insert_str.bind(
-            setter=insert_string_to.insert.setText,
-            getter=insert_string_to.insert.text,
+            setter=insert_string_to.set_insert,
+            getter=insert_string_to.insert,
         )
         settings.insert_to.bind(
-            setter=insert_string_to.insert_to.setCurrentIndex,
-            getter=insert_string_to.insert_to.currentIndex,
+            setter=insert_string_to.set_insert_to,
+            getter=insert_string_to.insert_to,
         )
-
-        def get_rules_json() -> str:
-            """Helper to encode rules to JSON string."""
-            return json.dumps(self.__find_and_replace.rules())
-
-        def set_rules_json(val: str) -> None:
-            """Helper to decode rules from JSON string."""
-            try:
-                rules: Any = json.loads(val)
-                if not rules:
-                    rules = [["", ""]]
-
-                self.__find_and_replace.set_rules(rules)
-
-            except json.JSONDecodeError:
-                self.__find_and_replace.set_rules([["", ""]])
-
         settings.find_replace_rules.bind(
-            setter=set_rules_json,
-            getter=get_rules_json,
+            setter=self.__find_and_replace.set_rules,
+            getter=self.__find_and_replace.rules,
         )
 
     def string_and_number(self, preview: bool) -> None:
@@ -504,20 +582,23 @@ class MainWindow(framework.ToolWindow[Settings]):
         """
         self.save_settings()
         settings: Settings = self.tool_settings()
+        base_name: str = settings.base_name.value()
         start: str = settings.start_number.value()
+        padding: int = settings.padding.value()
+        suffix: str = settings.suffix.value()
 
         find: str = ""
         replace: str = ""
         number: int = 0
         if re.search("^[0-9]*$", start):
             find = "^.*$"
-            replace = f"{settings.base_name.value()}@i<{settings.padding.value()}>{settings.suffix.value()}"
+            replace = f"{base_name}@i<{padding}>{suffix}"
             number = int(start)
 
         elif re.search("^[a-zA-Z]*$", start):
             tag: str = "J" if re.search("^[A-Z]*$", start) else "j"
             find = "^.*$"
-            replace = f"{settings.base_name.value()}@{tag}<{settings.padding.value()}>{settings.suffix.value()}"
+            replace = f"{base_name}@{tag}<{padding}>{suffix}"
             number = char_to_num(start.upper())
 
         else:
@@ -535,11 +616,13 @@ class MainWindow(framework.ToolWindow[Settings]):
         """
         self.save_settings()
         settings: Settings = self.tool_settings()
+        insert_str: str = settings.insert_str.value()
+
         find: str = "^.*$"
         if settings.insert_to.value() == 0:
-            replace: str = f"{settings.insert_str.value()}@g<0>"
+            replace: str = f"{insert_str}@g<0>"
         else:
-            replace = f"@g<0>{settings.insert_str.value()}"
+            replace = f"@g<0>{insert_str}"
 
         self.rename([(find, replace)], preview=preview)
 
@@ -850,8 +933,8 @@ def main(unique_id: str = "") -> None:
     """Entry point to launch the Renamer tool window.
 
     Args:
-        unique_id (str, optional): The unique identifier for the tool window instance.
-            Defaults to "".
+        unique_id (str, optional): The unique identifier for
+            the tool window instance. Defaults to "".
     """
     window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()

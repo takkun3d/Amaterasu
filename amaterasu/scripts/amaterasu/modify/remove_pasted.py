@@ -19,6 +19,7 @@
 # SOFTWARE.
 """Command to remove 'pasted__' prefixes from the scene."""
 
+from maya import cmds
 from amaterasu.base import dcc, utils
 
 __product__ = "Remove 'pasted__'"
@@ -28,5 +29,6 @@ _logger: utils.Logger = utils.get_logger(__product__)
 
 def main() -> None:
     """Entry point for the command."""
-    result: utils.Result = dcc.node.remove_pasted_prefixes()
+    selection: list[str] = cmds.ls(selection=True)
+    result: utils.Result = dcc.node.remove_pasted_prefixes(selection)
     result.log(_logger)

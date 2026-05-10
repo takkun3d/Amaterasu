@@ -59,18 +59,24 @@ class SolidOptionWidget(QtWidgets.QWidget):
         """
         super().__init__(parent, flag)
 
-        layout = widgets.FormLayout(self)
+        layout: widgets.FormLayout = widgets.FormLayout(self)
         layout.setFieldGrowthPolicy(
             widgets.FormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
         )
 
-        self.__src = widgets.NodePicker(self, multi_select=False)
+        self.__src: widgets.NodePicker = widgets.NodePicker(
+            self, multi_select=False
+        )
         layout.addRow(widgets.FormLabel("Source"), self.__src)
 
-        self.__dsts = widgets.NodePicker(self, multi_select=True)
+        self.__dsts: widgets.NodePicker = widgets.NodePicker(
+            self, multi_select=True
+        )
         layout.addRow(widgets.FormLabel("Destinations"), self.__dsts)
 
-        button = QtWidgets.QPushButton("Apply Solid Unfreeze", self)
+        button: QtWidgets.QPushButton = QtWidgets.QPushButton(
+            "Apply Solid Unfreeze", self
+        )
         button.clicked.connect(self._emit_apply)
         layout.addRow(button)
 
@@ -108,18 +114,24 @@ class PlanarOptionWidget(QtWidgets.QWidget):
         """
         super().__init__(parent, flag)
 
-        layout = widgets.FormLayout(self)
+        layout: widgets.FormLayout = widgets.FormLayout(self)
         layout.setFieldGrowthPolicy(
             widgets.FormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
         )
 
-        self.__src = widgets.NodePicker(self, multi_select=False)
+        self.__src: widgets.NodePicker = widgets.NodePicker(
+            self, multi_select=False
+        )
         layout.addRow(widgets.FormLabel("Source"), self.__src)
 
-        self.__dsts = widgets.NodePicker(self, multi_select=True)
+        self.__dsts: widgets.NodePicker = widgets.NodePicker(
+            self, multi_select=True
+        )
         layout.addRow(widgets.FormLabel("Destinations"), self.__dsts)
 
-        button = QtWidgets.QPushButton("Apply Planar Unfreeze", self)
+        button: QtWidgets.QPushButton = QtWidgets.QPushButton(
+            "Apply Planar Unfreeze", self
+        )
         button.clicked.connect(self._emit_apply)
         layout.addRow(button)
 
@@ -157,21 +169,29 @@ class ManualOptionWidget(QtWidgets.QWidget):
         """
         super().__init__(parent, flag)
 
-        layout = widgets.FormLayout(self)
+        layout: widgets.FormLayout = widgets.FormLayout(self)
         layout.setFieldGrowthPolicy(
             widgets.FormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
         )
 
-        self.__pivot = widgets.NodePicker(self, multi_select=False)
+        self.__pivot: widgets.NodePicker = widgets.NodePicker(
+            self, multi_select=False
+        )
         layout.addRow(widgets.FormLabel("Pivot"), self.__pivot)
 
-        self.__aim = widgets.NodePicker(self, multi_select=False)
+        self.__aim: widgets.NodePicker = widgets.NodePicker(
+            self, multi_select=False
+        )
         layout.addRow(widgets.FormLabel("Aim (X+)"), self.__aim)
 
-        self.__up = widgets.NodePicker(self, multi_select=False)
+        self.__up: widgets.NodePicker = widgets.NodePicker(
+            self, multi_select=False
+        )
         layout.addRow(widgets.FormLabel("Up (Y+)"), self.__up)
 
-        button = QtWidgets.QPushButton("Apply Manual Unfreeze", self)
+        button: QtWidgets.QPushButton = QtWidgets.QPushButton(
+            "Apply Manual Unfreeze", self
+        )
         button.clicked.connect(self._emit_apply)
         layout.addRow(button)
 
@@ -219,21 +239,21 @@ class MainWindow(framework.ToolWindow[Settings]):
         Args:
             parent (QtWidgets.QWidget): The parent widget to attach the UI elements to.
         """
-        main_layout = QtWidgets.QVBoxLayout(parent)
+        main_layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(parent)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
-        tabs = QtWidgets.QTabWidget(self)
+        tabs: QtWidgets.QTabWidget = QtWidgets.QTabWidget(self)
         main_layout.addWidget(tabs)
 
-        tab_solid = SolidOptionWidget(self)
+        tab_solid: SolidOptionWidget = SolidOptionWidget(self)
         tab_solid.applied.connect(self.apply_solid)
         tabs.addTab(tab_solid, "Solid")
 
-        tab_planar = PlanarOptionWidget(self)
+        tab_planar: PlanarOptionWidget = PlanarOptionWidget(self)
         tab_planar.applied.connect(self.apply_planar)
         tabs.addTab(tab_planar, "Planar")
 
-        tab_manual = ManualOptionWidget(self)
+        tab_manual: ManualOptionWidget = ManualOptionWidget(self)
         tab_manual.applied.connect(self.apply_manual)
         tabs.addTab(tab_manual, "Manual")
 

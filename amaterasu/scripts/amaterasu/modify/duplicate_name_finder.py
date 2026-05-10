@@ -98,7 +98,8 @@ class MainWindow(framework.ToolWindow[Settings]):
         button.clicked.connect(self.__tree.collapseAll)
         btn_layout.addWidget(button)
 
-        self.tool_settings().window_geo.bind(
+        settings: Settings = self.tool_settings()
+        settings.window_geo.bind(
             setter=self.restoreGeometry,
             getter=self.saveGeometry,
             encoder=utils.qt_to_ascii,

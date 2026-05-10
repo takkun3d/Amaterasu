@@ -59,10 +59,10 @@ class AttributePage(QtWidgets.QWidget):
                 Defaults to None.
         """
         super().__init__(parent)
-        layout = QtWidgets.QVBoxLayout(self)
+        layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
 
-        self.__list = widgets.ListWidget(self)
+        self.__list: widgets.ListWidget = widgets.ListWidget(self)
         self.__list.set_placeholder_text("Select a node and click 'Copy'")
         self.__list.setSelectionMode(
             QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection
@@ -74,25 +74,29 @@ class AttributePage(QtWidgets.QWidget):
         self.__list.customContextMenuRequested.connect(self.show_context_menu)
         layout.addWidget(self.__list)
 
-        btn_layout = QtWidgets.QHBoxLayout()
+        btn_layout: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout()
         layout.addLayout(btn_layout)
 
-        copy = QtWidgets.QPushButton("Copy", self)
-        copy.clicked.connect(self.copy_from_maya)
-        btn_layout.addWidget(copy)
+        button: QtWidgets.QPushButton = QtWidgets.QPushButton("Copy", self)
+        button.clicked.connect(self.copy_from_maya)
+        btn_layout.addWidget(button)
 
-        paste = QtWidgets.QPushButton("Paste", self)
-        paste.clicked.connect(self.paste_to_maya)
-        btn_layout.addWidget(paste)
+        button = QtWidgets.QPushButton("Paste", self)
+        button.clicked.connect(self.paste_to_maya)
+        btn_layout.addWidget(button)
 
         self.__context_menu: QtWidgets.QMenu = QtWidgets.QMenu(self.__list)
-        self.__action_copy = QtGui.QAction("Copy to Clipboard", self)
+        self.__action_copy: QtGui.QAction = QtGui.QAction(
+            "Copy to Clipboard", self
+        )
         self.__action_copy.setShortcut(QtGui.QKeySequence.StandardKey.Copy)
         self.__action_copy.triggered.connect(self.copy_to_clipboard)
         self.__list.addAction(self.__action_copy)
         self.__context_menu.addAction(self.__action_copy)
 
-        self.__action_paste = QtGui.QAction("Paste from Clipboard", self)
+        self.__action_paste: QtGui.QAction = QtGui.QAction(
+            "Paste from Clipboard", self
+        )
         self.__action_paste.setShortcut(QtGui.QKeySequence.StandardKey.Paste)
         self.__action_paste.triggered.connect(self.paste_from_clipboard)
         self.__list.addAction(self.__action_paste)
@@ -100,7 +104,9 @@ class AttributePage(QtWidgets.QWidget):
 
         self.__context_menu.addSeparator()
 
-        self.__action_delete = QtGui.QAction("Delete Selected", self)
+        self.__action_delete: QtGui.QAction = QtGui.QAction(
+            "Delete Selected", self
+        )
         self.__action_delete.setShortcut(QtGui.QKeySequence.StandardKey.Delete)
         self.__action_delete.triggered.connect(self.__list.delete_selected_item)
         self.__list.addAction(self.__action_delete)

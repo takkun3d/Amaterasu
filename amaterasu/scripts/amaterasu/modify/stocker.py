@@ -143,7 +143,7 @@ class StockerViewWidget(widgets.TreeWidget):
         item.setData(2, QtCore.Qt.ItemDataRole.UserRole, type(value))
         self.addTopLevelItem(item)
 
-    def get_item_data(
+    def item_data(
         self, item: QtWidgets.QTreeWidgetItem
     ) -> tuple[str, str, Any]:
         """Extracts node, attribute, and formatted value from a tree item.
@@ -173,7 +173,7 @@ class StockerViewWidget(widgets.TreeWidget):
 
         return node_name, attr_name, value
 
-    def get_export_data(self) -> list[list[Any]]:
+    def export_data(self) -> list[list[Any]]:
         """Gets all items in the tree for JSON exporting.
 
         Returns:
@@ -182,7 +182,7 @@ class StockerViewWidget(widgets.TreeWidget):
         items: list[QtWidgets.QTreeWidgetItem] = [
             self.topLevelItem(i) for i in range(self.topLevelItemCount())
         ]
-        return [list(self.get_item_data(item)) for item in items]
+        return [list(self.item_data(item)) for item in items]
 
     def load_import_data(self, datas: list[list[Any]]) -> None:
         """Loads items from imported JSON data.
@@ -201,7 +201,7 @@ class StockerViewWidget(widgets.TreeWidget):
             self.topLevelItem(i) for i in range(self.topLevelItemCount())
         ]
         data: list[tuple[str, str, Any]] = [
-            self.get_item_data(item) for item in items
+            self.item_data(item) for item in items
         ]
 
         mime_data = QtCore.QMimeData()
@@ -280,7 +280,7 @@ class StockerViewWidget(widgets.TreeWidget):
             node: str
             attr: str
             value: Any
-            node, attr, value = self.get_item_data(item)
+            node, attr, value = self.item_data(item)
 
             target_nodes: list[str] = selection
             if not is_selection:
@@ -309,41 +309,41 @@ class Stock(QtWidgets.QWidget):
                 Defaults to None.
         """
         super().__init__(parent)
-        main_layout = QtWidgets.QGridLayout(self)
+        main_layout: QtWidgets.QGridLayout = QtWidgets.QGridLayout(self)
         main_layout.setContentsMargins(4, 4, 4, 4)
 
-        self.__viewer = StockerViewWidget(self)
+        self.__viewer: StockerViewWidget = StockerViewWidget(self)
         main_layout.addWidget(self.__viewer, 0, 0, 1, 2)
 
-        layout = QtWidgets.QHBoxLayout()
+        layout: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         main_layout.addLayout(layout, 1, 0, 1, 2)
 
         layout.addWidget(QtWidgets.QLabel("Find & Replace :", self))
 
-        self.search = QtWidgets.QLineEdit(self)
-        layout.addWidget(self.search)
+        self.__search: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
+        layout.addWidget(self.__search)
 
-        self.replace = QtWidgets.QLineEdit(self)
-        layout.addWidget(self.replace)
+        self.__replace: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
+        layout.addWidget(self.__replace)
 
-        clear_button = QtWidgets.QPushButton("Clear", self)
-        clear_button.clicked.connect(self.clear)
-        layout.addWidget(clear_button)
+        button: QtWidgets.QPushButton = QtWidgets.QPushButton("Clear", self)
+        button.clicked.connect(self.clear)
+        layout.addWidget(button)
 
-        copy_button = QtWidgets.QPushButton("Copy", self)
-        copy_button.clicked.connect(self.copy)
-        main_layout.addWidget(copy_button, 3, 0)
+        button = QtWidgets.QPushButton("Copy", self)
+        button.clicked.connect(self.copy)
+        main_layout.addWidget(button, 3, 0)
 
-        paste_button = QtWidgets.QPushButton("Paste", self)
-        paste_button.clicked.connect(self.paste)
-        main_layout.addWidget(paste_button, 3, 1)
+        button = QtWidgets.QPushButton("Paste", self)
+        button.clicked.connect(self.paste)
+        main_layout.addWidget(button, 3, 1)
 
     @QtCore.Slot()
     def clear(self) -> None:
         """Clears the search and replace line edits."""
-        self.search.setText("")
-        self.replace.setText("")
+        self.__search.setText("")
+        self.__replace.setText("")
 
     @QtCore.Slot()
     def copy(self) -> None:
@@ -355,10 +355,10 @@ class Stock(QtWidgets.QWidget):
     def paste(self) -> None:
         """Triggers the paste action on the viewer and applies undo chunk."""
         selection: list[str] = cmds.ls(selection=True)
-        if self.search.text() or self.replace.text():
+        if self.__search.text() or self.__replace.text():
             cmds.select(clear=True)
 
-        self.__viewer.paste(self.search.text(), self.replace.text())
+        self.__viewer.paste(self.__search.text(), self.__replace.text())
 
         if selection:
             cmds.select(*selection)
@@ -370,6 +370,38 @@ class Stock(QtWidgets.QWidget):
             StockerViewWidget: The internal tree view widget.
         """
         return self.__viewer
+
+    def search(self) -> str:
+        """Gets the current search string.
+
+        Returns:
+            str: The search string.
+        """
+        return self.__search.text()
+
+    def set_search(self, value: str) -> None:
+        """Sets the search string.
+
+        Args:
+            value (str): The search string to set.
+        """
+        self.__search.setText(value)
+
+    def replace(self) -> str:
+        """Gets the current replace string.
+
+        Returns:
+            str: The replace string.
+        """
+        return self.__replace.text()
+
+    def set_replace(self, value: str) -> None:
+        """Sets the replace string.
+
+        Args:
+            value (str): The replace string to set.
+        """
+        self.__replace.setText(value)
 
 
 class MainWindow(framework.ToolWindow[Settings]):
@@ -402,16 +434,16 @@ class MainWindow(framework.ToolWindow[Settings]):
         Args:
             menu_bar (QtWidgets.QMenuBar): The main menu bar widget.
         """
-        data_menu = QtWidgets.QMenu("Data", self)
+        data_menu: QtWidgets.QMenu = QtWidgets.QMenu("Data", self)
         menu_bar.addMenu(data_menu)
 
-        action_import = QtGui.QAction("Import JSON...", self)
-        action_import.triggered.connect(self.import_json)
-        data_menu.addAction(action_import)
+        action: QtGui.QAction = QtGui.QAction("Import JSON...", self)
+        action.triggered.connect(self.import_json)
+        data_menu.addAction(action)
 
-        action_export = QtGui.QAction("Export JSON...", self)
-        action_export.triggered.connect(self.export_json)
-        data_menu.addAction(action_export)
+        action = QtGui.QAction("Export JSON...", self)
+        action.triggered.connect(self.export_json)
+        data_menu.addAction(action)
 
     def create_ui(self, parent: QtWidgets.QWidget) -> None:
         """Creates the tool-specific user interface.
@@ -419,7 +451,7 @@ class MainWindow(framework.ToolWindow[Settings]):
         Args:
             parent (QtWidgets.QWidget): The parent widget to attach the UI elements to.
         """
-        main_layout = QtWidgets.QVBoxLayout(parent)
+        main_layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(parent)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
         self.__tab = widgets.TabWidget(
@@ -454,7 +486,7 @@ class MainWindow(framework.ToolWindow[Settings]):
             str: The current search text.
         """
         current: Stock = cast(Stock, self.__tab.currentWidget())
-        return current.search.text()
+        return current.search()
 
     def set_current_search_text(self, value: str) -> None:
         """Sets the search text to the active tab.
@@ -463,7 +495,7 @@ class MainWindow(framework.ToolWindow[Settings]):
             value (str): The text to set.
         """
         current: Stock = cast(Stock, self.__tab.currentWidget())
-        current.search.setText(value)
+        current.set_search(value)
 
     def current_replace_text(self) -> str:
         """Gets the replace text from the active tab.
@@ -471,8 +503,8 @@ class MainWindow(framework.ToolWindow[Settings]):
         Returns:
             str: The current replace text.
         """
-        current: Stock = cast(Stock, self.__tab.currentWidget())
-        return current.replace.text()
+        stock: Stock = cast(Stock, self.__tab.currentWidget())
+        return stock.replace()
 
     def set_current_replace_text(self, value: str) -> None:
         """Sets the replace text to the active tab.
@@ -480,8 +512,8 @@ class MainWindow(framework.ToolWindow[Settings]):
         Args:
             value (str): The text to set.
         """
-        current: Stock = cast(Stock, self.__tab.currentWidget())
-        current.replace.setText(value)
+        stock: Stock = cast(Stock, self.__tab.currentWidget())
+        stock.set_replace(value)
 
     def add_tab(self, label: str) -> None:
         """Adds a new Stock tab to the tool window.
@@ -489,18 +521,18 @@ class MainWindow(framework.ToolWindow[Settings]):
         Args:
             label (str): The label for the new tab.
         """
-        page_widget = Stock(self)
-        self.__tab.add_custom_tab(page_widget, label)
+        stock = Stock(self)
+        self.__tab.add_custom_tab(stock, label)
 
         settings: Settings = self.tool_settings()
-        page_widget.search.setText(settings.search.value())
-        page_widget.replace.setText(settings.replace.value())
+        stock.set_search(settings.search.value())
+        stock.set_replace(settings.replace.value())
 
     @QtCore.Slot()
     def import_json(self) -> None:
         """Imports a JSON file into the current stock tab."""
-        stock_widget: Stock = cast(Stock, self.__tab.currentWidget())
-        if not stock_widget:
+        stock: Stock = cast(Stock, self.__tab.currentWidget())
+        if not stock:
             _logger.warning("No active stock tab found.")
             return
 
@@ -514,7 +546,7 @@ class MainWindow(framework.ToolWindow[Settings]):
             with open(file_path, "r", encoding="utf-8") as f:
                 raw_list = json.load(f)
 
-            stock_widget.viewer().load_import_data(raw_list)
+            stock.viewer().load_import_data(raw_list)
 
         except json.JSONDecodeError as e:
             _logger.error("Invalid JSON format in file %s: %s", file_path, e)
@@ -525,8 +557,8 @@ class MainWindow(framework.ToolWindow[Settings]):
     @QtCore.Slot()
     def export_json(self) -> None:
         """Exports the current stock tab to a JSON file."""
-        stock_widget: Stock = cast(Stock, self.__tab.currentWidget())
-        if not stock_widget:
+        stock: Stock = cast(Stock, self.__tab.currentWidget())
+        if not stock:
             _logger.warning("No active stock tab found.")
             return
 
@@ -537,7 +569,7 @@ class MainWindow(framework.ToolWindow[Settings]):
             return
 
         try:
-            json_data: list[list[Any]] = stock_widget.viewer().get_export_data()
+            json_data: list[list[Any]] = stock.viewer().export_data()
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(json_data, f, indent=4, ensure_ascii=False)
 

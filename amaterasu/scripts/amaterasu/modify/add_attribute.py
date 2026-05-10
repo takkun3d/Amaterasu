@@ -131,19 +131,21 @@ class MainWindow(framework.StandardToolWindow[Settings]):
         """
         main_layout: widgets.FormLayout = widgets.FormLayout(parent)
 
-        mtoa = QtWidgets.QCheckBox("Insert mtoa_constant_", self)
+        mtoa: QtWidgets.QCheckBox = QtWidgets.QCheckBox(
+            "Insert mtoa_constant_", self
+        )
         main_layout.addRow("", mtoa)
 
-        attr_name = QtWidgets.QLineEdit(self)
+        attr_name: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
         main_layout.addRow(widgets.FormLabel("Attribute Name"), attr_name)
 
         main_layout.addRow(widgets.HorizontalLine(self))
 
-        make_attr = QtWidgets.QComboBox(self)
+        make_attr: QtWidgets.QComboBox = QtWidgets.QComboBox(self)
         make_attr.addItems(["Keyable", "Displayable", "Hidden"])
         main_layout.addRow(widgets.FormLabel("Make Attribute"), make_attr)
 
-        data_type = QtWidgets.QComboBox(self)
+        data_type: QtWidgets.QComboBox = QtWidgets.QComboBox(self)
         data_type.addItems(
             [
                 "Vector",
@@ -160,19 +162,19 @@ class MainWindow(framework.StandardToolWindow[Settings]):
 
         main_layout.addRow(widgets.HorizontalLine(self))
 
-        min_value = QtWidgets.QLineEdit(self)
+        min_value: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
         main_layout.addRow(widgets.FormLabel("Min Value"), min_value)
         min_idx: int = main_layout.row_id()
 
-        max_value = QtWidgets.QLineEdit(self)
+        max_value: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
         main_layout.addRow(widgets.FormLabel("Max Value"), max_value)
         max_idx: int = main_layout.row_id()
 
-        default_value = QtWidgets.QLineEdit(self)
+        default_value: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
         main_layout.addRow(widgets.FormLabel("Default Value"), default_value)
         def_idx: int = main_layout.row_id()
 
-        enum_value = QtWidgets.QLineEdit(self)
+        enum_value: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
         enum_value.setPlaceholderText("Red:Green:Blue:")
         main_layout.addRow(widgets.FormLabel("Enum Value"), enum_value)
         enum_idx: int = main_layout.row_id()

@@ -118,7 +118,7 @@ def remove_pasted_prefixes(nodes: list[str] | None = None) -> utils.Result:
         utils.Result: The result of the operation, containing any failures.
     """
     result: utils.Result = utils.Result()
-    if nodes is None:
+    if not nodes:
         nodes = cmds.ls("pasted__*", long=True)
         if not nodes:
             return result
