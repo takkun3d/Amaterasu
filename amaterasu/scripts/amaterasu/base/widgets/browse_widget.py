@@ -17,7 +17,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""rovides a generic combined widget with a text field and an action button.
+"""Provides a generic combined widget with a text field and an action button.
 
 This highly versatile widget is commonly used for browsing file paths,
 capturing selected Maya nodes, or triggering custom input dialogs.

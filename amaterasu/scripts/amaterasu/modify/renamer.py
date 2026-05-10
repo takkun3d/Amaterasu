@@ -1,518 +1,691 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Renamer
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""A powerful, artist-friendly batch renaming tool.
+
+Built for creators who want to keep their Outliner perfectly organized
+without the headache of manual renaming. Whether you are prepping a massive
+environment, finalizing a complex character rig, or just cleaning up after
+a long modeling session, Renamer streamlines your workflow so you can focus
+on what matters: creating.
+"""
+
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any
+from typing import Any
 import re
-
-try:
-    from PySide2.QtCore import Qt, Slot, QItemSelectionModel, QModelIndex
-    from PySide2.QtGui import QStandardItemModel, QStandardItem
-    from PySide2.QtWidgets import (
-        QWidget,
-        QVBoxLayout,
-        QLineEdit,
-        QSpinBox,
-        QPushButton,
-        QGridLayout,
-        QTreeView,
-        QTabWidget,
-    )
-
-except ImportError:
-    if not TYPE_CHECKING:
-        from PySide6.QtCore import Qt, Slot, QItemSelectionModel, QModelIndex
-        from PySide6.QtGui import QStandardItemModel, QStandardItem
-        from PySide6.QtWidgets import (
-            QWidget,
-            QVBoxLayout,
-            QLineEdit,
-            QSpinBox,
-            QPushButton,
-            QGridLayout,
-            QTreeView,
-            QTabWidget,
-        )
 from maya import cmds
 from maya.api import OpenMaya
-from maya.app.renderSetup.model import utils
+from maya.app.renderSetup.model import utils as rs_utils
 from maya.app.renderSetup.views import viewCmds
-from ..lib import logger, parser, widgets
+from amaterasu.base.qt import QtCore, QtWidgets, QtGui
+from amaterasu.base import dcc, framework, utils, widgets
+
+__product__: str = "Renamer"
+__version__: str = "1.40"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Renamer'
-__version__: str = '1.30'
-__doc__ = 'A tool to rename selected nodes at once.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+class Settings(framework.ToolSettings):
+    """Settings for the Renamer tool.
 
-RENDER_SETUP_NODES: tuple[str, ...] = (
-    'renderSetupLayer',
-    'collection',
-    'connectionOverride',
-    'shaderOverride',
-    'materialOverride',
-    'absOverride',
-    'relOverride',
-)
+    Attributes:
+        window_geo (framework.Variant[str]): Saved window geometry data.
+        base_name (framework.Variant[str]): The base string for renaming.
+        start_number (framework.Variant[str]): The starting number or
+            character sequence.
+        padding (framework.Variant[int]): Padding for numbers or characters.
+        suffix (framework.Variant[str]): The suffix string.
+        insert_str (framework.Variant[str]): The string to insert.
+        insert_to (framework.Variant[int]): Insertion position index
+            (0 for First, 1 for Last).
+        find_replace_rules (framework.Variant[str]): JSON string representing
+            multiple find/replace rules.
+    """
 
-
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-class Settings(parser.ToolSettings):
-    '''Settings for tool.'''
-
-    window_geo: parser.Variant[str] = parser.Variant('')
-    find_str: parser.Variant[str] = parser.Variant('')
-    replace_str: parser.Variant[str] = parser.Variant('')
-    base_name: parser.Variant[str] = parser.Variant('')
-    start_number: parser.Variant[str] = parser.Variant('0')
-    padding: parser.Variant[int] = parser.Variant(1)
-    suffix: parser.Variant[str] = parser.Variant('')
-    insert_str: parser.Variant[str] = parser.Variant('')
-    insert_to: parser.Variant[int] = parser.Variant(0)
+    window_geo: framework.Variant[str] = framework.Variant("")
+    base_name: framework.Variant[str] = framework.Variant("")
+    start_number: framework.Variant[str] = framework.Variant("0")
+    padding: framework.Variant[int] = framework.Variant(1)
+    suffix: framework.Variant[str] = framework.Variant("")
+    insert_str: framework.Variant[str] = framework.Variant("")
+    insert_to: framework.Variant[int] = framework.Variant(0)
+    find_replace_rules: framework.Variant[str] = framework.Variant('[["", ""]]')
 
 
-class StringAndNumber(QWidget):
-    '''String and number option'''
+class PreviewDialog(QtWidgets.QDialog):
+    """Dialog to show a before/after preview of renamed nodes."""
 
     def __init__(
         self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
+        changes: list[tuple[str, str]],
+        parent: QtWidgets.QWidget | None = None,
     ) -> None:
-        super().__init__(parent, flag)
+        """Initializes the preview dialog.
 
-        main_layout: QVBoxLayout = QVBoxLayout(self)
+        Args:
+            changes (list[tuple[str, str]]): A list containing tuples of
+                (old_name, new_name).
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+        """
+        super().__init__(parent)
+        self.setWindowTitle("Rename Preview")
+        self.resize(500, 400)
+
+        layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+
+        tree: widgets.TreeWidget = widgets.TreeWidget(self)
+        tree.setHeaderLabels(["Current Name", "New Name"])
+        tree.setAlternatingRowColors(True)
+        tree.setRootIsDecorated(False)
+        tree.setSelectionMode(
+            QtWidgets.QAbstractItemView.SelectionMode.NoSelection
+        )
+        layout.addWidget(tree)
+
+        for old_name, new_name in changes:
+            item: QtWidgets.QTreeWidgetItem = QtWidgets.QTreeWidgetItem(
+                [old_name, new_name]
+            )
+            item.setForeground(1, QtGui.QColor("#73d216"))
+            tree.addTopLevelItem(item)
+
+        tree.resizeColumnToContents(0)
+
+        btn_layout: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout()
+        layout.addLayout(btn_layout)
+        btn_layout.addStretch()
+
+        button: QtWidgets.QPushButton = QtWidgets.QPushButton("Apply", self)
+        button.clicked.connect(self.accept)
+        btn_layout.addWidget(button)
+
+        button = QtWidgets.QPushButton("Cancel", self)
+        button.clicked.connect(self.reject)
+        btn_layout.addWidget(button)
+
+
+class StringAndNumber(QtWidgets.QWidget):
+    """String and number option tab."""
+
+    applied = QtCore.Signal(bool)
+
+    def __init__(
+        self,
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Widget,
+    ) -> None:
+        """Initializes the String and Number tab.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The window flags.
+                Defaults to Widget.
+        """
+        super().__init__(parent, flag)
+        main_layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 10, 0, 0)
 
         form_layout: widgets.FormLayout = widgets.FormLayout()
         main_layout.addLayout(form_layout)
 
-        self.__base_name: QLineEdit = QLineEdit(self)
-        form_layout.addRow(widgets.FormLabel('Base Name'), self.__base_name)
+        self.__base_name: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
+        form_layout.addRow(widgets.FormLabel("Base Name"), self.__base_name)
 
-        self.__start_number: QLineEdit = QLineEdit(self)
-        self.__start_number.setToolTip('Can be input string : [A-Z][a-z][0-9]')
-        form_layout.addRow(widgets.FormLabel('Start'), self.__start_number)
+        self.__start_number: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
+        self.__start_number.setToolTip("Can be input string : [A-Z][a-z][0-9]")
+        form_layout.addRow(widgets.FormLabel("Start"), self.__start_number)
 
-        self.__padding: QSpinBox = QSpinBox(self)
+        self.__padding: QtWidgets.QSpinBox = QtWidgets.QSpinBox(self)
         self.__padding.setRange(1, 256)
-        self.__padding.setButtonSymbols(QSpinBox.NoButtons)
         self.__padding.setMinimumWidth(70)
-        form_layout.addRow(widgets.FormLabel('Padding'), self.__padding)
+        form_layout.addRow(widgets.FormLabel("Padding"), self.__padding)
 
-        self.__suffix: QLineEdit = QLineEdit(self)
-        form_layout.addRow(widgets.FormLabel('Suffix'), self.__suffix)
+        self.__suffix: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
+        form_layout.addRow(widgets.FormLabel("Suffix"), self.__suffix)
 
-        button: QPushButton = QPushButton('Apply', self)
-        button.clicked.connect(self.apply)
-        main_layout.addWidget(button)
+        btn_layout: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout()
+        main_layout.addLayout(btn_layout)
 
-    def load_settings(self) -> None:
-        '''Load ui settings from file.'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.__base_name.setText(settings.base_name.value())
-        self.__start_number.setText(settings.start_number.value())
-        self.__padding.setValue(settings.padding.value())
-        self.__suffix.setText(settings.suffix.value())
+        button: QtWidgets.QPushButton = QtWidgets.QPushButton("Preview", self)
+        button.clicked.connect(lambda: self.applied.emit(True))
+        btn_layout.addWidget(button)
 
-    def save_settings(self) -> None:
-        '''Save ui settings to file.'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.base_name.set_value(self.__base_name.text())
-        settings.start_number.set_value(self.__start_number.text())
-        settings.padding.set_value(self.__padding.value())
-        settings.suffix.set_value(self.__suffix.text())
-        settings.write()
+        button = QtWidgets.QPushButton("Apply", self)
+        button.clicked.connect(lambda: self.applied.emit(False))
+        btn_layout.addWidget(button)
 
-    def reset_settings(self) -> None:
-        '''Reset ui settings.'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
+    def base_name(self) -> str:
+        """Gets the base name string.
 
-    @widgets.undo
-    def apply(self) -> None:
-        '''Do it'''
+        Returns:
+            str: The current base name.
+        """
+        return self.__base_name.text()
+
+    def set_base_name(self, value: str) -> None:
+        """Sets the base name string.
+
+        Args:
+            value (str): The new base name to set.
+        """
+        self.__base_name.setText(value)
+
+    def start_number(self) -> str:
+        """Gets the start number or character sequence.
+
+        Returns:
+            str: The current start sequence.
+        """
+        return self.__start_number.text()
+
+    def set_start_number(self, value: str) -> None:
+        """Sets the start number or character sequence.
+
+        Args:
+            value (str): The new start sequence to set.
+        """
+        self.__start_number.setText(value)
+
+    def padding(self) -> int:
+        """Gets the padding value.
+
+        Returns:
+            int: The current padding value.
+        """
+        return self.__padding.value()
+
+    def set_padding(self, value: int) -> None:
+        """Sets the padding value.
+
+        Args:
+            value (int): The new padding value to set.
+        """
+        self.__padding.setValue(value)
+
+    def suffix(self) -> str:
+        """Gets the suffix string.
+
+        Returns:
+            str: The current suffix.
+        """
+        return self.__suffix.text()
+
+    def set_suffix(self, value: str) -> None:
+        """Sets the suffix string.
+
+        Args:
+            value (str): The new suffix to set.
+        """
+        self.__suffix.setText(value)
+
+
+class InsertStringTo(QtWidgets.QWidget):
+    """Insert string to fist/last option tab."""
+
+    applied = QtCore.Signal(bool)
+
+    def __init__(
+        self,
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Widget,
+    ) -> None:
+        """Initializes the Insert String tab.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The window flags.
+                Defaults to Widget.
+        """
+        super().__init__(parent, flag)
+        main_layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 10, 0, 0)
+
+        form_layout: widgets.FormLayout = widgets.FormLayout()
+        main_layout.addLayout(form_layout)
+
+        self.__insert: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
+        form_layout.addRow(widgets.FormLabel("String"), self.__insert)
+
+        self.__insert_to: QtWidgets.QComboBox = QtWidgets.QComboBox(self)
+        self.__insert_to.addItems(["First", "Last"])
+        form_layout.addRow(widgets.FormLabel("Insert to"), self.__insert_to)
+
+        btn_layout: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout()
+        main_layout.addLayout(btn_layout)
+
+        button: QtWidgets.QPushButton = QtWidgets.QPushButton("Preview", self)
+        button.clicked.connect(lambda: self.applied.emit(True))
+        btn_layout.addWidget(button)
+
+        button = QtWidgets.QPushButton("Apply", self)
+        button.clicked.connect(lambda: self.applied.emit(False))
+        btn_layout.addWidget(button)
+
+    def insert(self) -> str:
+        """Gets the string to be inserted.
+
+        Returns:
+            str: The current insert string.
+        """
+        return self.__insert.text()
+
+    def set_insert(self, value: str) -> None:
+        """Sets the string to be inserted.
+
+        Args:
+            value (str): The new insert string to set.
+        """
+        self.__insert.setText(value)
+
+    def insert_to(self) -> int:
+        """Gets the insertion position index.
+
+        Returns:
+            int: The current index (0 for First, 1 for Last).
+        """
+        return self.__insert_to.currentIndex()
+
+    def set_insert_to(self, value: int) -> None:
+        """Sets the insertion position index.
+
+        Args:
+            value (int): The new index to set (0 for First, 1 for Last).
+        """
+        self.__insert_to.setCurrentIndex(value)
+
+
+class FindReplaceRuleWidget(QtWidgets.QWidget):
+    """A single row widget for a find and replace rule."""
+
+    removed = QtCore.Signal(QtWidgets.QWidget)
+
+    def __init__(
+        self,
+        find_str: str = "",
+        replace_str: str = "",
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Widget,
+    ) -> None:
+        """Initializes a rule widget.
+
+        Args:
+            find_str (str, optional): The initial find string. Defaults to "".
+            replace_str (str, optional): The initial replace string.
+                Defaults to "".
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The window flags.
+                Defaults to Widget.
+        """
+        super().__init__(parent, flag)
+        layout: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+
+        self.__search: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
+        self.__search.setPlaceholderText("Find")
+        self.__search.setText(find_str)
+        layout.addWidget(self.__search)
+
+        layout.addWidget(QtWidgets.QLabel("->", self))
+
+        self.__replace: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
+        self.__replace.setPlaceholderText("Replace")
+        self.__replace.setText(replace_str)
+        layout.addWidget(self.__replace)
+
+        button = widgets.IconButton(self)
+        button.set_icon(dcc.get_icon_path("a_close.png"))
+        button.setToolTip("Remove Rule")
+        button.clicked.connect(lambda: self.removed.emit(self))
+        layout.addWidget(button)
+
+    def rule(self) -> tuple[str, str]:
+        """Gets the rule from this widget.
+
+        Returns:
+            tuple[str, str]: A tuple containing the find and replace strings.
+        """
+        return self.__search.text(), self.__replace.text()
+
+
+class FindAndReplace(QtWidgets.QWidget):
+    """Find and replace option tab with dynamic rows."""
+
+    applied = QtCore.Signal(bool)
+
+    def __init__(
+        self,
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Widget,
+    ) -> None:
+        """Initializes the Find and Replace tab.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The window flags.
+                Defaults to Widget.
+        """
+        super().__init__(parent, flag)
+        main_layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(self)
+        main_layout.setContentsMargins(4, 10, 4, 4)
+
+        scroll_area = QtWidgets.QScrollArea(self)
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        main_layout.addWidget(scroll_area)
+
+        self.rules_container: QtWidgets.QWidget = QtWidgets.QWidget(self)
+        scroll_area.setWidget(self.rules_container)
+
+        self.__rules_layout = QtWidgets.QVBoxLayout(self.rules_container)
+        self.__rules_layout.setContentsMargins(0, 0, 0, 0)
+        self.__rules_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
+
+        ctrl_layout: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout()
+        main_layout.addLayout(ctrl_layout)
+
+        ctrl_layout.addStretch()
+
+        button: QtWidgets.QPushButton = QtWidgets.QPushButton(
+            "+ Add Rules", self
+        )
+        button.clicked.connect(lambda: self.add_rule())
+        ctrl_layout.addWidget(button)
+
+        btn_layout: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout()
+        main_layout.addLayout(btn_layout)
+
+        button = QtWidgets.QPushButton("Preview", self)
+        button.clicked.connect(lambda: self.applied.emit(True))
+        btn_layout.addWidget(button)
+
+        button = QtWidgets.QPushButton("Apply", self)
+        button.clicked.connect(lambda: self.applied.emit(False))
+        btn_layout.addWidget(button)
+
+    @QtCore.Slot()
+    def add_rule(self, find: str = "", replace: str = "") -> None:
+        """Adds a new dynamic rule row.
+
+        Args:
+            find (str, optional): The initial find string. Defaults to "".
+            replace (str, optional): The initial replace string. Defaults to "".
+        """
+        rule_widget: FindReplaceRuleWidget = FindReplaceRuleWidget(
+            find, replace, self.rules_container
+        )
+        rule_widget.removed.connect(self.remove_rule)
+        self.__rules_layout.addWidget(rule_widget)
+
+    @QtCore.Slot(QtWidgets.QWidget)
+    def remove_rule(self, widget: QtWidgets.QWidget) -> None:
+        """Removes a dynamic rule row widget.
+
+        Args:
+            widget (QtWidgets.QWidget): The rule widget to be removed.
+        """
+        self.__rules_layout.removeWidget(widget)
+        widget.deleteLater()
+        if self.__rules_layout.count() == 0:
+            self.add_rule()
+
+    def rules(self) -> list[tuple[str, str]]:
+        """Collects the find and replace data from all dynamic rows.
+
+        Returns:
+            list[tuple[str, str]]: A list of (find, replace) tuples.
+        """
+        rules: list[tuple[str, str]] = []
+        for i in range(self.__rules_layout.count()):
+            item: QtWidgets.QLayoutItem = self.__rules_layout.itemAt(i)
+            if item and item.widget():
+                widget: QtWidgets.QWidget = item.widget()
+                if isinstance(widget, FindReplaceRuleWidget):
+                    rules.append(widget.rule())
+
+        return rules
+
+    def set_rules(self, rules: list[list[str]]) -> None:
+        """Populates the dynamic rows from a list of rules.
+
+        Args:
+            rules (list[list[str]]): A list of rule pairs
+                (e.g., [["find1", "replace1"], ...]).
+        """
+        while self.__rules_layout.count():
+            item: QtWidgets.QLayoutItem = self.__rules_layout.takeAt(0)
+            if item and item.widget():
+                item.widget().deleteLater()
+
+        for rule in rules:
+            if len(rule) == 2:
+                self.add_rule(rule[0], rule[1])
+
+        if self.__rules_layout.count() == 0:
+            self.add_rule()
+
+
+class MainWindow(framework.ToolWindow[Settings]):
+    """Tool main window acting as the controller."""
+
+    def __init__(
+        self,
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Widget,
+        unique_id: str = "",
+    ) -> None:
+        """Initializes the main window.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The window flags.
+                Defaults to Widget.
+            unique_id (str, optional): The unique identifier for this window.
+                Defaults to "".
+        """
+        super().__init__(parent, flag, unique_id)
+        self.setWindowTitle(__product__)
+        self.resize(400, 300)
+        self.__tab: QtWidgets.QTabWidget
+        self.__find_and_replace: FindAndReplace
+
+    def create_ui(self, parent: QtWidgets.QWidget) -> None:
+        """Creates the user interface.
+
+        Args:
+            parent (QtWidgets.QWidget): The parent widget to contain the UI.
+        """
+        main_layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(parent)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.__tab = QtWidgets.QTabWidget(self)
+        self.__tab.setDocumentMode(True)
+        main_layout.addWidget(self.__tab)
+
+        string_and_number: StringAndNumber = StringAndNumber(self)
+        string_and_number.applied.connect(self.string_and_number)
+        self.__tab.addTab(string_and_number, "String && Number")
+
+        insert_string_to: InsertStringTo = InsertStringTo(self)
+        insert_string_to.applied.connect(self.insert_string)
+        self.__tab.addTab(insert_string_to, "Insert String To")
+
+        self.__find_and_replace = FindAndReplace(self)
+        self.__find_and_replace.applied.connect(self.find_replace)
+        self.__tab.addTab(self.__find_and_replace, "Find && Replace")
+
+        settings: Settings = self.tool_settings()
+        settings.window_geo.bind(
+            setter=self.restoreGeometry,
+            getter=self.saveGeometry,
+            encoder=utils.qt_to_ascii,
+            decoder=utils.ascii_to_qt,
+        )
+        settings.base_name.bind(
+            setter=string_and_number.set_base_name,
+            getter=string_and_number.base_name,
+        )
+        settings.start_number.bind(
+            setter=string_and_number.set_start_number,
+            getter=string_and_number.start_number,
+        )
+        settings.padding.bind(
+            setter=string_and_number.set_padding,
+            getter=string_and_number.padding,
+        )
+        settings.suffix.bind(
+            setter=string_and_number.set_suffix,
+            getter=string_and_number.suffix,
+        )
+        settings.insert_str.bind(
+            setter=insert_string_to.set_insert,
+            getter=insert_string_to.insert,
+        )
+        settings.insert_to.bind(
+            setter=insert_string_to.set_insert_to,
+            getter=insert_string_to.insert_to,
+        )
+        settings.find_replace_rules.bind(
+            setter=self.__find_and_replace.set_rules,
+            getter=self.__find_and_replace.rules,
+        )
+
+    def string_and_number(self, preview: bool) -> None:
+        """Executes the string and number logic.
+
+        Args:
+            preview (bool): If True, runs in preview mode without modifying
+                the scene.
+        """
         self.save_settings()
-        settings: Settings = Settings.instance(__name__, True)
+        settings: Settings = self.tool_settings()
         base_name: str = settings.base_name.value()
         start: str = settings.start_number.value()
         padding: int = settings.padding.value()
         suffix: str = settings.suffix.value()
-        find: str = ''
-        replace: str = ''
+
+        find: str = ""
+        replace: str = ""
         number: int = 0
-        if re.search('^[0-9]*$', start):
-            find = '^.*$'
-            replace = f'{base_name}@i<{padding}>{suffix}'
+        if re.search("^[0-9]*$", start):
+            find = "^.*$"
+            replace = f"{base_name}@i<{padding}>{suffix}"
             number = int(start)
 
-        elif re.search('^[a-zA-Z]*$', start):
-            tag: str = 'j'
-            if re.search('^[A-Z]*$', start):
-                tag = 'J'
-
-            find = '^.*$'
-            replace = f'{base_name}@{tag}<{padding}>{suffix}'
+        elif re.search("^[a-zA-Z]*$", start):
+            tag: str = "J" if re.search("^[A-Z]*$", start) else "j"
+            find = "^.*$"
+            replace = f"{base_name}@{tag}<{padding}>{suffix}"
             number = char_to_num(start.upper())
 
         else:
-            _logger.error('Start has no legal characters.')
+            _logger.error("Start has no legal characters.")
             return
 
-        rename(find, replace, number)
+        self.rename([(find, replace)], number, preview)
 
+    def insert_string(self, preview: bool) -> None:
+        """Executes the insert string logic.
 
-class InsertStringTo(QWidget):
-    '''Insert string to fist/last option'''
-
-    def __init__(
-        self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-    ) -> None:
-        super().__init__(parent, flag)
-
-        main_layout: QVBoxLayout = QVBoxLayout(self)
-
-        form_layout: widgets.FormLayout = widgets.FormLayout()
-        main_layout.addLayout(form_layout)
-
-        self.__insert_str: QLineEdit = QLineEdit(self)
-        form_layout.addRow(widgets.FormLabel('String'), self.__insert_str)
-
-        self.__insert_to: widgets.RadioButtons = widgets.RadioButtons(self)
-        self.__insert_to.set_labels(('First', 'Last'))
-        form_layout.addRow(widgets.FormLabel('Insert to'), self.__insert_to)
-
-        button = QPushButton('Apply', self)
-        button.clicked.connect(self.apply)
-        main_layout.addWidget(button)
-
-    def load_settings(self) -> None:
-        '''Load ui settings from file.'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.__insert_str.setText(settings.insert_str.value())
-        self.__insert_to.set_check_id(settings.insert_to.value())
-
-    def save_settings(self) -> None:
-        '''Save ui settings to file.'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.insert_str.set_value(self.__insert_str.text())
-        settings.insert_to.set_value(self.__insert_to.check_id())
-        settings.write()
-
-    def reset_settings(self) -> None:
-        '''Reset ui settings.'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
-
-    @widgets.undo
-    def apply(self) -> None:
-        '''Do it'''
+        Args:
+            preview (bool): If True, runs in preview mode without modifying
+                the scene.
+        """
         self.save_settings()
-        settings: Settings = Settings.instance(__name__, True)
-        find: str = ''
-        replace: str = ''
+        settings: Settings = self.tool_settings()
+        insert_str: str = settings.insert_str.value()
+
+        find: str = "^.*$"
         if settings.insert_to.value() == 0:
-            find = '^.*$'
-            replace = f'{settings.insert_str.value()}@g<0>'
+            replace: str = f"{insert_str}@g<0>"
+        else:
+            replace = f"@g<0>{insert_str}"
+
+        self.rename([(find, replace)], preview=preview)
+
+    def find_replace(self, preview: bool) -> None:
+        """Executes the multiple find and replace logic.
+
+        Args:
+            preview (bool): If True, runs in preview mode without modifying
+                the scene.
+        """
+        self.save_settings()
+        raw_rules: list[tuple[str, str]] = self.__find_and_replace.rules()
+        rules: list[tuple[str, str]] = []
+        for find, replace in raw_rules:
+            rules.append((find.replace("*", ".*"), replace))
+
+        self.rename(rules, preview=preview)
+
+    @dcc.undo
+    def rename(
+        self,
+        rules: list[tuple[str, str]],
+        number: int = 0,
+        preview: bool = False,
+    ) -> None:
+        """A wrapper for the core renaming logic to handle UI updates and
+        undo grouping.
+
+        Args:
+            rules (list[tuple[str, str]]): A list of (find, replace) tuples.
+            number (int, optional): The initial number for sequential renaming.
+                Defaults to 0.
+            preview (bool, optional): If True, opens the preview dialog
+                instead of applying directly. Defaults to False.
+        """
+        if preview:
+            changes: list[tuple[str, str]] = rename(rules, number, preview=True)
+            if not changes:
+                _logger.warning("No nodes will be renamed.")
+                return
+
+            dialog: PreviewDialog = PreviewDialog(changes, self)
+            result: int = dialog.exec_()
+            if result == QtWidgets.QDialog.DialogCode.Accepted:
+                rename(rules, number, preview=False)
 
         else:
-            find = '^.*$'
-            replace = f'@g<0>{settings.insert_str.value()}'
-
-        rename(find, replace)
+            rename(rules, number, preview=False)
 
 
-class FindAndReplace(QWidget):
-    '''Find and replace option'''
-
-    def __init__(
-        self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-    ) -> None:
-        super().__init__(parent, flag)
-
-        main_layout: QVBoxLayout = QVBoxLayout(self)
-
-        form_layout: widgets.FormLayout = widgets.FormLayout()
-        main_layout.addLayout(form_layout)
-
-        self.__find_str: QLineEdit = QLineEdit(self)
-        self.__find_str.setToolTip('Any character is *')
-        form_layout.addRow(widgets.FormLabel('Find'), self.__find_str)
-
-        self.__replace_str: QLineEdit = QLineEdit(self)
-        form_layout.addRow(widgets.FormLabel('Replace'), self.__replace_str)
-
-        button = QPushButton('Apply', self)
-        button.clicked.connect(self.apply)
-        main_layout.addWidget(button)
-
-    def load_settings(self) -> None:
-        '''Load ui settings from file.'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.__find_str.setText(settings.find_str.value())
-        self.__replace_str.setText(settings.replace_str.value())
-
-    def save_settings(self) -> None:
-        '''Save ui settings to file.'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.find_str.set_value(self.__find_str.text())
-        settings.replace_str.set_value(self.__replace_str.text())
-        settings.write()
-
-    def reset_settings(self) -> None:
-        '''Reset ui settings.'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
-
-    @widgets.undo
-    def apply(self) -> None:
-        '''Do it'''
-        self.save_settings()
-        settings: Settings = Settings.instance(__name__, True)
-        find_str: str = settings.find_str.value()
-        replace_str: str = settings.replace_str.value()
-        rename(find_str.replace('*', '.*'), replace_str)
-
-
-class NameRefiner(QWidget):
-    '''A toolset for refining and standardizing node names in the scene.'''
-
-    def __init__(
-        self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-    ) -> None:
-        super().__init__(parent, flag)
-
-        main_layout: QVBoxLayout = QVBoxLayout(self)
-
-        button = QPushButton('Normalize Shape Name', self)
-        button.clicked.connect(self.normalize_shape_name)
-        main_layout.addWidget(button)
-
-        button = QPushButton('Normalize Shading Engine Name', self)
-        button.clicked.connect(self.normalize_shading_engine_name)
-        main_layout.addWidget(button)
-
-        button = QPushButton('Remove \'pasted__\'', self)
-        button.clicked.connect(self.remove_pasted)
-        main_layout.addWidget(button)
-
-        main_layout.addStretch(True)
-
-    @widgets.undo
-    def normalize_shape_name(self) -> None:
-        '''Do it'''
-        normalize_shape_name_from_selection()
-
-    @widgets.undo
-    def normalize_shading_engine_name(self) -> None:
-        '''Do it'''
-        normalize_shading_engine_name_from_selection()
-
-    @widgets.undo
-    def remove_pasted(self) -> None:
-        '''Do it'''
-        remove_pasted()
-
-
-class SameNameFinder(QWidget):
-    '''Same name finder'''
-
-    def __init__(
-        self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-    ) -> None:
-        super().__init__(parent, flag)
-
-        main_layout: QGridLayout = QGridLayout(self)
-
-        self.__model = QStandardItemModel(0, 1, self)
-        self.__model.setHeaderData(0, Qt.Horizontal, 'Node')
-        self.__model.itemChanged.connect(self.item_changed_callback)
-
-        self.__selection_model = QItemSelectionModel(self.__model)
-        self.__selection_model.selectionChanged.connect(self.select_callback)
-
-        self.__view = QTreeView(self)
-        self.__view.setSelectionMode(QTreeView.ExtendedSelection)
-        self.__view.setAlternatingRowColors(True)
-        self.__view.setModel(self.__model)
-        self.__view.setSelectionModel(self.__selection_model)
-        main_layout.addWidget(self.__view, 0, 0, 1, 2)
-
-        button = QPushButton('Update', self)
-        button.clicked.connect(self.update_view)
-        main_layout.addWidget(button, 1, 0)
-
-        button = QPushButton('Expand Selected', self)
-        button.clicked.connect(self.expand_selected)
-        main_layout.addWidget(button, 1, 1)
-
-    @Slot()
-    def update_view(self) -> None:
-        '''Update my view'''
-        self.__model.removeRows(0, self.__model.rowCount())
-        same_nodes: list[str] = find_same_name_node()
-        same_name_groups: dict[str, QStandardItem] = {}
-        for node in same_nodes:
-            short_name: str = node.split('|')[-1]
-            if short_name not in same_name_groups:
-                same_name_groups[short_name] = QStandardItem()
-                same_name_groups[short_name].setEditable(False)
-                same_name_groups[short_name].setText(short_name)
-                same_name_groups[short_name].setData(f'*{short_name}*')
-                # same_name_groups[short_name].setIcon()
-                self.__model.appendRow(same_name_groups[short_name])
-
-            item: QStandardItem = QStandardItem()
-            item.setText(node)
-            item.setData(node)
-            item.setEditable(True)
-            same_name_groups[short_name].setChild(
-                same_name_groups[short_name].rowCount(), item
-            )
-
-    @Slot()
-    def expand_selected(self) -> None:
-        '''Expand selected in my view.'''
-        indexes: list[QModelIndex] = self.__selection_model.selectedIndexes()
-        for index in indexes:
-            self.__view.expand(index)
-
-    @widgets.undo
-    def item_changed_callback(self, item: QStandardItem) -> None:
-        '''Item changed callback.'''
-        self.__model.blockSignals(True)
-        try:
-            new_name: str = cmds.rename(item.data(), item.text().split('|')[-1])
-            item.setText(new_name)
-            item.setData(new_name)
-        except RuntimeError:
-            _logger.error('Failed rename : %s', item.data())
-            item.setText(item.data())
-
-        self.__model.blockSignals(False)
-
-    @widgets.undo
-    def select_callback(self, *args: Any, **kwargs: Any) -> None:
-        '''select callback.'''
-        indexes: list[QModelIndex] = self.__selection_model.selectedIndexes()
-        if not indexes:
-            return
-
-        nodes: list[str] = []
-        for index in indexes:
-            nodes.append(self.__model.itemFromIndex(index).data())
-
-        if nodes:
-            cmds.select(*nodes)
-        else:
-            cmds.select(clear=True)
-
-
-class MainWindow(widgets.ToolWidget):
-    '''Tool main window'''
-
-    def __init__(
-        self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-        unique_id: str = '',
-    ) -> None:
-        '''Initialize widget.'''
-        super().__init__(parent, flag, unique_id)
-        self.setWindowTitle(__product__)
-        self.resize(400, 200)
-
-        option_widget: QWidget = self.option_widget()
-
-        main_layout: QGridLayout = QGridLayout()
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        option_widget.setLayout(main_layout)
-
-        self.__string_and_number: StringAndNumber = StringAndNumber(self)
-        self.__insert_string_to: InsertStringTo = InsertStringTo(self)
-        self.__find_and_replace: FindAndReplace = FindAndReplace(self)
-
-        self.__tab = QTabWidget(self)
-        self.__tab.setDocumentMode(True)
-        self.__tab.addTab(self.__string_and_number, 'String && Number')
-        self.__tab.addTab(self.__insert_string_to, 'Insert String To')
-        self.__tab.addTab(self.__find_and_replace, 'Find && Replace')
-        self.__tab.addTab(NameRefiner(self), 'Refine')
-        self.__tab.addTab(SameNameFinder(self), 'Same Name')
-        main_layout.addWidget(self.__tab, 0, 0)
-
-    # override
-    def load_settings(self) -> None:
-        '''Load ui settings from file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
-        self.__string_and_number.load_settings()
-        self.__insert_string_to.load_settings()
-        self.__find_and_replace.load_settings()
-
-    # override
-    def save_settings(self) -> None:
-        '''Save ui settings to file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
-        self.__string_and_number.save_settings()
-        self.__insert_string_to.save_settings()
-        self.__find_and_replace.save_settings()
-        settings.write()
-
-    # override
-    def reset_settings(self) -> None:
-        '''Reset ui settings.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
-
-    # override
-    def about(self) -> None:
-        '''Show a about dialog.[override]'''
-        widgets.AboutDialog.info(
-            self, __product__, __version__, __copyright__, __doc__
-        )
-
-    @widgets.undo
-    def apply(self) -> None:
-        '''Apply[override]'''
-        self.save_settings()
-        main()
-
-
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
 def num_to_char(v: int, padding: int, is_lower: bool = False) -> str:
-    '''Number to character'''
-    result: str = ''
+    """Converts an integer to an alphabetical sequence (e.g., 1 -> A, 27 -> AA).
+
+    Args:
+        v (int): The integer to convert.
+        padding (int): The minimum character padding (e.g., padding=3 -> AAB).
+        is_lower (bool, optional): If True, returns lowercase characters.
+            Defaults to False.
+
+    Returns:
+        str: The alphabetical sequence.
+    """
+    result: str = ""
     abc: list[str] = [chr(x) for x in range(65, 91)]
     while v > 0:
         result = abc[(v % len(abc)) - 1] + result
@@ -520,7 +693,7 @@ def num_to_char(v: int, padding: int, is_lower: bool = False) -> str:
 
     if len(result) < padding:
         d: int = padding - len(result)
-        result = ('A' * d) + result
+        result = ("A" * d) + result
 
     if is_lower:
         result = result.lower()
@@ -529,246 +702,239 @@ def num_to_char(v: int, padding: int, is_lower: bool = False) -> str:
 
 
 def char_to_num(chars: str) -> int:
-    '''Character to number'''
+    """Converts an alphabetical sequence back to an integer.
+
+    Args:
+        chars (str): The string of characters to convert (e.g., 'A', 'AA').
+
+    Returns:
+        int: The resulting integer.
+    """
     num: int = 0
     for c in chars:
         num = num * 26 + (ord(c) - 64)
     return num
 
 
-def normalize_shape_name(node: str) -> None:
-    '''Normalize shape name from transform.'''
-    shapes: list[str] = cmds.listRelatives(node, shapes=True, path=True) or []
-    if not shapes:
-        return
+def apply_rule(string: str, find: str, replace: str, number: int) -> str:
+    """Applies a single find/replace rule resolving special formatting tokens.
 
-    is_solo: bool = len(shapes) == 1
-    for i, shape in enumerate(shapes):
-        try:
-            short_name: str = node.split('|')[-1]
-            if is_solo:
-                cmds.rename(shape, f'{short_name}Shape')
-            else:
-                cmds.rename(shape, f'{short_name}{i}Shape')
+    Supports advanced replacement tokens such as:
+    @g<X> for Regex Groups
+    @u<X> for Uppercase
+    @l<X> for Lowercase
+    @ul<X> for Swapcase
+    @i<X> for Incrementing Integer
+    @J<X> for Uppercase Alphabetical
+    @j<X> for Lowercase Alphabetical
 
-        except RuntimeError as error:
-            _logger.error('Failed to rename : %s', error)
+    Args:
+        string (str): The input string to modify.
+        find (str): The regex pattern to find.
+        replace (str): The replacement string potentially containing special tokens.
+        number (int): The sequence number for incremental replacement.
 
+    Returns:
+        str: The modified string.
+    """
+    base_string: str = string
+    temp: str = string
 
-def normalize_shape_name_from_selection() -> None:
-    '''Normalize shape name from transform.'''
-    selection: list[str] = cmds.ls(selection=True, type='transform')
-    if not selection:
-        _logger.error('Select nodes to normalize shape name.')
-        return
-
-    for node in selection:
-        normalize_shape_name(node)
-
-    _logger.info('Done.')
-
-
-def normalize_shading_engine_name(node: str) -> None:
-    '''Normalize shading engine name from material.'''
-    # Ignore default matrials.
-    if node in [
-        'lambert1',
-        'particleCloud1',
-        'shaderGlow1',
-        'standardSurface1',
-    ]:
-        return
-
-    shading_engine: list[str] = (
-        cmds.listConnections(
-            node, source=False, destination=True, type='shadingEngine'
-        )
-        or []
-    )
-    if not shading_engine:
-        return
-
-    try:
-        cmds.rename(shading_engine[0], f'{node}SG')
-    except RuntimeError as error:
-        _logger.error('Failed to rename : %s', error)
-
-
-def normalize_shading_engine_name_from_selection() -> None:
-    '''Normalize shading engine name from transform.'''
-    selection: list[str] = cmds.ls(selection=True, materials=True)
-    if not selection:
-        _logger.error('Select nodes to normalize shading engine name.')
-        return
-
-    for node in selection:
-        normalize_shading_engine_name(node)
-
-    _logger.info('Done.')
-
-
-def remove_pasted() -> None:
-    '''Removes the 'pasted__' prefix from all scene nodes.'''
-    cmds.select('pasted__*')
-    cmds.select('pasted__*', add=True, allDependencyNodes=True)
-    nodes: list[str] = cmds.ls(selection=True)
-    if not nodes:
-        _logger.info('No \'pasted__\' nodes found.')
-
-    rename('pasted__', '')
-    _logger.info('Done.')
-
-
-def find_same_name_node() -> list[str]:
-    '''Find same name node in scene.'''
-    result: list[str] = []
-    iter_dag: OpenMaya.MItDag = OpenMaya.MItDag(
-        OpenMaya.MItDag.kDepthFirst, OpenMaya.MFn.kBase
-    )
-    dag_fn: OpenMaya.MFnDagNode = OpenMaya.MFnDagNode()
-    while not iter_dag.isDone():
-        dag_fn.setObject(iter_dag.currentItem())
-        if not dag_fn.isInstanced():
-            path: OpenMaya.MDagPath = dag_fn.getPath()
-            node_name: str = path.partialPathName()
-            if len(node_name.split('|')) >= 2:
-                result.append(node_name)
-
-        iter_dag.next()
-    return result
-
-
-def expression_to_string(
-    string: str, find: str, replace: str, number: int = 0
-) -> str:
-    '''Return new name fron expression.'''
     # @g<*>
     for i in range(9):
-        u2: re.Match[str] | None = re.search(rf'@g<[{i}]>', replace)
+        u2: re.Match[str] | None = re.search(rf"@g<[{i}]>", replace)
         if u2:
-            myid = int(re.sub(r'@g<|>', '', u2.group(0)))
-            match_value: re.Match[str] | None = re.search(find, string)
+            myid = int(re.sub(r"@g<|>", "", u2.group(0)))
+            match_value: re.Match[str] | None = re.search(find, base_string)
             if match_value:
-                value: str = match_value.group(myid)
-                replace = re.sub(rf'@g<{i}>', value, replace)
-
+                try:
+                    value: str = match_value.group(myid)
+                    replace = re.sub(rf"@g<{i}>", value, replace)
+                except IndexError:
+                    replace = re.sub(rf"@g<{i}>", "", replace)
             else:
-                replace = re.sub(rf'@g<{i}>', '', replace)
+                replace = re.sub(rf"@g<{i}>", "", replace)
 
-    temp: str = re.sub(find, replace, string)
+    temp = re.sub(find, replace, temp)
 
     # @u<*>
     for i in range(9):
-        upper_cmd: re.Match[str] | None = re.search(rf'@u<[{i}]>', temp)
+        upper_cmd: re.Match[str] | None = re.search(rf"@u<[{i}]>", temp)
         if upper_cmd:
-            myid = int(re.sub(r'@u<|>', '', upper_cmd.group(0)))
-            match_value = re.search(find, string)
+            myid = int(re.sub(r"@u<|>", "", upper_cmd.group(0)))
+            match_value = re.search(find, base_string)
             if match_value:
-                value = match_value.group(myid).upper()
-            temp = re.sub(rf'@u<{i}>', value, temp)
+                try:
+                    value = match_value.group(myid).upper()
+                    temp = re.sub(rf"@u<{i}>", value, temp)
+                except IndexError:
+                    pass
 
     # @l<*>
     for i in range(9):
-        lower_cmd: re.Match[str] | None = re.search(rf'@l<[{i}]>', temp)
+        lower_cmd: re.Match[str] | None = re.search(rf"@l<[{i}]>", temp)
         if lower_cmd:
-            myid = int(re.sub(r'@l<|>', '', lower_cmd.group(0)))
-            match_value = re.search(find, string)
+            myid = int(re.sub(r"@l<|>", "", lower_cmd.group(0)))
+            match_value = re.search(find, base_string)
             if match_value:
-                value = match_value.group(myid).lower()
-            temp = re.sub(rf'@l<{i}>', value, temp)
+                try:
+                    value = match_value.group(myid).lower()
+                    temp = re.sub(rf"@l<{i}>", value, temp)
+                except IndexError:
+                    pass
 
     # @ul<*>
     for i in range(9):
-        swap_cmd: re.Match[str] | None = re.search(rf'@ul<[{i}]>', temp)
+        swap_cmd: re.Match[str] | None = re.search(rf"@ul<[{i}]>", temp)
         if swap_cmd:
-            myid = int(re.sub(r'@ul<|>', '', swap_cmd.group(0)))
-            match_value = re.search(find, string)
+            myid = int(re.sub(r"@ul<|>", "", swap_cmd.group(0)))
+            match_value = re.search(find, base_string)
             if match_value:
-                value = match_value.group(myid).swapcase()
-            temp = re.sub(rf'@ul<{i}>', value, temp)
+                try:
+                    value = match_value.group(myid).swapcase()
+                    temp = re.sub(rf"@ul<{i}>", value, temp)
+                except IndexError:
+                    pass
 
     # @i<*>
-    number_cmd: re.Match[str] | None = re.search(r'@i<[0-9]*>', temp)
+    number_cmd: re.Match[str] | None = re.search(r"@i<[0-9]*>", temp)
     if number_cmd:
-        padding: str = re.sub(r'@i<|>', '', number_cmd.group(0))
-        number_format: str = f'%.{padding}i'
-        replace_str: str = number_format % number
-        temp = re.sub(rf'@i<{padding}>', replace_str, temp)
+        padding_str: str = re.sub(r"@i<|>", "", number_cmd.group(0))
+        if padding_str:
+            padding: int = int(padding_str)
+            number_format: str = f"%.{padding}i"
+            replace_str: str = number_format % number
+            temp = re.sub(rf"@i<{padding}>", replace_str, temp)
 
     # @J<*>
-    number_cmd = re.search(r'@J<[0-9]*>', temp)
+    number_cmd = re.search(r"@J<[0-9]*>", temp)
     if number_cmd:
-        padding_num: int = int(re.sub(r'@J<|>', '', number_cmd.group(0)))
-        replace_str = num_to_char(number, padding_num)
-        temp = re.sub(rf'@J<{padding_num}>', replace_str, temp)
+        padding_str = re.sub(r"@J<|>", "", number_cmd.group(0))
+        if padding_str:
+            padding_num: int = int(padding_str)
+            replace_str = num_to_char(number, padding_num)
+            temp = re.sub(rf"@J<{padding_num}>", replace_str, temp)
 
     # @j<*>
-    number_cmd = re.search(r'@j<[0-9]*>', temp)
+    number_cmd = re.search(r"@j<[0-9]*>", temp)
     if number_cmd:
-        padding_num = int(re.sub(r'@j<|>', '', number_cmd.group(0)))
-        replace_str = num_to_char(number, padding_num, True)
-        temp = re.sub(rf'@j<{padding_num}>', replace_str, temp)
+        padding_str = re.sub(r"@j<|>", "", number_cmd.group(0))
+        if padding_str:
+            padding_num = int(padding_str)
+            replace_str = num_to_char(number, padding_num, True)
+            temp = re.sub(rf"@j<{padding_num}>", replace_str, temp)
 
     return temp
 
 
-def rename(find: str, replace: str, number: int = 0) -> None:
-    '''Renaem nodes form selection'''
+def apply_rules(
+    string: str, rules: list[tuple[str, str]], number: int = 0
+) -> str:
+    """Iterates through all rules to process sequential replacements.
+
+    Args:
+        string (str): The initial string to modify.
+        rules (list[tuple[str, str]]): A list of (find, replace) tuples.
+        number (int, optional): The sequence number. Defaults to 0.
+
+    Returns:
+        str: The final modified string after applying all rules.
+    """
+    temp: str = string
+    for find, replace in rules:
+        temp = apply_rule(temp, find, replace, number)
+
+    return temp
+
+
+def rename(
+    rules: list[tuple[str, str]], number: int = 0, preview: bool = False
+) -> list[tuple[str, str]]:
+    """Core renaming logic handling sequential rules across selected objects.
+
+    Iterates over currently selected nodes in Maya (including Render Setup layers)
+    and applies the renaming rules. It returns a list of the modifications made.
+
+    Args:
+        rules (list[tuple[str, str]]): A list of (find, replace) tuples.
+        number (int, optional): The initial sequence number. Defaults to 0.
+        preview (bool, optional): If True, performs calculations but
+            avoids renaming nodes. Defaults to False.
+
+    Returns:
+        list[tuple[str, str]]: A list of (old_name, new_name) tuples for
+            UI updates or previewing.
+    """
     default_number: int = number
     has_error: bool = False
+    changes: list[tuple[str, str]] = []
 
-    selection = OpenMaya.MGlobal.getActiveSelectionList(True)
+    selection: OpenMaya.MSelectionList = (
+        OpenMaya.MGlobal.getActiveSelectionList(True)
+    )
     rs_selection: list[str] = viewCmds.getSelection(False, False, False, False)
     if not selection and not rs_selection:
-        _logger.error('Select nodes or render layer to rename.')
-        return
+        _logger.error("Select nodes or render layer to rename.")
+        return changes
 
     # From Selection
     for i in range(selection.length()):
         try:
-            # Dag Node
             full_path: str = selection.getDagPath(i).fullPathName()
-            short_name: str = full_path.split('|')[-1]
+            short_name: str = full_path.split("|")[-1]
 
         except TypeError:
-            # DG Node
             mobject: OpenMaya.MObject = selection.getDependNode(i)
             full_path = OpenMaya.MFnDependencyNode(mobject).name()
             short_name = full_path
 
-        new_name: str = expression_to_string(short_name, find, replace, number)
+        new_name: str = apply_rules(short_name, rules, number)
         number += 1
+
         if short_name == new_name:
             continue
 
-        try:
-            cmds.rename(full_path, new_name)
+        changes.append((short_name, new_name))
+        if not preview:
+            try:
+                cmds.rename(full_path, new_name)
 
-        except RuntimeError as error:
-            _logger.error('Failed to rename : %s', error)
-            has_error = True
+            except RuntimeError as error:
+                _logger.error("Failed to rename : %s", error)
+                has_error = True
 
     # From Render Setup Nodes
     number = default_number
-    for i in range(len(rs_selection)):
-        new_name = expression_to_string(rs_selection[i], find, replace, number)
+    for rs_node in rs_selection:
+        new_name = apply_rules(rs_node, rules, number)
         number += 1
-        if rs_selection[i] == new_name:
+
+        if rs_node == new_name:
             continue
 
-        try:
-            layer = utils.nameToUserNode(rs_selection[i])
-            layer.setName(new_name)
+        changes.append((rs_node, new_name))
 
-        except RuntimeError as error:
-            _logger.error('Failed to rename : %s', error)
-            has_error = True
+        if not preview:
+            try:
+                layer: Any | None = rs_utils.nameToUserNode(rs_node)
+                layer.setName(new_name)  # type: ignore
 
-    if not has_error:
-        _logger.info('Done')
+            except RuntimeError as error:
+                _logger.error("Failed to rename : %s", error)
+                has_error = True
+
+    if not has_error and not preview and changes:
+        _logger.info("Done")
+
+    return changes
 
 
-def main(unique_id: str = '') -> None:
-    '''Show window.'''
+def main(unique_id: str = "") -> None:
+    """Entry point to launch the Renamer tool window.
+
+    Args:
+        unique_id (str, optional): The unique identifier for
+            the tool window instance. Defaults to "".
+    """
     window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()

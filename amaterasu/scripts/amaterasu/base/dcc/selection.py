@@ -20,7 +20,8 @@
 """Provides utilities for managing Maya node selections and filtering."""
 
 from __future__ import annotations
-from maya import cmds
+from itertools import product
+from maya import cmds, mel
 from amaterasu.base import utils
 
 ANIMATION_CURVES: list[str] = [
@@ -66,3 +67,65 @@ def filter_animated(nodes: list[str] | None = None) -> utils.Result:
 
     cmds.select(*final_nodes, replace=True)
     return result
+
+
+def get_selected_channel_box_plugs() -> list[str]:
+    """Gets a list of selected plugs (node.attribute) from the Channel Box.
+
+    Returns:
+        list[str]: A list of combined plug strings
+            (e.g., ['pCube1.tx', 'pCube1.ty']).
+    """
+    cb_name: str = mel.eval("$gChannelBoxName=$gChannelBoxName;")
+    if not cb_name:
+        return []
+
+    def _get_plugs(
+        nodes: list[str] | None,
+        attrs: list[str] | None,
+    ) -> list[str]:
+        """Creates a list of full plug names from nodes and attributes.
+
+        Args:
+            nodes (list[str] | None): A list of node names.
+            attrs (list[str] | None): A list of attribute names.
+
+        Returns:
+            list[str]: A list of combined plug strings (e.g., ['node.attr']).
+        """
+        return [f"{n}.{a}" for n, a in product(nodes or [], attrs or [])]
+
+    plugs: list[str] = []
+    plugs.extend(
+        _get_plugs(
+            cmds.channelBox(cb_name, query=True, mainObjectList=True),  # type: ignore
+            cmds.channelBox(cb_name, query=True, selectedMainAttributes=True),  # type: ignore
+        )
+    )
+
+    plugs.extend(
+        _get_plugs(
+            cmds.channelBox(cb_name, query=True, shapeObjectList=True),  # type: ignore
+            cmds.channelBox(cb_name, query=True, selectedShapeAttributes=True),  # type: ignore
+        )
+    )
+
+    plugs.extend(
+        _get_plugs(
+            cmds.channelBox(cb_name, query=True, historyObjectList=True),  # type: ignore
+            cmds.channelBox(
+                cb_name, query=True, selectedHistoryAttributes=True
+            ),  # type: ignore
+        )
+    )
+
+    plugs.extend(
+        _get_plugs(
+            cmds.channelBox(cb_name, query=True, outputObjectList=True),  # type: ignore
+            cmds.channelBox(
+                cb_name, query=True, selectedOutputAttributes=True
+            ),  # type: ignore
+        )
+    )
+
+    return plugs

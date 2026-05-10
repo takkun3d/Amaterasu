@@ -27,16 +27,52 @@ and decoupled from direct DCC API calls.
 """
 
 from __future__ import annotations
+from amaterasu.base.dcc.attribute.create import (
+    add_integer,
+    add_float,
+    add_string,
+    add_boolean,
+    add_enum,
+    add_vector,
+    add_color,
+    add_separator,
+)
+from amaterasu.base.dcc.attribute.query import get_default_value, get_range
 from amaterasu.base.dcc.attribute.lock import (
     lock,
     unlock,
     lock_and_hide,
     unlock_and_show,
 )
+from amaterasu.base.dcc.attribute.sort import reorder_user_attributes
+from amaterasu.base.dcc.attribute.transfer import (
+    TransferBuffer,
+    extract_transfer_buffers,
+    apply_transfer_buffer,
+)
 
 __all__: list[str] = [
+    # create
+    "add_integer",
+    "add_float",
+    "add_string",
+    "add_boolean",
+    "add_enum",
+    "add_vector",
+    "add_color",
+    "add_separator",
+    # query
+    "get_default_value",
+    "get_range",
+    # lock
     "lock",
     "unlock",
     "lock_and_hide",
     "unlock_and_show",
+    # sort
+    "reorder_user_attributes",
+    # transfer
+    "TransferBuffer",
+    "extract_transfer_buffers",
+    "apply_transfer_buffer",
 ]

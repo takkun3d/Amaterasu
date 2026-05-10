@@ -17,40 +17,37 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Locks or unlocks the selected nodes.
+"""Attribute reordering utilities for Maya.
 
-This tool safely changes the lock state of the currently selected
-nodes in the Maya scene, preventing or allowing modifications
-such as deletion or renaming. It utilizes the centralized
-`dcc.node` API for execution.
+This module provides functions to manipulate and reorder user-defined attributes
+on Maya nodes
 """
 
 from __future__ import annotations
 from maya import cmds
-from amaterasu.base import utils
-
-__product__: str = "Lock Node"
-__version__: str = "1.10"
-_logger: utils.Logger = utils.get_logger(__product__)
 
 
-def lock() -> None:
-    """Locks the selected nodes."""
-    selection: list[str] = cmds.ls(selection=True)
-    if not selection:
-        _logger.error("Select node(s) to lock state.")
-        return
+def reorder_user_attributes(node: str, attr_names: list[str]) -> None:
+    """Reorders user-defined attributes on a node.
 
-    cmds.lockNode(*selection, lock=True)
-    _logger.info("Done.")
+    This function uses a known Maya hack: it deletes the attributes in reverse order
+    and then undoes the deletions.
 
+    WARNING: Because of this hack, it MUST NOT be wrapped in an undo chunk,
+    and it will flush Maya's undo queue upon completion.
 
-def unlock() -> None:
-    """Unlocks the selected nodes."""
-    selection: list[str] = cmds.ls(selection=True)
-    if not selection:
-        _logger.error("Select node(s) to unlock state.")
-        return
+    Args:
+        node (str): The name of the Maya node.
+        attr_names (list[str]): The desired order of the attribute names.
 
-    cmds.lockNode(*selection, lock=False)
-    _logger.info("Done.")
+    Raises:
+        RuntimeError: If deleting or undoing fails.
+    """
+    attr_orders_reversed: list[str] = list(reversed(attr_names))
+    for attr in attr_orders_reversed:
+        cmds.deleteAttr(f"{node}.{attr}")
+
+    for _ in range(len(attr_orders_reversed)):
+        cmds.undo()
+
+    cmds.flushUndo()

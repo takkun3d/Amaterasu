@@ -17,40 +17,18 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Locks or unlocks the selected nodes.
+"""Command to remove 'pasted__' prefixes from the scene."""
 
-This tool safely changes the lock state of the currently selected
-nodes in the Maya scene, preventing or allowing modifications
-such as deletion or renaming. It utilizes the centralized
-`dcc.node` API for execution.
-"""
-
-from __future__ import annotations
 from maya import cmds
-from amaterasu.base import utils
+from amaterasu.base import dcc, utils
 
-__product__: str = "Lock Node"
-__version__: str = "1.10"
+__product__ = "Remove 'pasted__'"
+__version__: str = "1.00"
 _logger: utils.Logger = utils.get_logger(__product__)
 
 
-def lock() -> None:
-    """Locks the selected nodes."""
+def main() -> None:
+    """Entry point for the command."""
     selection: list[str] = cmds.ls(selection=True)
-    if not selection:
-        _logger.error("Select node(s) to lock state.")
-        return
-
-    cmds.lockNode(*selection, lock=True)
-    _logger.info("Done.")
-
-
-def unlock() -> None:
-    """Unlocks the selected nodes."""
-    selection: list[str] = cmds.ls(selection=True)
-    if not selection:
-        _logger.error("Select node(s) to unlock state.")
-        return
-
-    cmds.lockNode(*selection, lock=False)
-    _logger.info("Done.")
+    result: utils.Result = dcc.node.remove_pasted_prefixes(selection)
+    result.log(_logger)

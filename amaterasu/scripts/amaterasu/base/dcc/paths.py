@@ -59,6 +59,7 @@ def get_icon_path(file_name: str) -> str:
     for path in icon_path.split(';'):
         fullpath: str = os.path.join(path, file_name)
         if os.path.isfile(fullpath):
+            fullpath = fullpath.replace("\\", "/")
             return fullpath
 
     raise ValueError(f'Not found file: {file_name}')

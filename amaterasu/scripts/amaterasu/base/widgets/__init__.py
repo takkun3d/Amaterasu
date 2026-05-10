@@ -29,13 +29,18 @@ from amaterasu.base.widgets.browse_widget import BrowseWidget
 from amaterasu.base.widgets.color_button import ColorButton
 from amaterasu.base.widgets.color_palette import ColorPalette
 from amaterasu.base.widgets.color_select_button import ColorSelectButton
+from amaterasu.base.widgets.double_range_widget import DoubleRangeWidget
 from amaterasu.base.widgets.form_label import FormLabel
 from amaterasu.base.widgets.form_layout import FormLayout
 from amaterasu.base.widgets.horizontal_line import HorizontalLine
 from amaterasu.base.widgets.icon_button import IconButton
 from amaterasu.base.widgets.index_color_palette import IndexColorPalette
+from amaterasu.base.widgets.list_view_widget import ListWidget
+from amaterasu.base.widgets.node_picker import NodePicker
 from amaterasu.base.widgets.range_slider import RangeSlider
+from amaterasu.base.widgets.tab_widget import TabBarPlus, TabWidget
 from amaterasu.base.widgets.toast import ToastWidget, ToastSignalEmitter
+from amaterasu.base.widgets.tree_widget import TreeWidget
 from amaterasu.base.widgets.vertical_line import VerticalLine
 
 __all__: list[str] = [
@@ -43,13 +48,19 @@ __all__: list[str] = [
     "ColorButton",
     "ColorPalette",
     "ColorSelectButton",
+    "DoubleRangeWidget",
     "IndexColorPalette",
     "FormLabel",
     "FormLayout",
     "HorizontalLine",
     "IconButton",
+    "ListWidget",
+    "NodePicker",
     "RangeSlider",
+    "TabBarPlus",
+    "TabWidget",
     "ToastWidget",
     "ToastSignalEmitter",
+    "TreeWidget",
     "VerticalLine",
 ]

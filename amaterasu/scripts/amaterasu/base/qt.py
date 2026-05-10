@@ -84,14 +84,14 @@ if not TYPE_CHECKING and PYSIDE_VERSION == 2:
     QtGui.QRegularExpressionValidator = QtGui.QRegExpValidator
 
     # Methods
-    for cls in (
-        QtCore.QEventLoop,
-        QtCore.QCoreApplication,
-        QtWidgets.QApplication,
-        QtWidgets.QDialog,
-        QtWidgets.QMenu,
-    ):
-        cls.exec = cls.exec_
+    # for cls in (
+    #     QtCore.QEventLoop,
+    #     QtCore.QCoreApplication,
+    #     QtWidgets.QApplication,
+    #     QtWidgets.QDialog,
+    #     QtWidgets.QMenu,
+    # ):
+    #     cls.exec = cls.exec_
 
     # Flags
     QtCore.Qt.AlignmentFlag = QtCore.Qt
@@ -102,6 +102,19 @@ if not TYPE_CHECKING and PYSIDE_VERSION == 2:
     QtCore.Qt.MouseButton = QtCore.Qt
     QtCore.Qt.Orientation = QtCore.Qt
     QtCore.Qt.MouseButton.MiddleButton = QtCore.Qt.MidButton
+
+else:
+    # Methods
+    for cls in (
+        QtCore.QEventLoop,
+        QtCore.QCoreApplication,
+        QtWidgets.QApplication,
+        QtWidgets.QDialog,
+        QtWidgets.QMenu,
+    ):
+        # cls.exec = cls.exec_
+        if hasattr(cls, "exec") and not hasattr(cls, "exec_"):
+            setattr(cls, "exec_", getattr(cls, "exec"))
 
 
 def wrap_instance(ptr: int, base: type[T]) -> T | None:
