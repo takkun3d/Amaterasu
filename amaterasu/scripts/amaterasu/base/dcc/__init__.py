@@ -28,7 +28,12 @@ path resolution and undo stack management.
 from __future__ import annotations
 from amaterasu.base.dcc.paths import get_icon_path
 from amaterasu.base.dcc.decorators import undo
-from amaterasu.base.dcc.ui import get_maya_window
+from amaterasu.base.dcc.ui import (
+    get_maya_window,
+    find_control,
+    find_layout,
+    find_menu_item,
+)
 
 from amaterasu.base.dcc import project
 from amaterasu.base.dcc import scene
@@ -43,9 +48,15 @@ from amaterasu.base.dcc import space
 from amaterasu.base.dcc import mesh
 
 __all__: list[str] = [
+    # paths
     "get_icon_path",
+    # decorators
     "undo",
+    # ui
     "get_maya_window",
+    "find_control",
+    "find_layout",
+    "find_menu_item",
     #
     "project",
     "scene",
