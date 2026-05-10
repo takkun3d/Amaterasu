@@ -1,70 +1,39 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Combine Shapes
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Combines shapes from selected nodes into the last selected node."""
+
 from __future__ import annotations
 from maya import cmds
-from ..lib import logger
+from amaterasu.base import dcc, utils
 
-
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Combine Shapes'
-__version__: str = '1.00'
-__doc__ = 'Combine Shapes from selected node.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
-
-
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-
-
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
-def apply(parent_node: str, source_nodes: list[str]) -> bool:
-    '''Combine shape.'''
-    result: list[bool] = []
-    for source_node in source_nodes:
-        shapes: list[str] | None = cmds.listRelatives(
-            source_node, shapes=True, path=True
-        )
-        if not shapes:
-            _logger.warning('Does not exists shape : %s', source_node)
-            result.append(False)
-            continue
-
-        for shape in shapes:
-            cmds.parent(shape, parent_node, addObject=True, shape=True)
-
-        cmds.parent(source_node, removeObject=True)
-        result.append(True)
-
-    return all(result)
+__product__: str = "Combine Shapes"
+__version__: str = "1.10"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
 def main() -> None:
-    '''Dot it.'''
-    selection: list[str] = cmds.ls(selection=True, type='transform')
-    if not selection:
-        _logger.error('Select objects to combine shape.')
+    """Executes the combine shape operation on the current selection."""
+    selection: list[str] = cmds.ls(selection=True, type="transform")
+    if len(selection) < 2:
+        _logger.error("Select at least 2 objects to combine shapes.")
         return
 
-    if len(selection) < 2:
-        _logger.error('Select least 2 objects to combine shape.')
-
-    result: bool = apply(selection[-1], selection[0:-1])
-    if result:
-        _logger.info('Done.')
+    result: utils.Result = dcc.shape.combine(selection[-1], selection[:-1])
+    result.log(_logger)

@@ -1,45 +1,44 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Open Work Directory
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Opens the current project directory in the OS file explorer.
+
+This tool retrieves the root directory of the currently active Maya
+project and opens it using the default system file manager (e.g.,
+Windows Explorer, macOS Finder).
+"""
+
 from __future__ import annotations
-from maya import cmds
-from ..lib import logger, utility
+from amaterasu.base import dcc, system, utils
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Open Work Directory'
-__version__: str = '1.00'
-__doc__ = 'Open directory of project in Explorer.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+__product__: str = "Open Work Directory"
+__version__: str = "1.10"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-
-
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
 def main() -> None:
-    '''Open the project in Explorer.'''
-    project_path: str = cmds.workspace(query=True, rootDirectory=True)
-    result: bool = utility.open_directory(project_path)
-    if result == -2:
-        _logger.error('Not supported os.')
-    elif result == -1:
-        _logger.error('Does not exists path : %s', project_path)
-    else:
-        _logger.info('Done.')
+    """Opens the project in Explorer."""
+    project_path: str = dcc.project.get_workspace()
+    if not project_path:
+        _logger.error("Project path is not set.")
+        return
+
+    result: utils.Result = system.open_directory(project_path)
+    if result.status() != utils.ResultStatus.SUCCESS:
+        result.log(_logger)

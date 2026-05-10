@@ -1,123 +1,44 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Xray Geometry
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Enables or disables X-ray mode for selected geometry.
+
+This module provides headless commands to control the X-ray display state
+in the Maya viewport, designed to be executed directly from menus or
+custom shelves.
+"""
+
 from __future__ import annotations
-from typing import TYPE_CHECKING
-from functools import partial
+from amaterasu.base import dcc, utils
 
-try:
-    from PySide2.QtCore import Qt
-    from PySide2.QtWidgets import QWidget, QHBoxLayout, QPushButton
-
-except ImportError:
-    if not TYPE_CHECKING:
-        from PySide6.QtCore import Qt
-        from PySide6.QtWidgets import QWidget, QHBoxLayout, QPushButton
-from maya import cmds
-from ..lib import logger, parser, widgets
+__product__: str = "Xray Geometry"
+__version__: str = "1.20"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Xray Geometry'
-__version__: str = '1.10'
-__doc__ = 'Set Xray for per geometry.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+def enable() -> None:
+    """Enables X-ray mode for the currently selected nodes."""
+    result: utils.Result = dcc.node.set_xray(True)
+    result.log(_logger)
 
 
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-class Settings(parser.ToolSettings):
-    '''Settings for tool.'''
-
-    window_geo: parser.Variant[str] = parser.Variant('')
-
-
-class MainWindow(widgets.ToolWidget):
-    '''Tool main window'''
-
-    def __init__(
-        self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-        unique_id: str = '',
-    ) -> None:
-        '''Initialize widget.'''
-        super().__init__(parent, flag, unique_id)
-        self.setWindowTitle(__product__)
-        self.resize(50, 50)
-
-        option_widget: QWidget = self.option_widget()
-        main_layout: QHBoxLayout = QHBoxLayout(option_widget)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-
-        button: QPushButton = QPushButton('ON', self)
-        button.setMinimumWidth(100)
-        button.clicked.connect(partial(apply, True))
-        main_layout.addWidget(button)
-
-        button = QPushButton('OFF', self)
-        button.setMinimumWidth(100)
-        button.clicked.connect(partial(apply, False))
-        main_layout.addWidget(button)
-
-    # override
-    def load_settings(self) -> None:
-        '''Load ui settings from file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
-
-    # override
-    def save_settings(self) -> None:
-        '''Save ui settings to file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
-        settings.write()
-
-    # override
-    def reset_settings(self) -> None:
-        '''Reset ui settings.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
-
-    # override
-    def about(self) -> None:
-        '''Show a about dialog.[override]'''
-        widgets.AboutDialog.info(
-            self, __product__, __version__, __copyright__, __doc__
-        )
-
-
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
-@widgets.undo
-def apply(xray: bool) -> None:
-    '''Apply according to the setting.'''
-    selection: list[str] = cmds.ls(selection=True)
-    if not selection:
-        _logger.error('Select one or more nodes to set xray.')
-        return
-
-    for node in selection:
-        cmds.displaySurface(node, xRay=xray)
-
-
-def main(unique_id: str = '') -> None:
-    '''Show window.'''
-    window: MainWindow = MainWindow(unique_id=unique_id)
-    window.show()
+def disable() -> None:
+    """Disables X-ray mode for the currently selected nodes."""
+    result: utils.Result = dcc.node.set_xray(False)
+    result.log(_logger)

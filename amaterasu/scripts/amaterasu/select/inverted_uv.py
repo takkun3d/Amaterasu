@@ -1,81 +1,54 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Select Inverted UV
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Selects inverted UV faces."""
+
 from __future__ import annotations
-from maya import OpenMaya
-from ..lib import logger
+from maya import cmds, mel
+from amaterasu.base import dcc, utils
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Select Inverted UV'
-__version__: str = '1.00'
-__doc__ = 'Select inverted uv.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+__product__: str = "Select Inverted UV"
+__version__: str = "1.10"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-
-
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
 def main() -> None:
-    '''Do it.'''
-    selection: OpenMaya.MSelectionList = OpenMaya.MSelectionList()
-    OpenMaya.MGlobal.getActiveSelectionList(selection)
-    if selection.length() == 0:
-        _logger.error('Select polygon to pick out inverted uvs.')
+    """Executes the select inverted UV operation."""
+    selection: list[str] = cmds.ls(selection=True) or []
+    if not selection:
+        _logger.error(
+            "Select polygon nodes or components to find inverted UVs."
+        )
         return
 
-    select_iter: OpenMaya.MItSelectionList = OpenMaya.MItSelectionList(
-        selection
-    )
-    result: OpenMaya.MSelectionList = OpenMaya.MSelectionList()
-    while not select_iter.isDone():
-        dag_path: OpenMaya.MDagPath = OpenMaya.MDagPath()
-        component: OpenMaya.MObject = OpenMaya.MObject()
-        select_iter.getDagPath(dag_path, component)
-
-        # TODO: Check if it's a mesh
-        fn_mesh: OpenMaya.MFnMesh = OpenMaya.MFnMesh(dag_path)
-        poly_iter: OpenMaya.MItMeshPolygon = OpenMaya.MItMeshPolygon(
-            dag_path, component
+    faces: list[str] = dcc.mesh.to_face(selection)
+    if not faces:
+        _logger.error(
+            "Select polygon vertices, edges, or faces to find hard edge shells."
         )
-        while not poly_iter.isDone():
-            normal: OpenMaya.MVector = OpenMaya.MVector()
-            fn_mesh.getPolygonNormal(poly_iter.index(), normal)
+        return
 
-            tangents: OpenMaya.MFloatVectorArray = OpenMaya.MFloatVectorArray()
-            fn_mesh.getFaceVertexTangents(poly_iter.index(), tangents)
-            tangent: OpenMaya.MFloatVector = tangents[0]
+    inverted_faces: list[str] = dcc.mesh.get_inverted_uv_faces(faces)
+    if not inverted_faces:
+        _logger.info("There were no inverted UVs in this selection.")
+        return
 
-            binormals: OpenMaya.MFloatVectorArray = OpenMaya.MFloatVectorArray()
-            fn_mesh.getFaceVertexBinormals(poly_iter.index(), binormals)
-            binormal: OpenMaya.MFloatVector = binormals[0]
-
-            cross: OpenMaya.MFloatVector = tangent ^ binormal
-            dot: float = OpenMaya.MFloatVector(normal) * cross
-
-            if dot < 0:
-                result.add(dag_path, poly_iter.currentItem())
-
-            poly_iter.next()
-
-        select_iter.next()
-
-    OpenMaya.MGlobal.setActiveSelectionList(result)
-    _logger.info('Done.')
+    mel.eval("SelectFacetMask")
+    cmds.select(*inverted_faces, replace=True)
+    _logger.info("Done.")
