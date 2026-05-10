@@ -17,13 +17,75 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-""""""
+"""Utilities for integrating Qt widgets with Autodesk Maya's UI elements.
+
+This module provides helper functions to retrieve and wrap internal Maya UI
+components (like windows, controls, layouts, and menus) into accessible Qt
+widget instances using OpenMayaUI.MQtUtil.
+"""
+
+from typing import TypeVar
 from maya import OpenMayaUI
-from amaterasu.base.qt import QtWidgets, wrap_instance
+from amaterasu.base.qt import QtCore, QtWidgets, wrap_instance
+
+T = TypeVar("T", bound=QtCore.QObject)
 
 
-def get_maya_window() -> QtWidgets.QWidget | None:
-    """"""
+def get_maya_window() -> QtWidgets.QMainWindow | None:
+    """Retrieves the main Maya application window as a Qt widget.
+
+    Returns:
+        QtWidgets.QMainWindow | None: The main window instance,
+            or None if it cannot be found.
+    """
     return wrap_instance(
-        int(OpenMayaUI.MQtUtil.mainWindow()), QtWidgets.QWidget
+        int(OpenMayaUI.MQtUtil.mainWindow()), QtWidgets.QMainWindow
     )
+
+
+def find_control(item: str, widget_type: type[T]) -> T | None:
+    """Finds a Maya control by its UI string name and wraps it into a Qt widget.
+
+    Args:
+        item (str): The string name of the Maya control.
+        widget_type (type[T]): The expected Qt class type
+            (e.g., QtWidgets.QPushButton).
+
+    Returns:
+        T | None: The wrapped Qt widget instance,
+            or None if the control is not found.
+    """
+    ptr: int = int(OpenMayaUI.MQtUtil.findControl(item))
+    return wrap_instance(int(ptr), widget_type)
+
+
+def find_layout(item: str, widget_type: type[T]) -> T | None:
+    """Finds a Maya layout by its UI string name and wraps it into a Qt widget.
+
+    Args:
+        item (str): The string name of the Maya layout.
+        widget_type (type[T]): The expected Qt class type
+            (e.g., QtWidgets.QVBoxLayout).
+
+    Returns:
+        T | None: The wrapped Qt layout instance,
+            or None if the layout is not found.
+    """
+    ptr: int = int(OpenMayaUI.MQtUtil.findLayout(item))
+    return wrap_instance(int(ptr), widget_type)
+
+
+def find_menu_item(item: str, widget_type: type[T]) -> T | None:
+    """Finds a Maya menu item by its UI string name and wraps it into a Qt object.
+
+    Args:
+        item (str): The string name of the Maya menu item.
+        widget_type (type[T]): The expected Qt class type
+            (e.g., QtGui.QAction).
+
+    Returns:
+        T | None: The wrapped Qt object instance,
+            or None if the menu item is not found.
+    """
+    ptr: int = int(OpenMayaUI.MQtUtil.findMenuItem(item))
+    return wrap_instance(int(ptr), widget_type)
