@@ -31,7 +31,7 @@ from amaterasu.base import dcc, framework
 from . import menu
 
 __product__: str = "Amaterasu"
-__version__: int = 20260412
+__version__: int = 20260510
 
 DEFAULT_LICENSE: str = """Copyright (c) 2014-2026 takkun (takkun3d).<br />
 <br />
