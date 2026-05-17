@@ -46,6 +46,7 @@ from amaterasu.base.dcc import selection
 from amaterasu.base.dcc import viewport
 from amaterasu.base.dcc import space
 from amaterasu.base.dcc import mesh
+from amaterasu.base.dcc import instance
 
 __all__: list[str] = [
     # paths
@@ -69,4 +70,5 @@ __all__: list[str] = [
     "viewport",
     "space",
     "mesh",
+    "instance",
 ]

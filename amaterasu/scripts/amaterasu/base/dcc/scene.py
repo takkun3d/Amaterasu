@@ -244,3 +244,39 @@ def find_duplicate_name_nodes() -> list[str]:
         iter_dag.next()
 
     return result
+
+
+def find_instance_nodes() -> list[str]:
+    """Finds all instance nodes in the current Maya scene.
+
+    Returns:
+        list[str]: A list of partial paths to all found instance nodes.
+    """
+    result: list[str] = []
+    dag_iter: OpenMaya.MItDag = OpenMaya.MItDag(
+        OpenMaya.MItDag.kDepthFirst, OpenMaya.MFn.kBase
+    )
+    dag_fn: OpenMaya.MFnDagNode = OpenMaya.MFnDagNode()
+
+    while not dag_iter.isDone():
+        dag_fn.setObject(dag_iter.currentItem())
+        paths: OpenMaya.MDagPathArray = dag_fn.getAllPaths()
+        path: OpenMaya.MDagPath = dag_fn.getPath()
+
+        for i in range(len(paths)):
+            if path.partialPathName() == paths[i].partialPathName():
+                continue
+
+            if paths[i].partialPathName() in result:
+                continue
+
+            dag_fn.setObject(paths[i])
+            dag_fn.setObject(dag_fn.parent(0))
+            if dag_fn.isInstanced():
+                continue
+
+            result.append(paths[i].partialPathName())
+
+        dag_iter.next()
+
+    return result
