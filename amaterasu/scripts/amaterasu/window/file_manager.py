@@ -92,7 +92,12 @@ QToolButton#missingBtn:checked {
 
 
 class Settings(framework.ToolSettings):
-    """Settings for the File Manager tool."""
+    """Settings for the File Manager tool.
+
+    Attributes:
+        window_geo (framework.Variant[str]): Saved window geometry data.
+        splitter_state (framework.Variant[str]): Saved splitter ratio.
+    """
 
     window_geo: framework.Variant[str] = framework.Variant("")
     splitter_state: framework.Variant[str] = framework.Variant("")
@@ -106,7 +111,13 @@ class CopyToDialog(QtWidgets.QDialog):
         file_list: list[dcc.asset.AssetFile],
         parent: QtWidgets.QWidget | None = None,
     ) -> None:
-        """Initializes the dialog."""
+        """Initializes the Copy To dialog.
+
+        Args:
+            file_list (list[dcc.asset.AssetFile]): The list of files to copy.
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+        """
         super().__init__(parent)
         self.__file_list: list[dcc.asset.AssetFile] = file_list
         self.setWindowTitle("Copy To")
@@ -223,7 +234,13 @@ class RepathDialog(QtWidgets.QDialog):
         file_list: list[dcc.asset.AssetFile],
         parent: QtWidgets.QWidget | None = None,
     ) -> None:
-        """Initializes the dialog."""
+        """Initializes the Repath dialog.
+
+        Args:
+            file_list (list[dcc.asset.AssetFile]): The list of files to repath.
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+        """
         super().__init__(parent)
         self.__file_list: list[dcc.asset.AssetFile] = file_list
         self.setWindowTitle("Repath")
@@ -301,7 +318,13 @@ class ReplaceStringDialog(QtWidgets.QDialog):
         file_list: list[dcc.asset.AssetFile],
         parent: QtWidgets.QWidget | None = None,
     ) -> None:
-        """Initializes the dialog."""
+        """Initializes the Replace String dialog.
+
+        Args:
+            file_list (list[dcc.asset.AssetFile]): The list of files to modify.
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+        """
         super().__init__(parent)
         self.__file_list: list[dcc.asset.AssetFile] = file_list
         self.setWindowTitle("Replace String")
@@ -383,7 +406,13 @@ class RenameDialog(QtWidgets.QDialog):
         target_file: dcc.asset.AssetFile,
         parent: QtWidgets.QWidget | None = None,
     ) -> None:
-        """Initializes the dialog."""
+        """Initializes the Rename dialog.
+
+        Args:
+            target_file (dcc.asset.AssetFile): The target file to rename.
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+        """
         super().__init__(parent)
         self.__file: dcc.asset.AssetFile = target_file
         self.setWindowTitle("Rename File")
@@ -430,14 +459,25 @@ class RenameDialog(QtWidgets.QDialog):
 
 
 class FileInfoPanel(QtWidgets.QWidget):
-    """Panel displaying detailed OS information for a specific file or folder."""
+    """Panel displaying detailed OS information for a specific file or folder.
+
+    Attributes:
+        clicked_copy_to (QtCore.Signal): Emitted when the Copy To button is clicked.
+        clicked_repath (QtCore.Signal): Emitted when the Repath button is clicked.
+        clicked_rename (QtCore.Signal): Emitted when the Rename button is clicked.
+    """
 
     clicked_copy_to = QtCore.Signal()
     clicked_repath = QtCore.Signal()
     clicked_rename = QtCore.Signal()
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
-        """Initializes the panel."""
+        """Initializes the panel.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+        """
         super().__init__(parent)
         self.__current_files: list[dcc.asset.AssetFile] = []
         self.__current_dir: str = ""
@@ -530,7 +570,11 @@ class FileInfoPanel(QtWidgets.QWidget):
 
     @QtCore.Slot(object)
     def set_selection(self, data: Any) -> None:
-        """Sets the active selection (File or Folder) and updates the UI."""
+        """Sets the active selection (File or Folder) and updates the UI.
+
+        Args:
+            data (Any): The selected file data tuple or AssetFile node.
+        """
         if not data:
             self.__current_files = []
             self.__current_dir = ""
@@ -666,12 +710,22 @@ class FileInfoPanel(QtWidgets.QWidget):
 
 
 class NodeListView(QtWidgets.QTreeView):
-    """View component displaying the grouped external files."""
+    """View component displaying the grouped external files.
+
+    Attributes:
+        file_selected (QtCore.Signal): Emitted when a file or folder is selected.
+            Passes the selected `dcc.asset.AssetFile` object or a tuple of `(dir_name, files)`.
+    """
 
     file_selected = QtCore.Signal(object)
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
-        """Initializes the view."""
+        """Initializes the view.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+        """
         super().__init__(parent)
         self.__node_type: str = ""
         self.__missing_only: bool = False
@@ -726,7 +780,11 @@ class NodeListView(QtWidgets.QTreeView):
         self.__file_list: dict[str, list[dcc.asset.AssetFile]] = {}
 
     def context_menu(self, point: QtCore.QPoint) -> None:
-        """Shows context menu at specific position."""
+        """Shows context menu at specific position.
+
+        Args:
+            point (QtCore.QPoint): The point at which to spawn the context menu.
+        """
         item_selection: QtCore.QItemSelection = (
             self.__proxy_model.mapSelectionToSource(
                 self.__selection_model.selection()
@@ -784,13 +842,21 @@ class NodeListView(QtWidgets.QTreeView):
 
     @QtCore.Slot(str)
     def set_node_type(self, node_type: str) -> None:
-        """Sets the current node type to filter by."""
+        """Sets the current node type to filter by.
+
+        Args:
+            node_type (str): The node type string.
+        """
         self.__node_type = node_type
         self.update_ui()
 
     @QtCore.Slot(bool)
     def set_missing_only(self, checked: bool) -> None:
-        """Sets whether to show only missing files and updates the view."""
+        """Sets whether to show only missing files and updates the view.
+
+        Args:
+            checked (bool): True to filter only missing files, False otherwise.
+        """
         self.__missing_only = checked
         self.update_ui()
 
@@ -864,9 +930,16 @@ class NodeListView(QtWidgets.QTreeView):
 
     @dcc.undo
     def change_item(
-        self, selected: QtCore.QItemSelection, deselected: QtCore.QItemSelection
+        self,
+        selected: QtCore.QItemSelection,
+        deselected: QtCore.QItemSelection,
     ) -> None:
-        """Handles selection changes and emits the selected file node or folder data."""
+        """Handles selection changes and emits the selected file node or folder data.
+
+        Args:
+            selected (QtCore.QItemSelection): The newly selected items.
+            deselected (QtCore.QItemSelection): The newly deselected items.
+        """
         item_selection: QtCore.QItemSelection = (
             self.__proxy_model.mapSelectionToSource(
                 self.__selection_model.selection()
@@ -888,18 +961,31 @@ class NodeListView(QtWidgets.QTreeView):
             self.file_selected.emit((data, files))
 
     def set_filter(self, filter_text: str) -> None:
-        """Sets the filter string to the proxy model."""
+        """Sets the filter string to the proxy model.
+
+        Args:
+            filter_text (str): The text to filter the items by.
+        """
         self.__proxy_model.setFilterWildcard(f"*{filter_text}*")
 
     def open_dialog(self, dialog_class: type, target: list[Any]) -> None:
-        """Opens a specific tool dialog."""
+        """Opens a specific tool dialog.
+
+        Args:
+            dialog_class (type): The class of the dialog to open.
+            target (list[Any]): The target files to pass into the dialog.
+        """
         app: QtWidgets.QDialog = dialog_class(target, self)
         result: int = app.exec_()
         if result:
             self.update_ui()
 
     def open_directory(self, paths: list[str]) -> None:
-        """Opens the OS directory."""
+        """Opens the OS directory.
+
+        Args:
+            paths (list[str]): A list of directory paths to open.
+        """
         for path in paths:
             system.open_directory(path)
 
@@ -913,7 +999,16 @@ class MainWindow(framework.ToolWindow[Settings]):
         flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Window,
         unique_id: str = "",
     ) -> None:
-        """Initializes the window."""
+        """Initializes the window.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The Qt window flags.
+                Defaults to Window.
+            unique_id (str, optional): A unique ID for the window.
+                Defaults to "".
+        """
         super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
         self.resize(700, 450)
@@ -925,7 +1020,11 @@ class MainWindow(framework.ToolWindow[Settings]):
         self.__splitter: QtWidgets.QSplitter
 
     def create_ui(self, parent: QtWidgets.QWidget) -> None:
-        """Creates the tool-specific user interface."""
+        """Creates the tool-specific user interface.
+
+        Args:
+            parent (QtWidgets.QWidget): The parent widget to contain the UI.
+        """
         main_layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(parent)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
@@ -995,7 +1094,11 @@ class MainWindow(framework.ToolWindow[Settings]):
         self.change_category(0)
 
     def create_custom_menu(self, menu_bar: QtWidgets.QMenuBar) -> None:
-        """Creates custom menus for view options."""
+        """Creates custom menus for view options.
+
+        Args:
+            menu_bar (QtWidgets.QMenuBar): The menu bar to append menus to.
+        """
         view_menu: QtWidgets.QMenu = QtWidgets.QMenu("View", self)
         menu_bar.addMenu(view_menu)
 
@@ -1004,7 +1107,11 @@ class MainWindow(framework.ToolWindow[Settings]):
 
     @QtCore.Slot(int)
     def change_category(self, index: int) -> None:
-        """Handles category combo box changes."""
+        """Handles category combo box changes.
+
+        Args:
+            index (int): The selected index in the combo box.
+        """
         if index < 0:
             return
 
@@ -1018,16 +1125,29 @@ class MainWindow(framework.ToolWindow[Settings]):
 
     @QtCore.Slot(str)
     def change_filter(self, filter_text: str) -> None:
-        """Passes the filter text to the view."""
+        """Passes the filter text to the view.
+
+        Args:
+            filter_text (str): The text to filter the files by.
+        """
         self.__node_list_view.set_filter(filter_text)
 
     @QtCore.Slot(bool)
     def missing_filter_change_callback(self, checked: bool) -> None:
-        """Passes the missing filter state to the view."""
+        """Passes the missing filter state to the view.
+
+        Args:
+            checked (bool): True to filter only missing files, False otherwise.
+        """
         self.__node_list_view.set_missing_only(checked)
 
 
 def main(unique_id: str = "") -> None:
-    """Entry point for launching the File Manager tool window."""
+    """Entry point for launching the File Manager tool window.
+
+    Args:
+        unique_id (str, optional): A unique ID for restoring window states.
+            Defaults to "".
+    """
     window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()
