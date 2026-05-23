@@ -33,6 +33,7 @@ from amaterasu.base.dcc.ui import (
     find_control,
     find_layout,
     find_menu_item,
+    show_attribute_editor,
 )
 
 from amaterasu.base.dcc import project
@@ -48,6 +49,7 @@ from amaterasu.base.dcc import space
 from amaterasu.base.dcc import mesh
 from amaterasu.base.dcc import instance
 from amaterasu.base.dcc import sets
+from amaterasu.base.dcc import asset
 
 __all__: list[str] = [
     # paths
@@ -59,6 +61,7 @@ __all__: list[str] = [
     "find_control",
     "find_layout",
     "find_menu_item",
+    "show_attribute_editor",
     #
     "project",
     "scene",
@@ -73,4 +76,5 @@ __all__: list[str] = [
     "mesh",
     "instance",
     "sets",
+    "asset",
 ]
