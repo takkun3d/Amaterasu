@@ -184,6 +184,7 @@ def execute_deferred() -> None:
     settings: Settings = Settings.instance(__name__, True)
     menu.create_main_menu()
     menu.create_channelbox_menu()
+    menu.create_display_layer_menu()
 
     if settings.latest_version.value() < __version__:
         settings.latest_version.set_value(__version__)

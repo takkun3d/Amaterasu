@@ -83,7 +83,10 @@
         {"label": "Enable Xray Geometry", "module": "amaterasu.display.xray_geometry", "main_func": "enable()"},
         {"label": "Disable Xray Geometry", "module": "amaterasu.display.xray_geometry", "main_func": "disable()"},
         {"label": "Show Local Axis", "module": "amaterasu.display.local_axis", "main_func": "show()"},
-        {"label": "Hide Local Axis", "module": "amaterasu.display.local_axis", "main_func": "hide()"}
+        {"label": "Hide Local Axis", "module": "amaterasu.display.local_axis", "main_func": "hide()"},
+        {"divider": "Display Layer"},
+        {"label": "Import Layer", "module": "amaterasu.display.display_layer_manager", "main_func": "import_json()"},
+        {"label": "Export Layer", "module": "amaterasu.display.display_layer_manager", "main_func": "export_json()"}
       ]
     },
     {
@@ -255,5 +258,9 @@
     {"divider": "Animation"},
     {"label": "Copy Animation", "module": "amaterasu.animation.copy_animation", "option_func": "option()"},
     {"label": "Delete Unused Animation", "module": "amaterasu.animation.delete_unused_animation", "option_func": "option()"}
+  ],
+  "DISPLAY_LAYER_MENU": [
+    {"label": "Import Layer", "module": "amaterasu.display.display_layer_manager", "main_func": "import_json()"},
+    {"label": "Export Layer", "module": "amaterasu.display.display_layer_manager", "main_func": "export_json()"}
   ]
 }
