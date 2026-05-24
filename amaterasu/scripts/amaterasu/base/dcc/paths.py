@@ -50,7 +50,7 @@ def get_icon_path(file_name: str) -> str:
 
     icon = QtGui.QIcon(':/' + file_name)
     if len(icon.availableSizes()) > 0:
-        return file_name
+        return ':/' + file_name
 
     icon_path: str | None = os.getenv('XBMLANGPATH')
     if not icon_path:

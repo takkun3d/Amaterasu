@@ -1,234 +1,192 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Instance Manager
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Tool for managing instance nodes in Autodesk Maya.
+
+This module provides a UI to find, select, un-instance (convert to object),
+and delete instance nodes within the Maya scene.
+"""
+
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any
-
-try:
-    from PySide2.QtCore import Qt, QItemSelectionModel, QModelIndex
-    from PySide2.QtGui import QStandardItemModel, QStandardItem
-    from PySide2.QtWidgets import QWidget, QGridLayout, QTreeView, QPushButton
-
-except ImportError:
-    if not TYPE_CHECKING:
-        from PySide6.QtCore import Qt, QItemSelectionModel, QModelIndex
-        from PySide6.QtGui import QStandardItemModel, QStandardItem
-        from PySide6.QtWidgets import (
-            QWidget,
-            QGridLayout,
-            QTreeView,
-            QPushButton,
-        )
 from maya import cmds
-from maya.api.OpenMaya import MItDag, MFn, MFnDagNode, MDagPathArray, MDagPath
-from ..lib import logger, parser, widgets
+from amaterasu.base.qt import QtCore, QtWidgets
+from amaterasu.base import dcc, framework, utils, widgets
+
+__product__: str = "Instance Manager"
+__version__: str = "1.30"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Instance Manager'
-__version__: str = '1.20'
-__doc__ = 'Find instance nodes in the scene.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+class Settings(framework.ToolSettings):
+    """Settings for the Instance Manager tool.
+
+    Attributes:
+        window_geo (framework.Variant[str]): Saved window geometry data.
+    """
+
+    window_geo: framework.Variant[str] = framework.Variant("")
 
 
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-class Settings(parser.ToolSettings):
-    '''Settings for tool.'''
-
-    window_geo: parser.Variant[str] = parser.Variant('')
-
-
-class MainWindow(widgets.ToolWidget):
-    '''Tool main window'''
+class MainWindow(framework.ToolWindow[Settings]):
+    """Main window for the Instance Manager tool."""
 
     def __init__(
         self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-        unique_id: str = '',
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Widget,
+        unique_id: str = "",
     ) -> None:
-        '''Initialize widget.'''
+        """Initializes the main window.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The window flags.
+                Defaults to Widget.
+            unique_id (str, optional): A unique identifier for the window instance.
+                Defaults to "".
+        """
         super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
-        self.resize(400, 200)
+        self.resize(400, 300)
+        self.__tree: widgets.TreeWidget
 
-        option_widget: QWidget = self.option_widget()
-        main_layout: QGridLayout = QGridLayout(option_widget)
-        main_layout.setContentsMargins(0, 0, 0, 0)
+    def create_ui(self, parent: QtWidgets.QWidget) -> None:
+        """Creates the tool-specific user interface.
 
-        self.__model: QStandardItemModel = QStandardItemModel(0, 1, self)
-        self.__model.setHeaderData(0, Qt.Horizontal, 'Node')
+        Args:
+            parent (QtWidgets.QWidget): The parent widget to attach the UI elements to.
+        """
+        layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(parent)
+        layout.setContentsMargins(0, 0, 0, 0)
 
-        self.__selection_model: QItemSelectionModel = QItemSelectionModel(
-            self.__model
+        self.__tree = widgets.TreeWidget(self)
+        self.__tree.setHeaderLabels(["Instance Nodes"])
+        self.__tree.setAlternatingRowColors(True)
+        self.__tree.setRootIsDecorated(False)
+        self.__tree.setSelectionMode(
+            QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection
         )
-        self.__selection_model.selectionChanged.connect(self.select_callback)
+        self.__tree.itemSelectionChanged.connect(self.select_nodes)
+        layout.addWidget(self.__tree)
 
-        self.__view: QTreeView = QTreeView(self)
-        self.__view.setSelectionMode(QTreeView.ExtendedSelection)
-        self.__view.setAlternatingRowColors(True)
-        self.__view.setRootIsDecorated(False)
-        self.__view.setModel(self.__model)
-        self.__view.setSelectionModel(self.__selection_model)
-        main_layout.addWidget(self.__view, 0, 0, 1, 3)
+        btn_layout: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout()
+        layout.addLayout(btn_layout)
 
-        button: QPushButton = QPushButton('Instance to Object', self)
-        button.clicked.connect(self.release_callback)
-        main_layout.addWidget(button, 1, 0)
+        button: QtWidgets.QPushButton = QtWidgets.QPushButton(
+            "Instance to Object"
+        )
+        button.clicked.connect(self.instance_to_object)
+        btn_layout.addWidget(button)
 
-        button = QPushButton('Delete', self)
-        button.clicked.connect(self.delete_callback)
-        main_layout.addWidget(button, 1, 1)
+        button = QtWidgets.QPushButton("Delete")
+        button.clicked.connect(self.delete_instance)
+        btn_layout.addWidget(button)
 
-        button = QPushButton('Update', self)
-        button.clicked.connect(self.initialize)
-        main_layout.addWidget(button, 1, 2)
-        self.initialize()
+        button = QtWidgets.QPushButton("Update")
+        button.clicked.connect(self.update_view)
+        btn_layout.addWidget(button)
 
-    # override
-    def load_settings(self) -> None:
-        '''Load ui settings from file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
-
-    # override
-    def save_settings(self) -> None:
-        '''Save ui settings to file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
-        settings.write()
-
-    # override
-    def reset_settings(self) -> None:
-        '''Reset ui settings.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
-
-    # override
-    def about(self) -> None:
-        '''Show a about dialog.[override]'''
-        widgets.AboutDialog.info(
-            self, __product__, __version__, __copyright__, __doc__
+        settings: Settings = self.tool_settings()
+        settings.window_geo.bind(
+            setter=self.restoreGeometry,
+            getter=self.saveGeometry,
+            encoder=utils.qt_to_ascii,
+            decoder=utils.ascii_to_qt,
         )
 
-    def initialize(self) -> None:
-        '''Initialize view.'''
-        self.__model.removeRows(0, self.__model.rowCount())
-        instance_list: list[str] = instances()
+        self.update_view()
+
+    @QtCore.Slot()
+    def update_view(self) -> None:
+        """Updates the tree view with current instance nodes in the scene."""
+        self.__tree.clear()
+        instance_list: list[str] = dcc.scene.find_instance_nodes()
         for instance in instance_list:
-            item: QStandardItem = QStandardItem()
-            item.setText(instance)
-            item.setData(instance)
-            self.__model.appendRow(item)
+            item = QtWidgets.QTreeWidgetItem([instance])
+            item.setData(0, QtCore.Qt.ItemDataRole.UserRole, instance)
+            self.__tree.addTopLevelItem(item)
 
-    @widgets.undo
-    def select_callback(self, *args: Any, **kwargs: Any) -> None:
-        '''select callback'''
+    @QtCore.Slot()
+    @dcc.undo
+    def select_nodes(self) -> None:
+        """Selects the corresponding Maya nodes when items are selected in the tree."""
         nodes: list[str] = self.__node_list()
         if not nodes:
             cmds.select(clear=True)
         else:
             cmds.select(*nodes)
 
-    @widgets.undo
-    def release_callback(self) -> None:
-        '''release callback'''
-        nodes: list[str] = self.__node_list()
-        for node in nodes:
-            instance_to_object(node)
-        self.initialize()
-        _logger.info('Done')
+    @QtCore.Slot()
+    @dcc.undo
+    def instance_to_object(self) -> None:
+        """Converts selected instance nodes into independent objects."""
+        result: utils.Result = utils.Result()
+        items: list[QtWidgets.QTreeWidgetItem] = self.__tree.selectedItems()
+        for item in items:
+            node: str = item.data(0, QtCore.Qt.ItemDataRole.UserRole)
+            r: utils.Result = dcc.instance.to_object(node)
+            if r.status() == utils.ResultStatus.SUCCESS:
+                index: int = self.__tree.indexOfTopLevelItem(item)
+                if index >= 0:
+                    self.__tree.takeTopLevelItem(index)
 
-    @widgets.undo
-    def delete_callback(self) -> None:
-        '''delete callback'''
-        nodes: list[str] = self.__node_list()
-        for node in nodes:
-            delete_instance(node)
-        self.initialize()
-        _logger.info('Done')
+            result.merge(r)
+
+        result.log(_logger, "Converted instances to objects.")
+
+    @QtCore.Slot()
+    @dcc.undo
+    def delete_instance(self) -> None:
+        """Deletes the selected instance nodes."""
+        result: utils.Result = utils.Result()
+        items: list[QtWidgets.QTreeWidgetItem] = self.__tree.selectedItems()
+        for item in items:
+            node: str = item.data(0, QtCore.Qt.ItemDataRole.UserRole)
+            r: utils.Result = dcc.instance.delete(node)
+            if r.status() == utils.ResultStatus.SUCCESS:
+                index: int = self.__tree.indexOfTopLevelItem(item)
+                if index >= 0:
+                    self.__tree.takeTopLevelItem(index)
+
+            result.merge(r)
+
+        result.log(_logger, "Deleted instances.")
 
     def __node_list(self) -> list[str]:
-        '''Return node list from selected item in view.'''
-        indexes: list[QModelIndex] = self.__selection_model.selectedIndexes()
-        if not indexes:
-            return []
-        nodes: list[str] = []
-        for index in indexes:
-            nodes.append(self.__model.item(index.row(), 0).text())
-        return nodes
+        """Extracts the node paths from the currently selected tree items.
+
+        Returns:
+            list[str]: A list of selected node paths.
+        """
+        return [
+            i.data(0, QtCore.Qt.ItemDataRole.UserRole)
+            for i in self.__tree.selectedItems()
+        ]
 
 
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
-def instance_to_object(node: str) -> None:
-    '''Instance to object.'''
-    if cmds.objectType(node, isAType='shape'):
-        parent: list[str] = (
-            cmds.listRelatives(node, parent=True, path=True) or []
-        )
-        if not parent:
-            _logger.error('Does not exists parent : %s', node)
-            return
-        node = parent[0]
+def main(unique_id: str = "") -> None:
+    """Entry point for launching the Instance Manager tool window.
 
-    new_node: str = cmds.duplicate(node, returnRootsOnly=True)[0]
-    delete_instance(node)
-    cmds.rename(new_node, node.split('|')[-1])
-
-
-def delete_instance(node: str) -> None:
-    '''Delete instance'''
-    if cmds.objectType(node, isAType='shape'):
-        cmds.parent(node, removeObject=True, shape=True)
-    else:
-        cmds.parent(node, removeObject=True)
-
-
-def instances() -> list[str]:
-    '''Return instance node in the scene.'''
-    result: list[str] = []
-    dag_iiter: MItDag = MItDag(MItDag.kDepthFirst, MFn.kBase)
-    dag_fn: MFnDagNode = MFnDagNode()
-    while not dag_iiter.isDone():
-        dag_fn.setObject(dag_iiter.currentItem())
-        paths: MDagPathArray = dag_fn.getAllPaths()
-        path: MDagPath = dag_fn.getPath()
-        for i in range(len(paths)):
-            if path.partialPathName() == paths[i].partialPathName():
-                continue
-
-            if paths[i].partialPathName() in result:
-                continue
-
-            dag_fn.setObject(paths[i])
-            dag_fn.setObject(dag_fn.parent(0))
-            if dag_fn.isInstanced():
-                continue
-
-            result.append(paths[i].partialPathName())
-        dag_iiter.next()
-    return result
-
-
-def main(unique_id: str = '') -> None:
-    '''Show window.'''
+    Args:
+        unique_id (str, optional): A unique identifier for the window instance.
+            Defaults to "".
+    """
     window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()

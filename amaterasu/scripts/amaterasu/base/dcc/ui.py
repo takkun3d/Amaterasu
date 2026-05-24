@@ -25,7 +25,7 @@ widget instances using OpenMayaUI.MQtUtil.
 """
 
 from typing import TypeVar
-from maya import OpenMayaUI
+from maya import OpenMayaUI, cmds, mel
 from amaterasu.base.qt import QtCore, QtWidgets, wrap_instance
 
 T = TypeVar("T", bound=QtCore.QObject)
@@ -89,3 +89,13 @@ def find_menu_item(item: str, widget_type: type[T]) -> T | None:
     """
     ptr: int = int(OpenMayaUI.MQtUtil.findMenuItem(item))
     return wrap_instance(int(ptr), widget_type)
+
+
+def show_attribute_editor(node_name: str) -> None:
+    """Selects the node and opens the Attribute Editor.
+
+    Args:
+        node_name (str): The name of the node to select.
+    """
+    cmds.select(node_name)
+    mel.eval("ShowAttributeEditorOrChannelBox")

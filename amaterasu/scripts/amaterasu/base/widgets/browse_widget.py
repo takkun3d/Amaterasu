@@ -93,3 +93,15 @@ class BrowseWidget(QtWidgets.QWidget):
             icon (str): The file name of the default icon (e.g., "icon.png").
         """
         self.__button.set_icon(icon_name)
+
+    def clear(self) -> None:
+        """Clears the current text in the line edit."""
+        self.__line_edit.clear()
+
+    def set_read_only(self, value: bool) -> None:
+        """Sets whether the line edit is read-only.
+
+        Args:
+            value (bool): True to make the line edit read-only, False otherwise.
+        """
+        self.__line_edit.setReadOnly(value)
