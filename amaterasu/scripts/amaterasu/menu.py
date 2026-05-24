@@ -39,6 +39,8 @@ MAIN_MENU_NAME: str = "AmaterasuMenu"
 MAIN_MENU_LABEL: str = "Amaterasu"
 CB_MENU_NAME: str = "AmaterasuChannelBoxMenu"
 CB_MENU_LABEL: str = "A"
+DL_MENU_NAME: str = "AmaterasuDisplayLayerMenu"
+DL_MENU_LABEL: str = "A"
 SHELF_ICON: str = "a_shelf.png"
 MAX_HISTORY: int = 10
 ROOT_PATH: pathlib.Path = pathlib.Path(__file__).parent
@@ -392,6 +394,16 @@ class MenuBuilder(utils.Singleton):
         with Menu(CB_MENU_NAME, label=CB_MENU_LABEL) as mm:
             self.build_items(mm, data)
 
+    def build_display_layer_menu(self) -> None:
+        """Builds the Amaterasu menu in the Maya channel box."""
+        cmds.setParent("DisplayLayerTab")
+        data: list[dict[str, Any]] = self.load_data().get(
+            "DISPLAY_LAYER_MENU", []
+        )
+
+        with Menu(DL_MENU_NAME, label=DL_MENU_LABEL) as mm:
+            self.build_items(mm, data)
+
     def build_history_menu(self, menu_name: str) -> None:
         """Builds a standard Maya menu populated with recent tools history.
 
@@ -501,6 +513,12 @@ def create_channelbox_menu() -> None:
     """Create an Amaterasu menu in channel box."""
     menu_builder: MenuBuilder = MenuBuilder(JSON_PATH)
     menu_builder.build_channelbox_menu()
+
+
+def create_display_layer_menu() -> None:
+    """Create an Amaterasu menu in display layer."""
+    menu_builder: MenuBuilder = MenuBuilder(JSON_PATH)
+    menu_builder.build_display_layer_menu()
 
 
 def build_history_menu(menu_name: str) -> None:
