@@ -129,3 +129,35 @@ def get_selected_channel_box_plugs() -> list[str]:
     )
 
     return plugs
+
+
+def get_selected_display_layers() -> list[str]:
+    """Gets a list of currently selected display layers from the Layer Editor.
+
+    Retrieves the names of display layers that are currently highlighted
+    in the Maya Layer Editor UI. The 'defaultLayer' is explicitly excluded
+    from the results.
+
+    Returns:
+        list[str]: A list of selected display layer names. Returns an empty
+            list if no layers are selected or if the UI cannot be found.
+    """
+    selected_layers: list[str] = []
+    buttons: list[str] = (
+        cmds.layout(
+            "LayerEditorDisplayLayerLayout", query=True, childArray=True
+        )
+        or []  # type: ignore
+    )
+    for button in buttons:
+        is_selected: bool = cmds.layerButton(button, query=True, select=True)  # type: ignore
+        if not is_selected:
+            continue
+
+        layer_name: str = cmds.layerButton(button, query=True, name=True)  # type: ignore
+        if layer_name == "defaultLayer":
+            continue
+
+        selected_layers.append(layer_name)
+
+    return selected_layers
