@@ -92,7 +92,7 @@ class SetsViewDelegate(QtWidgets.QStyledItemDelegate):
 
     CELL_SIZE: int = 20
     favorite_toggled = QtCore.Signal(str, bool)
-    action_triggered = QtCore.Signal(str, str, QtCore.Qt.KeyboardModifier)
+    action_triggered = QtCore.Signal(str, str, QtCore.Qt.KeyboardModifiers)
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         """Initializes the delegate and caches icons for performance.
