@@ -586,6 +586,7 @@ class MainWindow(framework.ToolWindow[Settings]):
     @QtCore.Slot()
     def update_model(self) -> None:
         """Refreshes the view model with the current Maya scene data."""
+        self.save_settings()
         self.__model.removeRows(0, self.__model.rowCount())
 
         sets_list: list[str] = cmds.ls(sets=True)
