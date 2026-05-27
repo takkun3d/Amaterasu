@@ -542,32 +542,6 @@ def apply_auto_color(
     return result
 
 
-# TODO: Remove this function once decompose_rotate are updated.
-def apply(
-    mode: int,
-    index: int = 0,
-    rgb: list[float] | None = None,
-    force_layer: bool = True,
-    selection: list[str] | None = None,
-) -> bool:
-    """Deprecated: Use amaterasu.base.dcc.node.color instead."""
-    if mode == 0:
-        if index == 0:
-            dcc.node.clear_drawing_color(nodes=selection)
-        else:
-            dcc.node.set_drawing_index_color(
-                index, nodes=selection, force_layer=force_layer
-            )
-    else:
-        if rgb is None:
-            dcc.node.clear_drawing_color(nodes=selection)
-        else:
-            dcc.node.set_drawing_rgb_color(
-                rgb, nodes=selection, force_layer=force_layer
-            )
-    return True
-
-
 def main(unique_id: str = "") -> None:
     """Show the tool window.
 

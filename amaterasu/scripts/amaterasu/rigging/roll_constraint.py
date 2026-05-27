@@ -16,7 +16,7 @@ except ImportError:
         from PySide6.QtWidgets import QWidget
 from maya import cmds
 from ..lib import logger, parser, widgets
-from ..modify import history_visibility
+from amaterasu.base import dcc
 
 # ==============================================================================
 #
@@ -193,7 +193,8 @@ def apply(src_node: str, dst_node: str, primary_axis: int = 0) -> bool:
 
     # Dst
     cmds.connectAttr(f'{roll_euler}.outputRotate', f'{dst_node}.rotate')
-    history_visibility.main([dst_node], 0)
+    # history_visibility.main([dst_node], 0)
+    dcc.node.hide_history([dst_node])
 
     return True
 

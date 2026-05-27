@@ -17,7 +17,7 @@ except ImportError:
 from maya import cmds
 from maya.api import OpenMaya
 from ..lib import logger, parser, widgets
-from ..modify import history_visibility
+from amaterasu.base import dcc
 
 # ==============================================================================
 #
@@ -376,7 +376,8 @@ def apply(
             controllers.append(controller)
 
         # Clean up
-        history_visibility.main([curve_space, *controllers], 0)
+        # history_visibility.main([curve_space, *controllers], 0)
+        dcc.node.hide_history([curve_space, *controllers])
 
     return True
 
