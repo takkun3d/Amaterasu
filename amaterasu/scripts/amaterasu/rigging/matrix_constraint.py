@@ -29,7 +29,7 @@ except ImportError:
 
 from maya import cmds
 from ..lib import logger, parser, widgets
-from ..modify import history_visibility
+from amaterasu.base import dcc
 
 # ==============================================================================
 #
@@ -352,7 +352,8 @@ def apply(
         cmds.outlinerEditor(panel, edit=True, refresh=True)
 
     # Clean up
-    history_visibility.main([target, *sources], 0)
+    # history_visibility.main([target, *sources], 0)
+    dcc.node.hide_history([target, *sources])
 
 
 def main(unique_id: str = '') -> None:

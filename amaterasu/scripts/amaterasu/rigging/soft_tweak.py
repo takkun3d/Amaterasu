@@ -29,7 +29,7 @@ except ImportError:
 from maya import cmds
 from ..lib import logger, parser, widgets
 from . import create_controller
-from ..modify import history_visibility
+from amaterasu.base import dcc
 
 # ==============================================================================
 #
@@ -328,15 +328,24 @@ def apply(
     )
 
     # Clean up
-    history_visibility.main(
+    # history_visibility.main(
+    #     [
+    #         controller_space,
+    #         soft_mod_pivot,
+    #         soft_mod_ctrl,
+    #         soft_mod_handle,
+    #         soft_mod,
+    #     ],
+    #     0,
+    # )
+    dcc.node.hide_history(
         [
             controller_space,
             soft_mod_pivot,
             soft_mod_ctrl,
             soft_mod_handle,
             soft_mod,
-        ],
-        0,
+        ]
     )
     if is_delete_guide:
         cmds.delete(guide)

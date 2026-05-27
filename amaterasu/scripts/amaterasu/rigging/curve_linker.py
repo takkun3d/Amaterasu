@@ -6,7 +6,7 @@
 from __future__ import annotations
 from maya import cmds
 from ..lib import logger
-from ..modify import history_visibility
+from amaterasu.base import dcc
 
 # ==============================================================================
 #
@@ -81,7 +81,8 @@ def apply(nodes: list[str]) -> str:
             f'{curve_shape}.controlPoints[{i}]',
         )
 
-    history_visibility.main([curve, curve_shape], False)
+    # history_visibility.main([curve, curve_shape], False)
+    dcc.node.hide_history([curve, curve_shape])
     return curve
 
 
