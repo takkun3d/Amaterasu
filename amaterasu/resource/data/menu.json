@@ -223,18 +223,7 @@
       "items": []
     },
     {"divider": true},
-    {
-      "label": "Web Site",
-      "items": [
-        {"divider": "Amaterasu"},
-        {"label": "Home", "module": "amaterasu", "main_func": "show_home()"},
-        {"label": "Patch Note", "module": "amaterasu", "main_func": "show_patch_note()"},
-        {"label": "Manual", "module": "amaterasu", "main_func": "show_manual()"},
-        {"divider": "Other"},
-        {"label": "Digital Craft Nodes", "module": "amaterasu", "main_func": "show_dcn()"}
-      ]
-    },
-    {"label": "About", "module": "amaterasu", "main_func": "show_about()"}
+    {"label": "Dashboard", "module": "amaterasu.launcher", "is_window_only": true, "main_func": "main()"}
   ],
   "CHANNEL_BOX_MENU": [
     {"divider": "Transform"},
