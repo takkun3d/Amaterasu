@@ -177,7 +177,7 @@ class UpdateCheckerThread(QtCore.QThread):
 
             digits: str = re.sub(r"\D", "", tag_name)
             github_version: int = int(digits) if digits else 0
-            local_version: int = int(env.__version__)
+            local_version: int = env.__version__
 
             if github_version <= local_version and not self.__force_emit:
                 return
