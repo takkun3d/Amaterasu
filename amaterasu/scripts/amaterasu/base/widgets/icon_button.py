@@ -23,6 +23,7 @@ This module provides the `IconButton` class, an image-based button
 that supports different icons for default, hover, and pressed states,
 as well as a custom signal for right-click detection.
 """
+
 from __future__ import annotations
 from amaterasu.base.qt import QtCore, QtGui, QtWidgets
 from amaterasu.base import dcc
@@ -49,7 +50,7 @@ class IconButton(QtWidgets.QPushButton):
         self.__pressed_icon: QtGui.QIcon | None = None
 
         self.setFlat(True)
-        self.setStyleSheet('QPushButton:pressed{padding:0;}')
+        self.setStyleSheet("QPushButton{margin:0;padding:0;}")
 
     def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
         """Handle the mouse press event to display the pressed icon.

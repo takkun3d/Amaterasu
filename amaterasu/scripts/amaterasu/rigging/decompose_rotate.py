@@ -6,8 +6,7 @@
 from __future__ import annotations
 from maya import cmds
 from ..lib import logger
-from ..display import drawing_color
-from ..modify import history_visibility
+from amaterasu.base import dcc
 
 # ==============================================================================
 #
@@ -48,7 +47,7 @@ class Plane:
         (1, 0, 1),
     ]
     axis_attr: tuple[str, str, str] = ('Z', 'X', 'Y')
-    index_color: tuple[float, float, float] = (13, 14, 6)
+    index_color: tuple[int, int, int] = (13, 14, 6)
 
 
 # ==============================================================================
@@ -64,7 +63,7 @@ def create_plane_control(
     vector: tuple[float, float, float] = Plane.vector[plane]
     axis: tuple[float, float, float] = Plane.axis[plane]
     axis_attr: str = Plane.axis_attr[plane]
-    index_color: float = Plane.index_color[plane]
+    index_color: int = Plane.index_color[plane]
 
     # Rotate Vector ------------------------------------------------------------
     rotate_vector: str = cmds.createNode(
@@ -150,8 +149,10 @@ def create_plane_control(
     cmds.setAttr(f'{locator}.localPosition', *shape_size, type='double3')
     cmds.setAttr(f'{locator}.localScale', *shape_size, type='double3')
     cmds.connectAttr(f'{rotate}.outputX', f'{locator}.rotate{axis_attr}')
-    drawing_color.apply(0, index_color, None, True, [locator])
-    history_visibility.main([locator], 0)
+    # drawing_color.apply(0, index_color, None, True, [locator])
+    dcc.node.set_drawing_index_color(index_color, [locator])
+    # history_visibility.main([locator], 0)
+    dcc.node.hide_history([locator])
 
     return locator
 
@@ -223,7 +224,8 @@ def create_offset_control(base_name: str, src_transform: str) -> str:
     )
     cmds.connectAttr(f'{offset_dmtx}.outputScale', f'{offset_transform}.scale')
     cmds.connectAttr(f'{offset_dmtx}.outputShear', f'{offset_transform}.shear')
-    history_visibility.main([offset_transform], 0)
+    # history_visibility.main([offset_transform], 0)
+    dcc.node.hide_history([offset_transform])
 
     return offset_transform
 

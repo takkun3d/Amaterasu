@@ -108,6 +108,7 @@ else:
     for cls in (
         QtCore.QEventLoop,
         QtCore.QCoreApplication,
+        QtGui.QDrag,
         QtWidgets.QApplication,
         QtWidgets.QDialog,
         QtWidgets.QMenu,

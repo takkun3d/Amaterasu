@@ -44,9 +44,8 @@ except ImportError:
         )
 from maya import cmds
 from ..lib import logger, parser, widgets
-from ..edit import combine_shapes
-from ..modify import renamer
 from ..display import drawing_color, outliner_color
+from amaterasu.base import dcc
 
 # ==============================================================================
 #
@@ -221,7 +220,8 @@ class Square(Controller):
             blendKnotInsertion=True,
             parameter=0.1,
         )
-        renamer.normalize_shape_name(node_name)
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -248,7 +248,8 @@ class Triangle(Controller):
             blendKnotInsertion=True,
             parameter=0.1,
         )
-        renamer.normalize_shape_name(node_name)
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -287,7 +288,8 @@ class Cross(Controller):
             blendKnotInsertion=True,
             parameter=0.1,
         )
-        renamer.normalize_shape_name(node_name)
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -320,7 +322,8 @@ class Arrow1(Controller):
             blendKnotInsertion=True,
             parameter=0.1,
         )
-        renamer.normalize_shape_name(node_name)
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -356,7 +359,8 @@ class Arrow2(Controller):
             blendKnotInsertion=True,
             parameter=0.1,
         )
-        renamer.normalize_shape_name(node_name)
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -406,7 +410,8 @@ class Arrow3(Controller):
             blendKnotInsertion=True,
             parameter=0.1,
         )
-        renamer.normalize_shape_name(node_name)
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -447,7 +452,8 @@ class Arrow4(Controller):
             blendKnotInsertion=True,
             parameter=0.1,
         )
-        renamer.normalize_shape_name(node_name)
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -501,7 +507,8 @@ class Arrow5(Controller):
             blendKnotInsertion=True,
             parameter=0.1,
         )
-        renamer.normalize_shape_name(node_name)
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -565,7 +572,8 @@ class Arch(Controller):
         )
         cmds.delete(circleB, lineA, lineB)
         node_name = cmds.rename(circleA, node_name)
-        renamer.normalize_shape_name(node_name)
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -637,7 +645,8 @@ class Ellipse(Controller):
         )
         cmds.delete(circleB, lineA, lineB)
         node_name = cmds.rename(circleA, node_name)
-        renamer.normalize_shape_name(node_name)
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -673,7 +682,8 @@ class Star(Controller):
             blendKnotInsertion=True,
             parameter=0.1,
         )
-        renamer.normalize_shape_name(node_name)
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -731,7 +741,8 @@ class VectorCircle(Controller):
             blendKnotInsertion=True,
             parameter=0.1,
         )
-        renamer.normalize_shape_name(node_name)
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -846,8 +857,10 @@ class Gear(Controller):
             blendKnotInsertion=True,
             parameter=0.1,
         )
-        combine_shapes.apply(node_name, [curveB])
-        renamer.normalize_shape_name(node_name)
+        # combine_shapes.apply(node_name, [curveB])
+        dcc.shape.combine(node_name, [curveB])
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -880,7 +893,8 @@ class Cube(Controller):
             ],
             knot=[i for i in range(15 + 1)],
         )
-        renamer.normalize_shape_name(node_name)
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -918,8 +932,10 @@ class Sphere(Controller):
             sections=8,
             constructionHistory=False,
         )[0]
-        combine_shapes.apply(node_name, [curveB, curveC])
-        renamer.normalize_shape_name(node_name)
+        # combine_shapes.apply(node_name, [curveB, curveC])
+        dcc.shape.combine(node_name, [curveB, curveC])
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -957,7 +973,8 @@ class Pyramid(Controller):
             blendKnotInsertion=True,
             parameter=0.1,
         )
-        renamer.normalize_shape_name(node_name)
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -983,7 +1000,8 @@ class TriPyramid(Controller):
             ],
             knot=[i for i in range(8 + 1)],
         )
-        renamer.normalize_shape_name(node_name)
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -1018,7 +1036,8 @@ class Octahedron(Controller):
             ],
             knot=[i for i in range(17 + 1)],
         )
-        renamer.normalize_shape_name(node_name)
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -1107,7 +1126,8 @@ class Cylinder(Controller):
             ],
             knot=[i for i in range(71 + 1)],
         )
-        renamer.normalize_shape_name(node_name)
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -1127,8 +1147,10 @@ class Locator(Controller):
             name=node_name, degree=1, point=[(0, 0, 1), (0, 0, -1)], knot=[0, 1]
         )
 
-        combine_shapes.apply(node_name, [curveB, curveC])
-        renamer.normalize_shape_name(node_name)
+        # combine_shapes.apply(node_name, [curveB, curveC])
+        dcc.shape.combine(node_name, [curveB, curveC])
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -1173,8 +1195,10 @@ class Root(Controller):
             blendKnotInsertion=True,
             parameter=0.1,
         )
-        combine_shapes.apply(node_name, [curveB])
-        renamer.normalize_shape_name(node_name)
+        # combine_shapes.apply(node_name, [curveB])
+        dcc.shape.combine(node_name, [curveB])
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -1238,7 +1262,8 @@ class Manipulator(Controller):
             ],
             knot=[i for i in range(46 + 1)],
         )
-        renamer.normalize_shape_name(node_name)
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -1281,7 +1306,8 @@ class Tag(Controller):
             ],
             knot=[i for i in range(25 + 1)],
         )
-        renamer.normalize_shape_name(node_name)
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -1303,7 +1329,8 @@ class LineArrow1(Controller):
             ],
             knot=[0, 1, 2, 3, 4],
         )
-        renamer.normalize_shape_name(node_name)
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -1328,7 +1355,8 @@ class LineArrow2(Controller):
             ],
             knot=[i for i in range(7 + 1)],
         )
-        renamer.normalize_shape_name(node_name)
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -1366,7 +1394,8 @@ class LineArrow3(Controller):
             ],
             knot=[i for i in range(20 + 1)],
         )
-        renamer.normalize_shape_name(node_name)
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -1393,7 +1422,8 @@ class LineArrow4(Controller):
             ],
             knot=[i for i in range(9 + 1)],
         )
-        renamer.normalize_shape_name(node_name)
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod
@@ -1429,7 +1459,8 @@ class LineArrow5(Controller):
             ],
             knot=[i for i in range(18 + 1)],
         )
-        renamer.normalize_shape_name(node_name)
+        # renamer.normalize_shape_name(node_name)
+        dcc.node.normalize_shape_name(node_name)
         return node_name
 
     @classmethod

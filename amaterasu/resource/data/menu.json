@@ -83,7 +83,10 @@
         {"label": "Enable Xray Geometry", "module": "amaterasu.display.xray_geometry", "main_func": "enable()"},
         {"label": "Disable Xray Geometry", "module": "amaterasu.display.xray_geometry", "main_func": "disable()"},
         {"label": "Show Local Axis", "module": "amaterasu.display.local_axis", "main_func": "show()"},
-        {"label": "Hide Local Axis", "module": "amaterasu.display.local_axis", "main_func": "hide()"}
+        {"label": "Hide Local Axis", "module": "amaterasu.display.local_axis", "main_func": "hide()"},
+        {"divider": "Display Layer"},
+        {"label": "Import Layer", "module": "amaterasu.display.display_layer_manager", "main_func": "import_json()"},
+        {"label": "Export Layer", "module": "amaterasu.display.display_layer_manager", "main_func": "export_json()"}
       ]
     },
     {
@@ -220,18 +223,7 @@
       "items": []
     },
     {"divider": true},
-    {
-      "label": "Web Site",
-      "items": [
-        {"divider": "Amaterasu"},
-        {"label": "Home", "module": "amaterasu", "main_func": "show_home()"},
-        {"label": "Patch Note", "module": "amaterasu", "main_func": "show_patch_note()"},
-        {"label": "Manual", "module": "amaterasu", "main_func": "show_manual()"},
-        {"divider": "Other"},
-        {"label": "Digital Craft Nodes", "module": "amaterasu", "main_func": "show_dcn()"}
-      ]
-    },
-    {"label": "About", "module": "amaterasu", "main_func": "show_about()"}
+    {"label": "Dashboard", "module": "amaterasu.launcher", "is_window_only": true, "main_func": "main()"}
   ],
   "CHANNEL_BOX_MENU": [
     {"divider": "Transform"},
@@ -255,5 +247,9 @@
     {"divider": "Animation"},
     {"label": "Copy Animation", "module": "amaterasu.animation.copy_animation", "option_func": "option()"},
     {"label": "Delete Unused Animation", "module": "amaterasu.animation.delete_unused_animation", "option_func": "option()"}
+  ],
+  "DISPLAY_LAYER_MENU": [
+    {"label": "Import Layer", "module": "amaterasu.display.display_layer_manager", "main_func": "import_json()"},
+    {"label": "Export Layer", "module": "amaterasu.display.display_layer_manager", "main_func": "export_json()"}
   ]
 }
