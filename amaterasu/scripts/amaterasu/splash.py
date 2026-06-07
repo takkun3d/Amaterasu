@@ -24,7 +24,7 @@ Amaterasu startup images.
 """
 
 from __future__ import annotations
-import random
+import pathlib
 from maya import cmds
 from amaterasu.base.qt import shiboken, QtCore, QtGui, QtWidgets
 from . import env
@@ -34,9 +34,7 @@ def override_splash_screen() -> QtWidgets.QApplication | None:
     """Overrides the default Maya splash screen with a custom Amaterasu image.
 
     Finds the `QSplashScreen` widget from the main Qt application and replaces
-    its pixmap with a randomly selected image from the `startup_images` directory.
-    It also dynamically draws the installed Maya version text onto the image.
-    This function safely aborts if Maya is running in batch mode.
+    its pixmap with the fixed Amaterasu startup theme image.
 
     Returns:
         QtWidgets.QApplication | None: The active Qt application instance if
@@ -66,13 +64,10 @@ def override_splash_screen() -> QtWidgets.QApplication | None:
     if not splash_screen:
         return None
 
-    images: list[str] = [
-        str(x) for x in (env.ICONS_PATH / "startup_images").glob("*.png")
-    ]
-    if images:
-        image: str = random.choice(images)
+    image: pathlib.Path = env.ICONS_PATH / "splash" / "startup_image.png"
+    if image.exists():
         geometry: QtCore.QRect = splash_screen.geometry()
-        pixmap: QtGui.QPixmap = QtGui.QPixmap(image)
+        pixmap: QtGui.QPixmap = QtGui.QPixmap(str(image))
         painter: QtGui.QPainter = QtGui.QPainter()
         painter.begin(pixmap)
         painter.setFont(QtGui.QFont("Arial", 8, 1))
