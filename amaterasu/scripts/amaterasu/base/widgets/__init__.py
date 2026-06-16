@@ -42,6 +42,7 @@ from amaterasu.base.widgets.tab_widget import TabBarPlus, TabWidget
 from amaterasu.base.widgets.toast import ToastWidget, ToastSignalEmitter
 from amaterasu.base.widgets.tree_widget import TreeWidget
 from amaterasu.base.widgets.vertical_line import VerticalLine
+from amaterasu.base.widgets.image_drop_widget import ImageDropImage
 
 __all__: list[str] = [
     "BrowseWidget",
@@ -63,4 +64,5 @@ __all__: list[str] = [
     "ToastSignalEmitter",
     "TreeWidget",
     "VerticalLine",
+    "ImageDropImage",
 ]
