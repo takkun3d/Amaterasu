@@ -1,0 +1,99 @@
+// This file contains derivative work based on "jiWindowBox":
+// Copyright 2018 Autodesk Inc, All rights reserved.
+// Licensed under the Apache License, Version 2.0.
+// https://github.com/ADN-DevTech/3dsMax-OSL-Shaders/blob/master/LICENSE.txt
+//
+// Modifications from the original by takkun (takkun3d):
+// - Added layer.
+// - Applied mathematical and performance optimizations.
+
+#define ONE_THIRD (1.0 / 3.0)
+#define TWO_THIRDS (2.0 / 3.0)
+
+shader Amaterasu_InteriorMap(
+    string filename = "",
+    float MainDepth = 1.0,
+    int EnableLayer0 = 1,
+    float DepthLayer0 = 0.0 ,
+    int EnableLayer1 = 1,
+    float DepthLayer1 = 0.25,
+    int EnableLayer2 = 1,
+    float DepthLayer2 = 0.5,
+    int EnableLayer3 = 1,
+    float DepthLayer3 = 0.75,
+    output color outColor = 0
+) {
+    int enableLayers[4] = {EnableLayer0, EnableLayer1, EnableLayer2, EnableLayer3};
+    float depthLayers[4] = {DepthLayer0, DepthLayer1, DepthLayer2, DepthLayer3};
+    vector layerOffsetUvs[4] = {
+        vector(0.0, 0.0, 0.0),
+        vector(TWO_THIRDS, 0.0, 0.0),
+        vector(0.0, TWO_THIRDS, 0.0),
+        vector(TWO_THIRDS, TWO_THIRDS, 0.0)
+    };
+    float maxAllowedDepth = MainDepth - 0.0001;
+    for (int i = 3; i >= 0; --i) {
+        if (enableLayers[i] > 0) {
+            depthLayers[i] = clamp(MainDepth * depthLayers[i], 0.0001, maxAllowedDepth);
+            maxAllowedDepth = depthLayers[i] - 0.001;
+        }
+    }
+
+    vector V = normalize(I);
+    vector N_ws = N;
+    vector T_ws = normalize(dPdu);
+    vector original_N = backfacing() ? -N_ws : N_ws;
+    vector B_ws = cross(original_N, T_ws);
+
+    vector R = vector(dot(V, T_ws), dot(V, B_ws), dot(V, N_ws));
+    vector invR = 1.0 / (-R);
+    vector P_uv = vector(u, v, 0.5);
+    vector S = step(0.0, R);
+
+    vector baseDepth = (P_uv - S) * (invR / MainDepth);
+    vector baseBack  = (P_uv - S) * invR;
+    vector baseWidth = baseDepth * MainDepth;
+
+    float fcRaw_x = baseWidth[1] * R[0] + P_uv[0] + 0.0;
+    float fcRaw_y = baseDepth[1] * R[2] + P_uv[2] + 0.5;
+    float swRaw_x = baseDepth[0] * R[2] + P_uv[2] + 0.5;
+    float swRaw_y = baseWidth[0] * R[1] + P_uv[1] + 0.0;
+
+    float fcMask = step(0.0, fcRaw_y) * step(0.0, 1.0 - max(fcRaw_x, 1.0 - fcRaw_x));
+    float fcUv_x = fcRaw_x / 3.0;
+    float fcUv_y = fcRaw_y / 3.0;
+
+    vector ceilUv = vector(fcUv_x + ONE_THIRD, ONE_THIRD - fcUv_y, 0.0) * fcMask * S[1];
+    vector floorUv = vector(fcUv_x + ONE_THIRD, TWO_THIRDS + fcUv_y, 0.0) * fcMask * (1.0 - S[1]);
+
+    float swMask = step(0.0, swRaw_x) * step(0.0, 1.0 - max(swRaw_y, 1.0 - swRaw_y));
+    float swUv_x = swRaw_x / 3.0;
+    float swUv_y = swRaw_y / 3.0;
+
+    vector lWallUv = vector(ONE_THIRD - swUv_x, TWO_THIRDS - swUv_y, 0.0) * swMask * (1.0 - S[0]);
+    vector rWallUv = vector(swUv_x + TWO_THIRDS, TWO_THIRDS - swUv_y, 0.0) * swMask * S[0];
+
+    float backRaw_x = (baseBack[2] * R[0] + (P_uv[0] / 2.0) / MainDepth) * (MainDepth * 2.0) / 3.0;
+    float backRaw_y = (baseBack[2] * R[1] + (P_uv[1] / 2.0) / MainDepth) * (MainDepth * 2.0) / 3.0;
+
+    vector bWallUv = vector(backRaw_x + ONE_THIRD, TWO_THIRDS - backRaw_y, 0.0) * (1.0 - max(step(0.0, swRaw_x), step(0.0, fcRaw_y)));
+
+    vector finalUv = ceilUv + floorUv + bWallUv + lWallUv + rWallUv;
+    color finalRgb = texture(filename, finalUv[0], finalUv[1]);
+    for (int i = 3; i >= 0; --i) {
+        if (enableLayers[i] > 0) {
+            float d2 = depthLayers[i] * 2.0;
+            float rawUv_x = (baseBack[2] * R[0] + P_uv[0] / d2) * d2 / 3.0;
+            float rawUv_y = (baseBack[2] * R[1] + P_uv[1] / d2) * d2 / 3.0;
+            vector layerUv = vector(rawUv_x, ONE_THIRD - rawUv_y, 0.0);
+            float layerMask = step(0.0, layerUv[1] * 3.0 * (1.0 - layerUv[1] * 3.0)) * step(0.0, layerUv[0] * (ONE_THIRD - layerUv[0]));
+            layerUv += layerOffsetUvs[i];
+
+            float layerA = 0.0;
+            color layerTex = texture(filename, layerUv[0], layerUv[1], "alpha", layerA);
+            finalRgb = mix(finalRgb, layerTex, layerA * layerMask);
+        }
+    }
+
+    outColor = finalRgb;
+}
