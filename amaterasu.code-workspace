@@ -6,6 +6,23 @@
     ],
     "settings": {
         "files.trimTrailingWhitespace": true,
+        "files.exclude": {
+            "**/.git": true,
+            "**/.svn": true,
+            "**/.hg": true,
+            "**/.env": true,
+            "**/.mypy_cache": true,
+            "**/.DS_Store": true,
+            "**/Thumbs.db": true,
+            "**/__pycache__": true,
+            "**/*.pyc": true
+        },
+        "files.associations": {
+            "*.ogsfx": "glsl",
+            "*.fx": "hlsl",
+            "*.osl": "osl"
+        },
+
         "editor.mouseWheelZoom": true,
         "editor.fontFamily": "'Moralerspace Neon JPDOC', Consolas, 'Courier New', monospace",
         "editor.fontSize": 14,
@@ -23,11 +40,14 @@
             "editor.defaultFormatter": "ms-python.black-formatter"
         },
         "python.autoComplete.extraPaths": [
-            "${workspaceFolder}\\.vscode\\stubs"
+            "${workspaceFolder}/.vscode/stubs",
+            "${workspaceFolder}/amaterasu/scripts"
         ],
         "python.analysis.extraPaths": [
-            "${workspaceFolder}\\.vscode\\stubs"
+            "${workspaceFolder}/.vscode/stubs",
+            "${workspaceFolder}/amaterasu/scripts"
         ],
+        "python.analysis.stubPath": "${workspaceFolder}/.vscode/stubs",
         "python.analysis.autoImportCompletions": true,
         "python.analysis.typeCheckingMode": "off",
         "python.analysis.inlayHints.functionReturnTypes": true,
@@ -35,21 +55,9 @@
         "python.analysis.inlayHints.pytestParameters": true,
 
         "pylint.args": [
-            "--extension-pkg-whitelist=PySide2,PySide6,maya,pymel",
-            "--max-line-length=80",
-            "--disable=W0613"
-        ],
-
-        "files.exclude": {
-            "**/.git": true,
-            "**/.svn": true,
-            "**/.hg": true,
-            "**/.env": true,
-            "**/.mypy_cache": true,
-            "**/.DS_Store": true,
-            "**/Thumbs.db": true,
-            "**/__pycache__": true,
-            "**/*.pyc": true
-        }
+            "--extension-pkg-whitelist=PySide2,PySide6,maya,pymel,mtoa,arnold",
+            "--ignored-modules=mtoa,arnold",
+            "--max-line-length=80"
+        ]
     }
 }
