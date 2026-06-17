@@ -10,7 +10,7 @@
 #define ONE_THIRD (1.0 / 3.0)
 #define TWO_THIRDS (2.0 / 3.0)
 
-shader Amaterasu_InteriorMap(
+shader ParallaxInteriorMapping(
     string filename = "",
     float MainDepth = 1.0,
     int EnableLayer0 = 1,
