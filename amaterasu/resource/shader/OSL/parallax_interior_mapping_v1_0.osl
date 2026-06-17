@@ -24,20 +24,28 @@ shader Amaterasu_InteriorMap(
     output color outColor = 0
 ) {
     int enableLayers[4] = {EnableLayer0, EnableLayer1, EnableLayer2, EnableLayer3};
-    float depthLayers[4] = {DepthLayer0, DepthLayer1, DepthLayer2, DepthLayer3};
+    float depths[4] = {
+        clamp(MainDepth * DepthLayer0, 0.0001, MainDepth - 0.0001),
+        clamp(MainDepth * DepthLayer1, 0.0001, MainDepth - 0.0001),
+        clamp(MainDepth * DepthLayer2, 0.0001, MainDepth - 0.0001),
+        clamp(MainDepth * DepthLayer3, 0.0001, MainDepth - 0.0001)
+    };
     vector layerOffsetUvs[4] = {
         vector(0.0, 0.0, 0.0),
         vector(TWO_THIRDS, 0.0, 0.0),
         vector(0.0, TWO_THIRDS, 0.0),
         vector(TWO_THIRDS, TWO_THIRDS, 0.0)
     };
-    float maxAllowedDepth = MainDepth - 0.0001;
-    for (int i = 3; i >= 0; --i) {
-        if (enableLayers[i] > 0) {
-            depthLayers[i] = clamp(MainDepth * depthLayers[i], 0.0001, maxAllowedDepth);
-            maxAllowedDepth = depthLayers[i] - 0.001;
-        }
-    }
+
+    int indices[4] = {0, 1, 2, 3};
+    int tmp;
+    #define SWAP(a, b) if(depths[indices[a]] < depths[indices[b]]) { tmp = indices[a]; indices[a] = indices[b]; indices[b] = tmp; }
+    SWAP(0, 1);
+    SWAP(2, 3);
+    SWAP(0, 2);
+    SWAP(1, 3);
+    SWAP(1, 2);
+    #undef SWAP
 
     vector V = normalize(I);
     vector N_ws = N;
@@ -80,9 +88,10 @@ shader Amaterasu_InteriorMap(
 
     vector finalUv = ceilUv + floorUv + bWallUv + lWallUv + rWallUv;
     color finalRgb = texture(filename, finalUv[0], finalUv[1]);
-    for (int i = 3; i >= 0; --i) {
+    for (int j = 0; j < 4; ++j) {
+        int i = indices[j];
         if (enableLayers[i] > 0) {
-            float d2 = depthLayers[i] * 2.0;
+            float d2 = depths[i] * 2.0;
             float rawUv_x = (baseBack[2] * R[0] + P_uv[0] / d2) * d2 / 3.0;
             float rawUv_y = (baseBack[2] * R[1] + P_uv[1] / d2) * d2 / 3.0;
             vector layerUv = vector(rawUv_x, ONE_THIRD - rawUv_y, 0.0);

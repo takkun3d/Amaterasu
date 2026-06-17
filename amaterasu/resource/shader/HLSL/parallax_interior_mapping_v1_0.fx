@@ -111,16 +111,23 @@ VS_OUTPUT VS(VS_INPUT IN) {
 
 float4 PS(VS_OUTPUT IN) : SV_Target {
     bool4 enableLayers = bool4(EnableLayer0, EnableLayer1, EnableLayer2, EnableLayer3);
-    float4 depthLayers = float4(DepthLayer0, DepthLayer1, DepthLayer2, DepthLayer3);
+    float depths[4] = {
+        clamp(MainDepth * DepthLayer0, 0.0001, MainDepth - 0.0001),
+        clamp(MainDepth * DepthLayer1, 0.0001, MainDepth - 0.0001),
+        clamp(MainDepth * DepthLayer2, 0.0001, MainDepth - 0.0001),
+        clamp(MainDepth * DepthLayer3, 0.0001, MainDepth - 0.0001)
+    };
     const float3 layerOffsetUvs[4] = {float3(0.0, 0.0, 0.0), float3(TWO_THIRDS, 0.0, 0.0), float3(0.0, TWO_THIRDS, 0.0), float3(TWO_THIRDS, TWO_THIRDS, 0.0)};
 
-    float maxAllowedDepth = MainDepth - 0.0001;
-    for (int i = 3; i >= 0; --i) {
-        if (enableLayers[i]) {
-            depthLayers[i] = clamp(MainDepth * depthLayers[i], 0.0001, maxAllowedDepth);
-            maxAllowedDepth = depthLayers[i] - 0.001;
-        }
-    }
+    int indices[4] = {0, 1, 2, 3};
+    int tmp;
+    #define SWAP(a, b) if(depths[indices[a]] < depths[indices[b]]) { tmp = indices[a]; indices[a] = indices[b]; indices[b] = tmp; }
+    SWAP(0, 1);
+    SWAP(2, 3);
+    SWAP(0, 2);
+    SWAP(1, 3);
+    SWAP(1, 2);
+    #undef SWAP
 
     float3 cameraPos = mul(float4(0.0, 0.0, 0.0, 1.0), ViewInverse).xyz;
     float3 V = normalize(IN.vWorldPos - cameraPos);
@@ -161,9 +168,10 @@ float4 PS(VS_OUTPUT IN) : SV_Target {
     float3 finalUv = ceilUv + floorUv + bWallUv + lWallUv + rWallUv;
     float3 finalRgb = MainTexture.Sample(MainSampler, finalUv.xy).rgb;
 
-    for (int i = 3; i >= 0; --i) {
+    for (int j = 0; j < 4; ++j) {
+        int i = indices[j];
         if (enableLayers[i]) {
-            float d2 = depthLayers[i] * 2.0;
+            float d2 = depths[i] * 2.0;
             float3 rawUv = ((baseBack.z * R + P / d2) * d2 / 3.0);
             float3 layerUv = float3(rawUv.x, ONE_THIRD - rawUv.y, 0.0);
             float layerMask = step(0.0, layerUv.y * 3.0 * (1.0 - layerUv.y * 3.0)) * step(0.0, layerUv.x * (ONE_THIRD - layerUv.x));
