@@ -49,9 +49,9 @@ _logger: utils.Logger = utils.get_logger(__product__)
 NEED_PLUGINS: list[str] = ["glslShader.mll", "dx11Shader.mll", "mtoa.mll"]
 SHADER_DIR: pathlib.Path = env.RESOURCE_PATH / "shader"
 SOURCE_FILES: dict[str, pathlib.Path] = {
-    "glsl": SHADER_DIR / "GLSL" / "parallax_interior_mapping_v1_0.ogsfx",
-    "hlsl": SHADER_DIR / "HLSL" / "parallax_interior_mapping_v1_0.fx",
-    "osl": SHADER_DIR / "OSL" / "parallax_interior_mapping_v1_0.osl",
+    "glsl": SHADER_DIR / "parallax_interior_mapping_v1_0.ogsfx",
+    "hlsl": SHADER_DIR / "parallax_interior_mapping_v1_0.fx",
+    "osl": SHADER_DIR / "parallax_interior_mapping_v1_0.osl",
 }
 
 ATTRIBUTE_LINK: list[str] = [
@@ -126,7 +126,7 @@ class MainWindow(framework.StandardToolWindow[Settings]):
 
         self.__engine = QtWidgets.QComboBox(parent)
         self.__engine.addItems(["GLSL (OpenGL)", "HLSL (DirectX 11)"])
-        if self.get_current_viewport_engine() == "HLSL":
+        if get_current_viewport_engine() == "HLSL":
             self.__engine.setCurrentIndex(1)
         else:
             self.__engine.setCurrentIndex(0)
@@ -146,15 +146,6 @@ class MainWindow(framework.StandardToolWindow[Settings]):
             setter=self.__base_name.setText,
             getter=self.__base_name.text,
         )
-
-    def get_current_viewport_engine(self) -> str:
-        """Determines the current Maya Viewport 2.0 rendering engine.
-
-        Returns:
-            str: "HLSL" if the viewport uses DirectX, otherwise "GLSL".
-        """
-        engine: str = cmds.optionVar(query="vp2RenderingEngine")  # type: ignore
-        return "HLSL" if "DirectX" in engine else "GLSL"
 
     @QtCore.Slot()
     @dcc.undo
@@ -179,6 +170,16 @@ class MainWindow(framework.StandardToolWindow[Settings]):
             engine_choice,
         )
         result.log(_logger)
+
+
+def get_current_viewport_engine() -> str:
+    """Determines the current Maya Viewport 2.0 rendering engine.
+
+    Returns:
+        str: "HLSL" if the viewport uses DirectX, otherwise "GLSL".
+    """
+    engine: str = cmds.optionVar(query="vp2RenderingEngine")  # type: ignore
+    return "HLSL" if "DirectX" in engine else "GLSL"
 
 
 def setup_project_shaders() -> dict[str, pathlib.Path]:
@@ -254,7 +255,7 @@ def create_network(
             result.merge(r)
             return result
 
-    # ----------------------------------------------------------------------
+    # --------------------------------------------------------------------------
     # Placement 2D
     place2d: str = cmds.shadingNode(
         'place2dTexture',
@@ -262,7 +263,7 @@ def create_network(
         asUtility=True,
     )
 
-    # ----------------------------------------------------------------------
+    # --------------------------------------------------------------------------
     # File Node
     file_node: str = cmds.shadingNode(
         'file',
@@ -274,7 +275,7 @@ def create_network(
     cmds.connectAttr(f"{place2d}.outUV", f"{file_node}.uvCoord")
     cmds.connectAttr(f"{place2d}.outUvFilterSize", f"{file_node}.uvFilterSize")
 
-    # ----------------------------------------------------------------------
+    # --------------------------------------------------------------------------
     # Viewport Shader
     if engine_choice == "GLSL":
         viewport_node: str = cmds.shadingNode(
@@ -302,7 +303,7 @@ def create_network(
 
     cmds.connectAttr(f"{file_node}.outColor", f"{viewport_node}.MainTexture")
 
-    # ----------------------------------------------------------------------
+    # --------------------------------------------------------------------------
     # OSL Shader
     osl_node: str = cmds.shadingNode(
         'aiOslShader',
@@ -317,7 +318,7 @@ def create_network(
     for attr in ATTRIBUTE_LINK:
         cmds.connectAttr(f"{viewport_node}.{attr}", f"{osl_node}.{attr}")
 
-    # ----------------------------------------------------------------------
+    # --------------------------------------------------------------------------
     # Arnold Shader
     ai_flat: str = cmds.shadingNode(
         "aiFlat", asShader=True, name=f"{base_name}Ai_MT"
@@ -325,7 +326,7 @@ def create_network(
 
     cmds.connectAttr(f"{osl_node}.outColor", f"{ai_flat}.color")
 
-    # ----------------------------------------------------------------------
+    # --------------------------------------------------------------------------
     # Shading Engine
     sg_node: str = cmds.sets(
         name=f"{base_name}_MTSG",
