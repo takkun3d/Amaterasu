@@ -46,6 +46,7 @@ https://github.com/ADN-DevTech/3dsMax-OSL-Shaders/blob/master/LICENSE.txt
 """
 _logger: utils.Logger = utils.get_logger(__product__)
 
+NEED_PLUGINS: list[str] = ["glslShader.mll", "dx11Shader.mll", "mtoa.mll"]
 SHADER_DIR: pathlib.Path = env.RESOURCE_PATH / "shader"
 SOURCE_FILES: dict[str, pathlib.Path] = {
     "glsl": SHADER_DIR / "GLSL" / "parallax_interior_mapping_v1_0.ogsfx",
@@ -246,6 +247,12 @@ def create_network(
     if not texture_path or not pathlib.Path(texture_path).exists():
         result.set_error(f"Texture image not found.: {texture_path}")
         return result
+
+    for plugin in NEED_PLUGINS:
+        r: utils.Result = dcc.plugin.load(plugin)
+        if r.status() != utils.ResultStatus.SUCCESS:
+            result.merge(r)
+            return result
 
     # ----------------------------------------------------------------------
     # Placement 2D
