@@ -26,7 +26,6 @@ provide a unified and intuitive artist experience.
 """
 
 from __future__ import annotations
-import shutil
 import pathlib
 from maya import cmds
 from mtoa import osl
