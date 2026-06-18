@@ -238,8 +238,28 @@ def create_network(
         isColorManaged=True,
     )
     cmds.setAttr(f"{file_node}.fileTextureName", texture_path, type="string")
-    cmds.connectAttr(f"{place2d}.outUV", f"{file_node}.uvCoord")
-    cmds.connectAttr(f"{place2d}.outUvFilterSize", f"{file_node}.uvFilterSize")
+    p2d_connections: list[tuple[str, str]] = [
+        ("coverage", "coverage"),
+        ("translateFrame", "translateFrame"),
+        ("rotateFrame", "rotateFrame"),
+        ("mirrorU", "mirrorU"),
+        ("mirrorV", "mirrorV"),
+        ("stagger", "stagger"),
+        ("wrapU", "wrapU"),
+        ("wrapV", "wrapV"),
+        ("repeatUV", "repeatUV"),
+        ("offset", "offset"),
+        ("rotateUV", "rotateUV"),
+        ("noiseUV", "noiseUV"),
+        ("vertexUvOne", "vertexUvOne"),
+        ("vertexUvTwo", "vertexUvTwo"),
+        ("vertexUvThree", "vertexUvThree"),
+        ("vertexCameraOne", "vertexCameraOne"),
+        ("outUV", "uvCoord"),
+        ("outUvFilterSize", "uvFilterSize"),
+    ]
+    for src_attr, dst_attr in p2d_connections:
+        cmds.connectAttr(f"{place2d}.{src_attr}", f"{file_node}.{dst_attr}")
 
     # --------------------------------------------------------------------------
     # Viewport Shader
