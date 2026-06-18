@@ -56,7 +56,7 @@
 
         "pylint.args": [
             "--extension-pkg-whitelist=PySide2,PySide6,maya,pymel,mtoa,arnold",
-            "--ignored-modules=mtoa,arnold",
+            "--ignored-modules=mtoa,arnold,maya",
             "--max-line-length=80"
         ]
     }
