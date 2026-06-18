@@ -126,7 +126,7 @@ class MainWindow(framework.StandardToolWindow[Settings]):
 
         self.__engine = QtWidgets.QComboBox(parent)
         self.__engine.addItems(["GLSL (OpenGL)", "HLSL (DirectX 11)"])
-        if get_current_viewport_engine() == "HLSL":
+        if dcc.viewport.get_current_viewport_engine() == "HLSL":
             self.__engine.setCurrentIndex(1)
         else:
             self.__engine.setCurrentIndex(0)
@@ -162,7 +162,10 @@ class MainWindow(framework.StandardToolWindow[Settings]):
             "HLSL" if self.__engine.currentIndex() == 1 else "GLSL"
         )
 
-        shader_paths: dict[str, pathlib.Path] = setup_project_shaders()
+        shader_paths: dict[str, pathlib.Path] = dcc.project.deploy_resources(
+            source_files=SOURCE_FILES,
+            sub_dir="data/shader",
+        )
         result: utils.Result = create_network(
             self.__base_name.text(),
             shader_paths,
@@ -170,42 +173,6 @@ class MainWindow(framework.StandardToolWindow[Settings]):
             engine_choice,
         )
         result.log(_logger)
-
-
-def get_current_viewport_engine() -> str:
-    """Determines the current Maya Viewport 2.0 rendering engine.
-
-    Returns:
-        str: "HLSL" if the viewport uses DirectX, otherwise "GLSL".
-    """
-    engine: str = cmds.optionVar(query="vp2RenderingEngine")  # type: ignore
-    return "HLSL" if "DirectX" in engine else "GLSL"
-
-
-def setup_project_shaders() -> dict[str, pathlib.Path]:
-    """Copies the required shader files to the current Maya project.
-
-    Ensures that the 'data/shader' directory exists within the current
-    workspace and copies the master GLSL, HLSL, and OSL shader files there.
-
-    Returns:
-        dict[str, pathlib.Path]: A dictionary mapping the shader type keys
-            ("glsl", "hlsl", "osl") to their copied destination paths.
-    """
-    project_dir: pathlib.Path = pathlib.Path(dcc.project.get_workspace())
-    dest_dir: pathlib.Path = project_dir / "data" / "shader"
-    if not dest_dir.exists():
-        dest_dir.mkdir(parents=True)
-
-    dest_paths: dict[str, pathlib.Path] = {}
-    for key, src_path in SOURCE_FILES.items():
-        dest_path: pathlib.Path = dest_dir / src_path.name
-        if not dest_path.exists() and src_path.exists():
-            shutil.copy2(src_path, dest_path)
-
-        dest_paths[key] = dest_path
-
-    return dest_paths
 
 
 def create_network(
