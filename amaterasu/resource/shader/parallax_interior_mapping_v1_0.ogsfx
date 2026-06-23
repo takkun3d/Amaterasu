@@ -1,0 +1,193 @@
+// This file contains derivative work based on "jiWindowBox":
+// Copyright 2018 Autodesk Inc, All rights reserved.
+// Licensed under the Apache License, Version 2.0.
+// https://github.com/ADN-DevTech/3dsMax-OSL-Shaders/blob/master/LICENSE.txt
+//
+// Modifications from the original by takkun (takkun3d):
+// - Ported from OSL to GLSL/OGSFX for real-time viewport rendering.
+// - Added layer.
+// - Applied mathematical and performance optimizations
+
+#define ONE_THIRD (1.0 / 3.0)
+#define TWO_THIRDS (2.0 / 3.0)
+
+uniform mat4 WorldViewProj : WorldViewProjection;
+uniform mat4 World : World;
+uniform mat4 WorldInverseTranspose : WorldInverseTranspose;
+uniform mat4 ViewInverse : ViewInverse;
+
+uniform texture2D MainTexture <
+    string Object = "Main";
+    string UIName = "Texture";
+>;
+uniform sampler2D MainSampler = sampler_state {
+    Texture = <MainTexture>;
+};
+
+uniform float MainDepth <
+    string Object = "Main";
+    string UIName = "Depth";
+    string UIWidget = "Slider";
+    float UIMin = 0.001;
+    float UIMax = 10.0;
+> = 1.0;
+
+uniform bool EnableLayer0 <
+    string Object = "Layer 0";
+    string UIName = "Enable";
+> = true;
+uniform float DepthLayer0 <
+    string Object = "Layer 0";
+    string UIName = "Depth";
+    string UIWidget = "Slider";
+    float UIMin = 0.0;
+    float UIMax = 1.0;
+> = 0.0;
+
+uniform bool EnableLayer1 <
+    string Object = "Layer 1";
+    string UIName = "Enable";
+> = true;
+uniform float DepthLayer1 <
+    string Object = "Layer 1";
+    string UIName = "Depth";
+    string UIWidget = "Slider";
+    float UIMin = 0.0;
+    float UIMax = 1.0;
+> = 0.25;
+
+uniform bool EnableLayer2 <
+    string Object = "Layer 2";
+    string UIName = "Enable";
+> = true;
+uniform float DepthLayer2 <
+    string Object = "Layer 2";
+    string UIName = "Depth";
+    string UIWidget = "Slider";
+    float UIMin = 0.0;
+    float UIMax = 1.0;
+> = 0.5;
+
+uniform bool EnableLayer3 <
+    string Object = "Layer 3";
+    string UIName = "Enable";
+> = true;
+uniform float DepthLayer3 <
+    string Object = "Layer 3";
+    string UIName = "Depth";
+    string UIWidget = "Slider";
+    float UIMin = 0.0;
+    float UIMax = 1.0;
+> = 0.75;
+
+attribute VS_INPUT {
+    vec3 Pos : POSITION;
+    vec3 Normal : NORMAL;
+    vec3 Tangent : TANGENT;
+    vec2 UV : TEXCOORD0;
+};
+
+attribute VS_OUTPUT {
+    vec2 vUV : TEXCOORD0;
+    vec3 vWorldPos : POSITION;
+    vec3 vNormal : NORMAL;
+    vec3 vTangent : TANGENT;
+};
+
+attribute PS_OUTPUT {
+    vec4 outColor : COLOR0;
+};
+
+GLSLShader VS {
+    void main() {
+        gl_Position = WorldViewProj * vec4(Pos, 1.0);
+        vUV = UV;
+        vWorldPos = (World * vec4(Pos, 1.0)).xyz;
+        vNormal = normalize((WorldInverseTranspose * vec4(Normal, 0.0)).xyz);
+        vTangent = normalize((World * vec4(Tangent, 0.0)).xyz);
+    }
+}
+
+GLSLShader PS {
+    void main() {
+        bvec4 enableLayers = bvec4(EnableLayer0, EnableLayer1, EnableLayer2, EnableLayer3);
+        float depths[4] = float[4](
+            clamp(MainDepth * DepthLayer0, 0.0001, MainDepth - 0.0001),
+            clamp(MainDepth * DepthLayer1, 0.0001, MainDepth - 0.0001),
+            clamp(MainDepth * DepthLayer2, 0.0001, MainDepth - 0.0001),
+            clamp(MainDepth * DepthLayer3, 0.0001, MainDepth - 0.0001)
+        );
+        const vec3 layerOffsetUvs[4] = vec3[4](vec3(0.0, 0.0, 0.0), vec3(TWO_THIRDS, 0.0, 0.0), vec3(0.0, TWO_THIRDS, 0.0), vec3(TWO_THIRDS, TWO_THIRDS, 0.0));
+
+        int indices[4] = int[4](0, 1, 2, 3);
+        int tmp;
+        #define SWAP(a, b) if(depths[indices[a]] < depths[indices[b]]) { tmp = indices[a]; indices[a] = indices[b]; indices[b] = tmp; }
+        SWAP(0, 1);
+        SWAP(2, 3);
+        SWAP(0, 2);
+        SWAP(1, 3);
+        SWAP(1, 2);
+        #undef SWAP
+
+        vec3 V = normalize(vWorldPos - ViewInverse[3].xyz);
+        vec3 N = vNormal;
+        vec3 T = vTangent;
+        vec3 B = cross(N, T);
+        if (dot(V, N) > 0.0) {
+            N = -N;
+        }
+
+        vec3 R = vec3(dot(V, T), dot(V, B), dot(V, N));
+        vec3 invR = 1.0 / (-R);
+        vec3 P = vec3(vUV.x, vUV.y, 0.5);
+        vec3 S = step(0.0, R);
+
+        vec3 baseDepth = (P - S) * (invR / MainDepth);
+        vec3 baseBack  = (P - S) * invR;
+        vec3 baseWidth = baseDepth * MainDepth;
+
+        vec2 fcRaw = vec2(baseWidth.y, baseDepth.y) * R.xz + P.xz + vec2(0.0, 0.5);
+        vec2 swRaw = vec2(baseDepth.x, baseWidth.x) * R.zy + P.zy + vec2(0.5, 0.0);
+
+        float fcMask = step(0.0, fcRaw.y) * step(0.0, 1.0 - max(fcRaw.x, 1.0 - fcRaw.x));
+        vec3 fcUv = vec3(fcRaw, 0.0) / 3.0;
+
+        vec3 ceilUv = vec3(fcUv.x + ONE_THIRD, ONE_THIRD - fcUv.y, 0.0) * fcMask * S.y;
+        vec3 floorUv = vec3(fcUv.x + ONE_THIRD, TWO_THIRDS + fcUv.y, 0.0) * fcMask * (1.0 - S.y);
+
+        float swMask = step(0.0, swRaw.x) * step(0.0, 1.0 - max(swRaw.y, 1.0 - swRaw.y));
+        vec3 swUv = vec3(swRaw, 0.0) / 3.0;
+
+        vec3 lWallUv = vec3(ONE_THIRD - swUv.x, TWO_THIRDS - swUv.y, 0.0) * swMask * (1.0 - S.x);
+        vec3 rWallUv = vec3(swUv.x + TWO_THIRDS, TWO_THIRDS - swUv.y, 0.0) * swMask * S.x;
+
+        vec2 backRaw = (baseBack.z * R.xy + (P.xy / 2.0) / MainDepth) * (MainDepth * 2.0) / 3.0;
+        vec3 bWallUv = vec3(backRaw.x + ONE_THIRD, TWO_THIRDS - backRaw.y, 0.0) * (1.0 - max(step(0.0, swRaw.x), step(0.0, fcRaw.y)));
+
+        vec3 finalUv = ceilUv + floorUv + bWallUv + lWallUv + rWallUv;
+        vec3 finalRgb = texture2D(MainSampler, finalUv.xy).rgb;
+
+        for (int j = 0; j < 4; ++j) {
+            int i = indices[j];
+            if (enableLayers[i]) {
+                float d2 = depths[i] * 2.0;
+                vec3 rawUv = ((baseBack.z * R + P / d2) * d2 / 3.0);
+                vec3 layerUv = vec3(rawUv.x, ONE_THIRD - rawUv.y, 0.0);
+                float layerMask = step(0.0, layerUv.y * 3.0 * (1.0 - layerUv.y * 3.0)) * step(0.0, layerUv.x * (ONE_THIRD - layerUv.x));
+                layerUv += layerOffsetUvs[i];
+
+                vec4 layerTex = texture2D(MainSampler, layerUv.xy);
+                finalRgb = mix(finalRgb, layerTex.rgb, layerTex.a * layerMask);
+            }
+        }
+
+        outColor = vec4(finalRgb, 1.0);
+    }
+}
+
+technique Main {
+    pass P0 {
+        VertexShader (in VS_INPUT, out VS_OUTPUT) = VS;
+        PixelShader (in VS_OUTPUT, out PS_OUTPUT) = PS;
+    }
+}

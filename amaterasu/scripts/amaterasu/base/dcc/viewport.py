@@ -101,3 +101,13 @@ def displayed_nodes() -> list[str]:
     OpenMaya.MGlobal.setSelectionMode(current_selection_mode)
     OpenMaya.MGlobal.setActiveSelectionList(old_sel)
     return nodes
+
+
+def get_current_viewport_engine() -> str:
+    """Determines the current Maya Viewport 2.0 rendering engine.
+
+    Returns:
+        str: "HLSL" if the viewport uses DirectX, otherwise "GLSL".
+    """
+    engine: str = cmds.optionVar(query="vp2RenderingEngine")  # type: ignore
+    return "HLSL" if "DirectX" in engine else "GLSL"

@@ -42,3 +42,29 @@ def remove_unknown() -> utils.Result:
             result.add_failure(plugin, "Cannot remove plugin")
 
     return result
+
+
+def load(plugin_name: str) -> utils.Result:
+    """Loads a Maya plugin if it is not already loaded.
+
+    Args:
+        plugin_name (str): The name of the plugin to load (e.g., "dx11Shader.mll").
+
+    Returns:
+        utils.Result: The result of the operation.
+    """
+    result: utils.Result = utils.Result()
+
+    is_loaded: bool = cmds.pluginInfo(plugin_name, query=True, loaded=True)  # type: ignore
+    if is_loaded:
+        result.add_info(plugin_name, "Plugin is already loaded.")
+        return result
+
+    try:
+        cmds.loadPlugin(plugin_name, quiet=True)
+        result.add_info(plugin_name, "Successfully loaded plugin.")
+
+    except RuntimeError as e:
+        result.set_error(f"Failed to load plugin '{plugin_name}': {e}")
+
+    return result

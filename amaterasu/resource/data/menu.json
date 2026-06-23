@@ -192,6 +192,7 @@
         {"label": "Reload Texture", "module": "amaterasu.rendering.reload_texture"},
         {"label": "Generate All UDIM Preview", "module": "amaterasu.rendering.generate_all_udim_preview"},
         {"label": "Matcap", "module": "amaterasu.rendering.matcap", "is_window_only": true},
+        {"label": "Parallax Interior Mapping", "module": "amaterasu.rendering.parallax_interior_mapping", "is_window_only": true},
         {"label": "Material Library", "module": "amaterasu.rendering.material_library", "is_window_only": true},
         {"divider": "Render Setup"},
         {"label": "Make Overrides", "module": "amaterasu.rendering.make_overrides", "is_window_only": true},
