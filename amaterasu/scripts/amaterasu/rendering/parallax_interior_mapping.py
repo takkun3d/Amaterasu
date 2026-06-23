@@ -163,7 +163,7 @@ class MainWindow(framework.StandardToolWindow[Settings]):
 
         shader_paths: dict[str, pathlib.Path] = dcc.project.deploy_resources(
             source_files=SOURCE_FILES,
-            sub_dir="data/shader",
+            sub_dir="renderData/shaders",
         )
         result: utils.Result = create_network(
             self.__base_name.text(),
