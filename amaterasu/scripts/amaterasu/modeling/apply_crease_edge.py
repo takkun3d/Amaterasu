@@ -66,7 +66,7 @@ class MainWindow(framework.StandardToolWindow[Settings]):
         """
         super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
-        self.resize(300, 80)
+        self.resize(400, 200)
 
     def create_ui(self, parent: QtWidgets.QWidget) -> None:
         """Creates the tool-specific user interface.
