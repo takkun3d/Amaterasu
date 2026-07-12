@@ -46,6 +46,7 @@ SOURCE_FILES: dict[str, pathlib.Path] = {
 }
 
 ATTRIBUTE_LINK: list[str] = [
+    "UVMargin",
     "MainDepth",
     "Layer0_Enable",
     "Layer0_Depth",
