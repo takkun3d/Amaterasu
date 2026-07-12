@@ -398,8 +398,8 @@ float4 PS(VS_OUTPUT input) : SV_Target {
     );
     uint width, height;
     MainTexture.GetDimensions(width, height);
-    float aspect = (float)height / (float)width;
-    rayDir.x *= aspect;
+    float aspect = (float)width / (float)height;
+    rayDir.y *= aspect;
 
     float2 mainUv = calcCubeUV(input.vUV, rayDir, -MainDepth);
     float3 finalRgb = MainTexture.Sample(MainSampler, mainUv).rgb;

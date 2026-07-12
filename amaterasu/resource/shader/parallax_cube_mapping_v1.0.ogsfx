@@ -423,8 +423,8 @@ GLSLShader PS {
             vTangent
         );
         ivec2 texSize = textureSize(MainSampler, 0);
-        float aspect = float(texSize.y) / float(texSize.x);
-        rayDir.x *= aspect;
+        float aspect = float(texSize.x) / float(texSize.y);
+        rayDir.y *= aspect;
 
         vec2 mainUv = calcCubeUV(vUV, rayDir, -MainDepth);
         vec3 finalRgb = texture2D(MainSampler, mainUv).rgb;

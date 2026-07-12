@@ -199,8 +199,8 @@ shader parallax_cube_mapping (
     vector rayDir = calcTangentViewDir();
     int res[2];
     gettextureinfo(MainTexture, "resolution", res);
-    float aspect = float(res[1]) / float(res[0]);
-    rayDir.x *= aspect;
+    float aspect = float(res[0]) / float(res[1]);
+    rayDir.y *= aspect;
 
     vector startUV = vector(u, v, 0.0);
     vector mainUv = calcCubeUV(startUV, rayDir, -MainDepth);
