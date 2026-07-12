@@ -197,6 +197,10 @@ shader parallax_cube_mapping (
     output color outColor = 0
 ) {
     vector rayDir = calcTangentViewDir();
+    int res[2];
+    gettextureinfo(MainTexture, "resolution", res);
+    float aspect = float(res[1]) / float(res[0]);
+    rayDir.x *= aspect;
 
     vector startUV = vector(u, v, 0.0);
     vector mainUv = calcCubeUV(startUV, rayDir, -MainDepth);
