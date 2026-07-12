@@ -35,9 +35,18 @@ Texture2D MainTexture <
 
 SamplerState MainSampler {
     Filter = MIN_MAG_MIP_LINEAR;
-    AddressU = Wrap;
-    AddressV = Wrap;
+    AddressU = Clamp;
+    AddressV = Clamp;
+    AddressW = Clamp;
 };
+
+float UVMargin <
+    string Object = "Main";
+    string UIName = "UV Margin";
+    string UIWidget = "Slider";
+    float UIMin = 0.0;
+    float UIMax = 0.02;
+> = 0.005;
 
 float MainDepth <
     string Object = "Main";
@@ -224,35 +233,35 @@ struct VS_OUTPUT {
 
 VS_OUTPUT VS(VS_INPUT input) {
     VS_OUTPUT output;
-    
+
     // Transform the vertex position from object space to clip space
     output.Pos = mul(float4(input.Pos, 1.0), WorldViewProj);
-    
+
     // Pass through the texture coordinates (UVs) to the pixel shader
     output.vUV = input.UV;
-    
+
     // Calculate the 3D world space position of the vertex
     output.vWorldPos = mul(float4(input.Pos, 1.0), World).xyz;
-    
+
     // Transform the normal vector to world space
     output.vNormal = normalize(mul(float4(input.Normal, 0.0), WorldInverseTranspose).xyz);
-    
+
     // Transform the tangent vector to world space
     output.vTangent = normalize(mul(float4(input.Tangent, 0.0), World).xyz);
-    
+
     return output;
 }
 
 float3 calcTangentViewDir(float3 worldPos, float3 camPos, float3 normal, float3 tangent) {
     // Calculate the normalized view ray direction from camera to the pixel
     float3 V = normalize(worldPos - camPos);
-    
+
     // Compute the bitangent vector to complete the TBN basis
     float3 B = cross(normal, tangent);
-    
+
     // Flip the normal if looking at the backface to ensure
     float3 N = (dot(V, normal) > 0.0) ? -normal : normal;
-    
+
     // Transform the view ray direction into tangent space
     return float3(dot(V, tangent), dot(V, B), dot(V, N));
 }
@@ -261,49 +270,49 @@ float3 applyBlendMode(int mode, float3 a, float3 b, float alpha) {
     float3 c = a;
     if (mode == 0) { // Normal
         c = b;
-        
+
     } else if (mode == 1) { // Darken
         c = min(a, b);
-        
+
     } else if (mode == 2) { // Multiply
         c = a * b;
-        
+
     } else if (mode == 3) { // Color Burn
         c = max(1.0 - (1.0 - a) / (b + 0.000001), 0.0);
-        
+
     } else if (mode == 4) { // Linear Burn
         c = max(a + b - 1.0, 0.0);
-        
+
     } else if (mode == 5) { // Lighten
         c = max(a, b);
-        
+
     } else if (mode == 6) { // Screen
         c = 1.0 - (1.0 - a) * (1.0 - b);
-        
+
     } else if (mode == 7) { // Color Dodge
         c = min(a / (1.0 - b + 0.000001), 1.0);
-        
+
     } else if (mode == 8) { // Add
         c = min(a + b, 1.0);
-        
+
     } else if (mode == 9) { // Overlay
         c = lerp(2.0 * a * b, 1.0 - 2.0 * (1.0 - a) * (1.0 - b), step(0.5, a));
-        
+
     } else if (mode == 10) { // Soft Light
         c = lerp(2.0 * a * b + a * a * (1.0 - 2.0 * b), sqrt(a) * (2.0 * b - 1.0) + 2.0 * a * (1.0 - b), step(0.5, b));
-        
+
     } else if (mode == 11) { // Hard Light
         c = lerp(2.0 * a * b, 1.0 - 2.0 * (1.0 - b) * (1.0 - a), step(0.5, b));
-        
+
     } else if (mode == 12) { // Difference
         c = abs(a - b);
-        
+
     } else if (mode == 13) { // Exclusion
         c = a + b - 2.0 * a * b;
-        
+
     } else if (mode == 14) { // Subtract
         c = max(a - b, 0.0);
-        
+
     } else if (mode == 15) { // Divide
         c = min(a / (b + 0.000001), 1.0);
     }
@@ -313,46 +322,46 @@ float3 applyBlendMode(int mode, float3 a, float3 b, float alpha) {
 float2 calcCubeUV(float2 startUV, float3 rayDir, float depth) {
     // Initialize the ray origin on the 2D surface (Z = 0.0)
     float3 rayPos = float3(startUV, 0.0);
-    
+
     // Precompute the inverse ray direction to optimize intersection calculations
     float3 invRay = 1.0 / rayDir;
-    
+
     // Determine the target wall coordinates (0.0 or 1.0) based on ray direction
     float3 wallTarget = step(0.0, rayDir);
-    
+
     // Calculate the distance to each plane using the slab method (tx, ty, tz)
     float tx = (wallTarget.x - rayPos.x) * invRay.x;
     float ty = (wallTarget.y - rayPos.y) * invRay.y;
     float tz = (depth - rayPos.z) * invRay.z;
-    
+
     // Select the closest intersection distance
     float tHit = min(tx, min(ty, tz));
-    
+
     // Calculate the exact 3D intersection point
     float3 hitPos = rayPos + rayDir * tHit;
-    
+
     // Normalize the Z depth for texture mapping (0.0 to 1.0 range)
     float normZ = hitPos.z / depth;
-    
+
     // Calc uv
     if (step(tx, tHit) == 1.0) {
         if (wallTarget.x >= 0.5) { // Right
             return float2(3.0 - normZ, 2.0 - hitPos.y) * ONE_THIRD;
-            
+
         } else {
             return float2(normZ, 2.0 - hitPos.y) * ONE_THIRD;
         }
     }
-    
+
     if (step(ty, tHit) == 1.0) {
         if (wallTarget.y >= 0.5) { // Top
             return float2(hitPos.x + 1.0, normZ) * ONE_THIRD;
-            
+
         } else {
             return float2(hitPos.x + 1.0, 3.0 - normZ) * ONE_THIRD;
         }
     }
-    
+
     // Back
     return float2(hitPos.x + 1.0, 2.0 - hitPos.y) * ONE_THIRD;
 }
@@ -360,17 +369,20 @@ float2 calcCubeUV(float2 startUV, float3 rayDir, float depth) {
 float3 calcPlaneUV(float2 startUV, float3 rayDir, float depth, float2 offset) {
     // Calculate the intersection point of the view ray with the layer plane
     float2 hitPos = startUV - (rayDir.xy / rayDir.z) * depth;
-    
+
     // Apply the custom 2D texture offset
     float2 offsetBaseUv = hitPos + offset;
-    
+
     // Create a clipping mask to prevent texture repeating
     // 1.0 if inside [0, 1] bounds
     // 0.0 if outside
     float maskX = step(0.0, offsetBaseUv.x) * step(offsetBaseUv.x, 1.0);
     float maskY = step(0.0, offsetBaseUv.y) * step(offsetBaseUv.y, 1.0);
     float mask = maskX * maskY;
-    
+
+    // Apply UV margin to prevent texture bleeding from adjacent atlas tiles.
+    offsetBaseUv = lerp(float2(UVMargin, UVMargin), float2(1.0 - UVMargin, 1.0 - UVMargin), offsetBaseUv);
+
     // Invert the Y-axis for correct texture orientation and scale down for
     // the 3x3 texture atlas
     float2 uv = float2(offsetBaseUv.x, 1.0 - offsetBaseUv.y) * ONE_THIRD;
@@ -384,10 +396,10 @@ float4 PS(VS_OUTPUT input) : SV_Target {
         input.vNormal,
         input.vTangent
     );
-    
+
     float2 mainUv = calcCubeUV(input.vUV, rayDir, -MainDepth);
     float3 finalRgb = MainTexture.Sample(MainSampler, mainUv).rgb;
-    
+
     bool enables[4] = {
         Layer0_Enable,
         Layer1_Enable,
@@ -424,7 +436,7 @@ float4 PS(VS_OUTPUT input) : SV_Target {
         float2(0.0, TWO_THIRDS),
         float2(TWO_THIRDS, TWO_THIRDS)
     };
-    
+
     // Sorting Network
     int indices[4] = { 0, 1, 2, 3 };
     int tmp;
@@ -441,18 +453,18 @@ float4 PS(VS_OUTPUT input) : SV_Target {
         if (!enables[i]) {
             continue;
         }
-        
+
         float3 layerUv = calcPlaneUV(input.vUV, rayDir, depths[i], -offsets[i]);
         if (layerUv.z == 0.0) {
             continue;
         }
-        
+
         float2 finalLayerUv = layerUv.xy + uvTiles[i];
         float4 layerTex = MainTexture.Sample(MainSampler, finalLayerUv);
-        float alpha = layerTex.a * opacities[i]; 
+        float alpha = layerTex.a * opacities[i];
         finalRgb = applyBlendMode(modes[i], finalRgb, layerTex.rgb, alpha);
     }
-    
+
     return float4(finalRgb, 1.0);
 }
 
