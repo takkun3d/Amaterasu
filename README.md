@@ -12,21 +12,15 @@
 <div align="center">
   <img src="./amaterasu/icons/splash/startup_image.png" width="600">
 </div>
-Working in Maya can sometimes involve massive, repetitive manual tasks or a series of complex procedures. Amaterasu was born to dramatically reduce this time and effort for artists, allowing them to focus on their creative work.
+In CG work, you often lose time on repeating tasks and complex steps. Amaterasu is a growing collection of tools made to change this.
 
-Born from years of development experience and feedback from production environments, Amaterasu is a powerful package comprising approximately 100 tools. It is designed to instantly automate tasks that previously took hours of manual labor, or to complete workflows requiring multiple steps with just a few clicks.
+Created from my own experience, it turns hours of hard work into just a few clicks. This gives artists more time to focus on creating.
 
-This documentation covers everything from how to use each tool in Amaterasu to the latest update information and download methods. We invite you to use Amaterasu to take your Maya workflow to the next level.
+This guide has everything you need: tool guides, updates, and downloads. Level up your workflow today!
 
 ## Document
-[Amaterasu Notion Page](https://telling-mink-b5d.notion.site/Amaterasu-15c88977f41f80a7af4adcfca26d304a)
+[Amaterasu Documentation (Japanese Only)](https://telling-mink-b5d.notion.site/Amaterasu-15c88977f41f80a7af4adcfca26d304a)
 
 ## License
 This project is licensed under the MIT License.\
 see the [LICENSE](./LICENSE) file for details.
-
-### Third-Party Licenses
-* Parallax Interior Mapping (GLSL / HLSL / OSL)\
-Based on "jiWindowBox" by Autodesk Inc., licensed under the Apache License, Version 2.0.\
-See the respective source files for detailed copyright and license notices.\
-https://github.com/ADN-DevTech/3dsMax-OSL-Shaders/blob/master/LICENSE.txt

@@ -17,10 +17,10 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Amaterasu Parallax Interior Mapping Tool.
+"""Amaterasu Parallax Cube Mapping Tool.
 
 This module provides a tool to automatically generate a hybrid shading network
-for parallax interior mapping. It seamlessly bridges real-time viewport shaders
+for parallax cube mapping. It seamlessly bridges real-time viewport shaders
 (GLSL/HLSL) with Arnold's offline OSL shaders, linking their attributes to
 provide a unified and intuitive artist experience.
 """
@@ -33,36 +33,45 @@ from amaterasu.base.qt import QtCore, QtWidgets
 from amaterasu.base import utils, framework, dcc, widgets
 from amaterasu import env
 
-__product__: str = "Parallax Interior Mapping"
+__product__: str = "Parallax Cube Mapping"
 __version__: str = "1.00"
-__copyright__: str = f"""
-{env.DEFAULT_LICENSE}
-<hr />
-Parallax Interior Mapping (GLSL / HLSL / OSL)<br />
-Based on "jiWindowBox" by Autodesk Inc., licensed under the Apache License, Version 2.0.<br />
-See the respective source files for detailed copyright and license notices.<br />
-https://github.com/ADN-DevTech/3dsMax-OSL-Shaders/blob/master/LICENSE.txt
-"""
 _logger: utils.Logger = utils.get_logger(__product__)
 
 NEED_PLUGINS: list[str] = ["glslShader.mll", "dx11Shader.mll", "mtoa.mll"]
 SHADER_DIR: pathlib.Path = env.RESOURCE_PATH / "shader"
 SOURCE_FILES: dict[str, pathlib.Path] = {
-    "glsl": SHADER_DIR / "parallax_interior_mapping_v1_0.ogsfx",
-    "hlsl": SHADER_DIR / "parallax_interior_mapping_v1_0.fx",
-    "osl": SHADER_DIR / "parallax_interior_mapping_v1_0.osl",
+    "glsl": SHADER_DIR / "parallax_cube_mapping_v1.0.ogsfx",
+    "hlsl": SHADER_DIR / "parallax_cube_mapping_v1.0.fx",
+    "osl": SHADER_DIR / "parallax_cube_mapping_v1.0.osl",
 }
 
 ATTRIBUTE_LINK: list[str] = [
+    "UVMargin",
     "MainDepth",
-    "EnableLayer0",
-    "DepthLayer0",
-    "EnableLayer1",
-    "DepthLayer1",
-    "EnableLayer2",
-    "DepthLayer2",
-    "EnableLayer3",
-    "DepthLayer3",
+    "Layer0_Enable",
+    "Layer0_Depth",
+    "Layer0_OffsetX",
+    "Layer0_OffsetY",
+    "Layer0_BlendMode",
+    "Layer0_Opacity",
+    "Layer1_Enable",
+    "Layer1_Depth",
+    "Layer1_OffsetX",
+    "Layer1_OffsetY",
+    "Layer1_BlendMode",
+    "Layer1_Opacity",
+    "Layer2_Enable",
+    "Layer2_Depth",
+    "Layer2_OffsetX",
+    "Layer2_OffsetY",
+    "Layer2_BlendMode",
+    "Layer2_Opacity",
+    "Layer3_Enable",
+    "Layer3_Depth",
+    "Layer3_OffsetX",
+    "Layer3_OffsetY",
+    "Layer3_BlendMode",
+    "Layer3_Opacity",
 ]
 
 
@@ -300,7 +309,7 @@ def create_network(
     cmds.setAttr(f"{osl_node}.codeCache", osl_code, type="string")
     cmds.setAttr(f"{osl_node}.code", osl_code, type="string")
     osl.OSLSceneModel(osl_code, osl_node)
-    cmds.connectAttr(f"{file_node}.fileTextureName", f"{osl_node}.filename")
+    cmds.connectAttr(f"{file_node}.fileTextureName", f"{osl_node}.MainTexture")
     for attr in ATTRIBUTE_LINK:
         cmds.connectAttr(f"{viewport_node}.{attr}", f"{osl_node}.{attr}")
 
