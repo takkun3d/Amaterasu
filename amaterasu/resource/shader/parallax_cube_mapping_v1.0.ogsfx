@@ -278,7 +278,12 @@ GLSLShader PS {
     const float ONE_THIRD = 1.0 / 3.0;
     const float TWO_THIRDS = 2.0 / 3.0;
 
-    vec3 calcTangentViewDir(vec3 worldPos, vec3 camPos, vec3 normal, vec3 tangent) {
+    vec3 calcTangentViewDir(
+        vec3 worldPos,
+        vec3 camPos,
+        vec3 normal,
+        vec3 tangent
+    ) {
         // Calculate the normalized view ray direction from camera to the pixel
         vec3 V = normalize(worldPos - camPos);
 
@@ -322,13 +327,25 @@ GLSLShader PS {
             c = min(a + b, 1.0);
 
         } else if (mode == 9) { // Overlay
-            c = mix(2.0 * a * b, 1.0 - 2.0 * (1.0 - a) * (1.0 - b), step(0.5, a));
+            c = mix(
+                2.0 * a * b,
+                1.0 - 2.0 * (1.0 - a) * (1.0 - b),
+                step(0.5, a)
+            );
 
         } else if (mode == 10) { // Soft Light
-            c = mix(2.0 * a * b + a * a * (1.0 - 2.0 * b), sqrt(a) * (2.0 * b - 1.0) + 2.0 * a * (1.0 - b), step(0.5, b));
+            c = mix(
+                2.0 * a * b + a * a * (1.0 - 2.0 * b),
+                sqrt(a) * (2.0 * b - 1.0) + 2.0 * a * (1.0 - b),
+                step(0.5, b)
+            );
 
         } else if (mode == 11) { // Hard Light
-            c = mix(2.0 * a * b, 1.0 - 2.0 * (1.0 - b) * (1.0 - a), step(0.5, b));
+            c = mix(
+                2.0 * a * b,
+                1.0 - 2.0 * (1.0 - b) * (1.0 - a),
+                step(0.5, b)
+                );
 
         } else if (mode == 12) { // Difference
             c = abs(a - b);
@@ -349,7 +366,7 @@ GLSLShader PS {
         // Initialize the ray origin on the 2D surface (Z = 0.0)
         vec3 rayPos = vec3(startUV, 0.0);
 
-        // Precompute the inverse ray direction to optimize intersection calculations
+        // Precompute the inverse ray direction tooptimize intersection calculations
         vec3 invRay = 1.0 / rayDir;
 
         // Determine the target wall coordinates (0.0 or 1.0) based on ray direction

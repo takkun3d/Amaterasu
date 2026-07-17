@@ -252,7 +252,12 @@ VS_OUTPUT VS(VS_INPUT input) {
     return output;
 }
 
-float3 calcTangentViewDir(float3 worldPos, float3 camPos, float3 normal, float3 tangent) {
+float3 calcTangentViewDir(
+    float3 worldPos,
+    float3 camPos,
+    float3 normal,
+    float3 tangent
+) {
     // Calculate the normalized view ray direction from camera to the pixel
     float3 V = normalize(worldPos - camPos);
 
@@ -296,13 +301,25 @@ float3 applyBlendMode(int mode, float3 a, float3 b, float alpha) {
         c = min(a + b, 1.0);
 
     } else if (mode == 9) { // Overlay
-        c = lerp(2.0 * a * b, 1.0 - 2.0 * (1.0 - a) * (1.0 - b), step(0.5, a));
+        c = lerp(
+                2.0 * a * b,
+                1.0 - 2.0 * (1.0 - a) * (1.0 - b),
+                step(0.5, a)
+            );
 
     } else if (mode == 10) { // Soft Light
-        c = lerp(2.0 * a * b + a * a * (1.0 - 2.0 * b), sqrt(a) * (2.0 * b - 1.0) + 2.0 * a * (1.0 - b), step(0.5, b));
+        c = lerp(
+                2.0 * a * b + a * a * (1.0 - 2.0 * b),
+                sqrt(a) * (2.0 * b - 1.0) + 2.0 * a * (1.0 - b),
+                step(0.5, b)
+            );
 
     } else if (mode == 11) { // Hard Light
-        c = lerp(2.0 * a * b, 1.0 - 2.0 * (1.0 - b) * (1.0 - a), step(0.5, b));
+        c = lerp(
+                2.0 * a * b,
+                1.0 - 2.0 * (1.0 - b) * (1.0 - a),
+                step(0.5, b)
+            );
 
     } else if (mode == 12) { // Difference
         c = abs(a - b);
@@ -345,7 +362,11 @@ float2 calcCubeUV(float2 startUV, float3 rayDir, float depth) {
 
     // Apply UV margin to prevent texture bleeding from adjacent atlas tiles.
     normZ = lerp(UVMargin, 1.0 - UVMargin, normZ);
-    hitPos.xy = lerp(float2(UVMargin, UVMargin), float2(1.0 - UVMargin, 1.0 - UVMargin), hitPos.xy);
+    hitPos.xy = lerp(
+        float2(UVMargin, UVMargin),
+        float2(1.0 - UVMargin, 1.0 - UVMargin),
+        hitPos.xy
+    );
 
     // Calc uv
     if (step(tx, tHit) == 1.0) {
@@ -385,7 +406,11 @@ float3 calcPlaneUV(float2 startUV, float3 rayDir, float depth, float2 offset) {
     float mask = maskX * maskY;
 
     // Apply UV margin to prevent texture bleeding from adjacent atlas tiles.
-    offsetBaseUv = lerp(float2(UVMargin, UVMargin), float2(1.0 - UVMargin, 1.0 - UVMargin), offsetBaseUv);
+    offsetBaseUv = lerp(
+        float2(UVMargin, UVMargin),
+        float2(1.0 - UVMargin, 1.0 - UVMargin),
+        offsetBaseUv
+    );
 
     // Invert the Y-axis for correct texture orientation and scale down for
     // the 3x3 texture atlas

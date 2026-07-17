@@ -68,13 +68,25 @@ color applyBlendMode(int mode, color a, color b, float alpha) {
         c = min(a + b, 1.0);
 
     } else if (mode == 9) { // Overlay
-        c = mix(2.0 * a * b, 1.0 - 2.0 * (1.0 - a) * (1.0 - b), step(0.5, a));
+        c = mix(
+            2.0 * a * b,
+            1.0 - 2.0 * (1.0 - a) * (1.0 - b),
+            step(0.5, a)
+        );
 
     } else if (mode == 10) { // Soft Light
-        c = mix(2.0 * a * b + a * a * (1.0 - 2.0 * b), sqrt(a) * (2.0 * b - 1.0) + 2.0 * a * (1.0 - b), step(0.5, b));
+        c = mix(
+            2.0 * a * b + a * a * (1.0 - 2.0 * b),
+            sqrt(a) * (2.0 * b - 1.0) + 2.0 * a * (1.0 - b),
+            step(0.5, b)
+        );
 
     } else if (mode == 11) { // Hard Light
-        c = mix(2.0 * a * b, 1.0 - 2.0 * (1.0 - b) * (1.0 - a), step(0.5, b));
+        c = mix(
+            2.0 * a * b,
+            1.0 - 2.0 * (1.0 - b) * (1.0 - a),
+            step(0.5, b)
+        );
 
     } else if (mode == 12) { // Difference
         c = abs(a - b);
@@ -91,7 +103,12 @@ color applyBlendMode(int mode, color a, color b, float alpha) {
     return mix(a, c, alpha);
 }
 
-vector calcCubeUV(vector startUV, vector rayDir, float depth, float UVMargin) {
+vector calcCubeUV(
+    vector startUV,
+    vector rayDir,
+    float depth,
+    float UVMargin
+) {
     // Initialize the ray origin on the 2D surface (Z = 0.0)
     vector rayPos = vector(startUV[0], startUV[1], 0.0);
 
@@ -143,7 +160,13 @@ vector calcCubeUV(vector startUV, vector rayDir, float depth, float UVMargin) {
     return vector(hitPos[0] + 1.0, 2.0 - hitPos[1], 0.0) * ONE_THIRD;
 }
 
-vector calcPlaneUV(vector startUV, vector rayDir, float depth, vector offset, float UVMargin) {
+vector calcPlaneUV(
+    vector startUV,
+    vector rayDir,
+    float depth,
+    vector offset,
+    float UVMargin
+) {
     // Calculate the intersection point of the view ray with the layer plane
     vector hitPos = startUV - (rayDir / rayDir[2]) * depth;
 
@@ -158,7 +181,11 @@ vector calcPlaneUV(vector startUV, vector rayDir, float depth, vector offset, fl
     float mask = maskX * maskY;
 
     // Apply UV margin to prevent texture bleeding from adjacent atlas tiles.
-    offsetBaseUv = mix(vector(UVMargin, UVMargin, 0.0), vector(1.0 - UVMargin, 1.0 - UVMargin, 0.0), offsetBaseUv);
+    offsetBaseUv = mix(
+        vector(UVMargin, UVMargin, 0.0),
+        vector(1.0 - UVMargin, 1.0 - UVMargin, 0.0),
+        offsetBaseUv
+    );
 
     // Invert the Y-axis for correct texture orientation and scale down for
     // the 3x3 texture atlas
@@ -272,7 +299,13 @@ shader parallax_cube_mapping (
             continue;
         }
 
-        vector layerUv = calcPlaneUV(startUV, rayDir, depths[i], -offsets[i], UVMargin);
+        vector layerUv = calcPlaneUV(
+            startUV,
+            rayDir,
+            depths[i],
+            -offsets[i],
+            UVMargin
+        );
         if (layerUv[2] == 0.0) {
             continue;
         }
