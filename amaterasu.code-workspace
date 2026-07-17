@@ -26,16 +26,15 @@
         "editor.mouseWheelZoom": true,
         "editor.fontFamily": "'Moralerspace Neon JPDOC', Consolas, 'Courier New', monospace",
         "editor.fontSize": 14,
-
+        "editor.rulers": [
+                80,
+                100
+            ],
         "[python]": {
             "editor.autoIndent": "full",
             "editor.detectIndentation": true,
             "editor.insertSpaces": true,
             "editor.tabSize": 4,
-            "editor.rulers": [
-                80,
-                100
-            ],
             "editor.formatOnSave": true,
             "editor.defaultFormatter": "ms-python.black-formatter"
         },
