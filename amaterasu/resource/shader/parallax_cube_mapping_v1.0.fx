@@ -343,6 +343,10 @@ float2 calcCubeUV(float2 startUV, float3 rayDir, float depth) {
     // Normalize the Z depth for texture mapping (0.0 to 1.0 range)
     float normZ = hitPos.z / depth;
 
+    // Apply UV margin to prevent texture bleeding from adjacent atlas tiles.
+    normZ = lerp(UVMargin, 1.0 - UVMargin, normZ);
+    hitPos.xy = lerp(float2(UVMargin, UVMargin), float2(1.0 - UVMargin, 1.0 - UVMargin), hitPos.xy);
+
     // Calc uv
     if (step(tx, tHit) == 1.0) {
         if (wallTarget.x >= 0.5) { // Right

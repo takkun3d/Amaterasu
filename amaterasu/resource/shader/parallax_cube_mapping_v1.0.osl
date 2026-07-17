@@ -91,7 +91,7 @@ color applyBlendMode(int mode, color a, color b, float alpha) {
     return mix(a, c, alpha);
 }
 
-vector calcCubeUV(vector startUV, vector rayDir, float depth) {
+vector calcCubeUV(vector startUV, vector rayDir, float depth, float UVMargin) {
     // Initialize the ray origin on the 2D surface (Z = 0.0)
     vector rayPos = vector(startUV[0], startUV[1], 0.0);
 
@@ -114,6 +114,11 @@ vector calcCubeUV(vector startUV, vector rayDir, float depth) {
 
     // Normalize the Z depth for texture mapping (0.0 to 1.0 range)
     float normZ = hitPos[2] / depth;
+
+    // Apply UV margin to prevent texture bleeding from adjacent atlas tiles.
+    normZ = mix(UVMargin, 1.0 - UVMargin, normZ);
+    hitPos[0] = mix(UVMargin, 1.0 - UVMargin, hitPos[0]);
+    hitPos[1] = mix(UVMargin, 1.0 - UVMargin, hitPos[1]);
 
     // Calc uv
     if (step(tx, tHit) == 1.0) {
@@ -203,7 +208,7 @@ shader parallax_cube_mapping (
     rayDir.y *= aspect;
 
     vector startUV = vector(u, v, 0.0);
-    vector mainUv = calcCubeUV(startUV, rayDir, -MainDepth);
+    vector mainUv = calcCubeUV(startUV, rayDir, -MainDepth, UVMargin);
     float mainAlpha = 1.0;
     color finalRgb = texture(
         MainTexture,
