@@ -74,6 +74,7 @@ def group_by_node(components: list[str]) -> dict[str, list[str]]:
             their components.
     """
     result: dict[str, list[str]] = {}
+    components = cmds.ls(*components, flatten=True)
     for comp in components:
         node: str = comp.split(".")[0]
         result.setdefault(node, []).append(comp)
