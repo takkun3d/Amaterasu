@@ -154,3 +154,17 @@ def extract_faces(faces: list[str]) -> list[str]:
         cmds.select(*result)
 
     return result
+
+
+def face_normals(face: str) -> list[float]:
+    """Return the normal vector of the specified polygon face.
+
+    Args:
+        face: The name of the polygon face (e.g., "pCube1.f[0]").
+
+    Returns:
+        A list of three floats representing the [x, y, z] components of
+            the face normal vector.
+    """
+    temp: list[str] = cmds.polyInfo(face, faceNormals=True)[0].split(" ")
+    return [float(temp[-3]), float(temp[-2]), float(temp[-1])]

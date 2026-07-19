@@ -46,6 +46,7 @@ from amaterasu.base.dcc.mesh.face import (
     get_hard_edge_shells,
     duplicate_faces,
     extract_faces,
+    face_normals,
 )
 from amaterasu.base.dcc.mesh.uv import get_inverted_uv_faces
 from amaterasu.base.dcc.mesh.material import get_shading_groups
@@ -72,6 +73,7 @@ __all__: list[str] = [
     "get_hard_edge_shells",
     "duplicate_faces",
     "extract_faces",
+    "face_normals",
     # uv
     "get_inverted_uv_faces",
     # material
