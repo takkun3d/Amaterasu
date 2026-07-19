@@ -42,7 +42,11 @@ from amaterasu.base.dcc.mesh.edge import (
     edge_length_2d,
     edge_length_3d,
 )
-from amaterasu.base.dcc.mesh.face import get_hard_edge_shells
+from amaterasu.base.dcc.mesh.face import (
+    get_hard_edge_shells,
+    duplicate_faces,
+    extract_faces,
+)
 from amaterasu.base.dcc.mesh.uv import get_inverted_uv_faces
 from amaterasu.base.dcc.mesh.material import get_shading_groups
 from amaterasu.base.dcc.mesh.node import get_polygon_transforms
@@ -66,6 +70,8 @@ __all__: list[str] = [
     "edge_length_3d",
     # facce
     "get_hard_edge_shells",
+    "duplicate_faces",
+    "extract_faces",
     # uv
     "get_inverted_uv_faces",
     # material

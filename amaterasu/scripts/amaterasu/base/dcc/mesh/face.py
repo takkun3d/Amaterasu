@@ -21,6 +21,8 @@
 
 from __future__ import annotations
 from maya.api import OpenMaya
+from maya import cmds
+from amaterasu.base.dcc.mesh import component
 
 
 def get_hard_edge_shells(faces: list[str]) -> list[str]:
@@ -78,3 +80,77 @@ def get_hard_edge_shells(faces: list[str]) -> list[str]:
                         stack.append(next_face)
 
     return result_faces
+
+
+def duplicate_faces(faces: list[str]) -> list[str]:
+    """Duplicates specified polygon faces as a new mesh.
+
+    This function groups selected faces by their parent geometry, duplicates
+    the original mesh, and removes all faces except for those specified in
+    the input list.
+
+    Args:
+        faces: A list of face component strings (e.g., ["pCube1.f[0]"]).
+
+    Returns:
+        A list of new mesh names created during the operation.
+    """
+    result: list[str] = []
+    grouped_faces: dict[str, list[str]] = component.group_by_node(faces)
+    for node, face_list in grouped_faces.items():
+        new_node: str = cmds.duplicate(node, returnRootsOnly=True)[0]
+        keep_faces: list[str] = [
+            f"{new_node}.{f.split('.')[-1]}" for f in face_list
+        ]
+
+        cmds.select(f"{new_node}.f[*]")
+        cmds.select(*keep_faces, deselect=True)
+
+        targets_to_delete: list[str] = cmds.ls(selection=True)
+        if targets_to_delete:
+            cmds.delete(*targets_to_delete)
+            result.append(new_node)
+
+        else:
+            cmds.delete(new_node)
+
+    if result:
+        cmds.select(*result)
+
+    return result
+
+
+def extract_faces(faces: list[str]) -> list[str]:
+    """Extracts specified polygon faces into a new mesh.
+
+    Groups selected faces by their parent geometry, duplicates the mesh,
+    and removes the extracted faces from the original geometry while
+    cleaning up the new mesh to retain only the extracted components.
+
+    Args:
+        faces: A list of face component strings (e.g., ["pCube1.f[0]"]).
+
+    Returns:
+        A list of new mesh names created during the operation.
+    """
+    result: list[str] = []
+    grouped_faces: dict[str, list[str]] = component.group_by_node(faces)
+    for node, face_list in grouped_faces.items():
+        new_node: str = cmds.duplicate(node, returnRootsOnly=True)[0]
+        keep_faces: list[str] = [
+            f"{new_node}.{f.split('.')[-1]}" for f in face_list
+        ]
+        cmds.select(f"{new_node}.f[*]")
+        cmds.select(*keep_faces, deselect=True)
+
+        targets_to_delete: list[str] = cmds.ls(selection=True)
+        if targets_to_delete:
+            cmds.delete(*targets_to_delete)
+
+        cmds.delete(*face_list)
+        result.append(new_node)
+
+    if result:
+        cmds.select(*result)
+
+    return result
