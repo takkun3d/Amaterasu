@@ -17,45 +17,43 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Provides a hub for polygon mesh and component operations in Maya.
-
-This subpackage acts as a facade, exposing component conversion utilities
-and edge/face/vertex evaluations from its internal modules for convenient access.
-"""
+"""Provides node utilities for Maya meshes."""
 
 from __future__ import annotations
-from amaterasu.base.dcc.mesh.component import (
-    to_edge,
-    to_face,
-    group_by_node,
-    get_index,
-)
-from amaterasu.base.dcc.mesh.edge import (
-    get_crease_edges,
-    get_hard_edges,
-    get_nth_edges,
-)
-from amaterasu.base.dcc.mesh.face import get_hard_edge_shells
-from amaterasu.base.dcc.mesh.uv import get_inverted_uv_faces
-from amaterasu.base.dcc.mesh.material import get_shading_groups
-from amaterasu.base.dcc.mesh.node import get_polygon_transforms
+from maya import cmds
 
-__all__: list[str] = [
-    # component
-    "to_edge",
-    "to_face",
-    "group_by_node",
-    "get_index",
-    # edge
-    "get_crease_edges",
-    "get_hard_edges",
-    "get_nth_edges",
-    # facce
-    "get_hard_edge_shells",
-    # uv
-    "get_inverted_uv_faces",
-    # material
-    "get_shading_groups",
-    # node
-    "get_polygon_transforms",
-]
+
+def get_polygon_transforms(
+    nodes: list[str], result: list[str] | None = None
+) -> list[str]:
+    """Searches for polygon transform nodes within the given hierarchy.
+
+    Args:
+        nodes (list[str]): A list of node names to search.
+
+    Returns:
+        list[str]: A list of transform nodes that contain mesh shapes.
+    """
+    if not result:
+        result = []
+
+    for node in nodes:
+        if cmds.objectType(node) != "transform":
+            continue
+
+        shapes: list[str] = (
+            cmds.listRelatives(node, shapes=True, path=True) or []
+        )
+        if not shapes:
+            children: list[str] = (
+                cmds.listRelatives(node, children=True, path=True) or []
+            )
+            if children:
+                result = get_polygon_transforms(children, result)
+
+        else:
+            shape: str = shapes[0]
+            if cmds.objectType(shape) == "mesh":
+                result.append(node)
+
+    return result

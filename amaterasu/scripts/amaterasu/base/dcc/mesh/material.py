@@ -17,45 +17,21 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Provides a hub for polygon mesh and component operations in Maya.
-
-This subpackage acts as a facade, exposing component conversion utilities
-and edge/face/vertex evaluations from its internal modules for convenient access.
-"""
+"""Provides material utilities for Maya meshes."""
 
 from __future__ import annotations
-from amaterasu.base.dcc.mesh.component import (
-    to_edge,
-    to_face,
-    group_by_node,
-    get_index,
-)
-from amaterasu.base.dcc.mesh.edge import (
-    get_crease_edges,
-    get_hard_edges,
-    get_nth_edges,
-)
-from amaterasu.base.dcc.mesh.face import get_hard_edge_shells
-from amaterasu.base.dcc.mesh.uv import get_inverted_uv_faces
-from amaterasu.base.dcc.mesh.material import get_shading_groups
-from amaterasu.base.dcc.mesh.node import get_polygon_transforms
+from maya import cmds
 
-__all__: list[str] = [
-    # component
-    "to_edge",
-    "to_face",
-    "group_by_node",
-    "get_index",
-    # edge
-    "get_crease_edges",
-    "get_hard_edges",
-    "get_nth_edges",
-    # facce
-    "get_hard_edge_shells",
-    # uv
-    "get_inverted_uv_faces",
-    # material
-    "get_shading_groups",
-    # node
-    "get_polygon_transforms",
-]
+
+def get_shading_groups(node: str) -> list[str]:
+    """Gets shading groups associated with the specified node.
+
+    Args:
+        node (str): The name of the node.
+
+    Returns:
+        list[str]: A list of shading group names.
+    """
+    all_nodes: list[str] = cmds.listHistory(node, future=True) or []  # type: ignore
+    shading_group: list[str] = cmds.ls(*all_nodes, type="shadingEngine")
+    return shading_group
