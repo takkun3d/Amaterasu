@@ -1,102 +1,96 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Flatten Faces
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Flattens selected polygon faces onto a shared plane."""
+
 from __future__ import annotations
 from maya import cmds
-from ..lib import logger, utility
+from amaterasu.base import dcc, utils
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Flatten Faces'
-__version__: str = '1.00'
-__doc__ = 'Flatten faces from selected it.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+__product__: str = "Flatten Faces"
+__version__: str = "1.10"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
+def flatten(faces: list[str]) -> None:
+    """Flatten the selected polygon faces onto a shared plane.
 
+    Calculates the average normal of the selected faces and aligns the
+    associated vertices to a plane defined by the averaged vertex positions
+    and the averaged face normal vector.
 
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
-def apply(faces: list[str]) -> None:
-    '''Flatten faces.'''
-    faces_each_geo: dict[str, list[str]] = utility.to_each_geometry(faces)
-    for node in faces_each_geo:
-        face_number: int = len(faces_each_geo[node])
-        bounding_box: list[float] = cmds.xform(
-            faces_each_geo[node], query=True, objectSpace=True, boundingBox=True
-        )
-        center_pivot: list[float] = [
-            (bounding_box[0] + bounding_box[3]) * 0.5,
-            (bounding_box[1] + bounding_box[4]) * 0.5,
-            (bounding_box[2] + bounding_box[5]) * 0.5,
+    Args:
+        faces: A list of strings representing the names of the selected
+            polygon faces (e.g., ["pCube1.f[0]", "pCube1.f[1]"]).
+
+    Returns:
+        None
+    """
+    faces_each_geo: dict[str, list[str]] = dcc.mesh.group_by_node(faces)
+    for _node, node_faces in faces_each_geo.items():
+        vertices: list[str] = dcc.mesh.to_vertex(node_faces)
+        positions: list[list[float]] = [
+            cmds.pointPosition(v, local=True) for v in vertices
         ]
-        face_vector: list[float] = [0.0, 0.0, 0.0]
-        for face in faces_each_geo[node]:
-            vector: list[float] = utility.face_normals(face)
-            face_vector[0] += vector[0] / face_number
-            face_vector[1] += vector[1] / face_number
-            face_vector[2] += vector[2] / face_number
+        num_verts: int = len(positions)
 
-        center_distance: float = (
-            face_vector[0] * center_pivot[0]
-            + face_vector[1] * center_pivot[1]
-            + face_vector[2] * center_pivot[2]
-        )
-        for face in faces_each_geo[node]:
-            vertexes = utility.to_vertex(face)
-            for vertex in vertexes:
-                value: list[float] = [0.0, 0.0, 0.0]
-                position: list[float] = cmds.pointPosition(vertex, local=True)
-                offset: float = (
-                    center_distance
-                    - (face_vector[0] * position[0])
-                    - (face_vector[1] * position[1])
-                    - (face_vector[2] * position[2])
-                )
-                length: float = (
-                    (face_vector[0] * face_vector[0])
-                    + (face_vector[1] * face_vector[1])
-                    + (face_vector[2] * face_vector[2])
-                )
-                if length != 0:
-                    value = [
-                        position[0] + (offset / length * face_vector[0]),
-                        position[1] + (offset / length * face_vector[1]),
-                        position[2] + (offset / length * face_vector[2]),
-                    ]
+        center_pivot: list[float] = [
+            sum(p[0] for p in positions) / num_verts,
+            sum(p[1] for p in positions) / num_verts,
+            sum(p[2] for p in positions) / num_verts,
+        ]
 
-                cmds.move(
-                    value[0],
-                    value[1],
-                    value[2],
-                    vertex,
-                    absolute=True,
-                    objectSpace=True,
-                )
+        avg_normal: list[float] = get_average_normal(node_faces)
+
+        # Plane equation: ax + by + cz = d
+        d: float = sum(n * c for n, c in zip(avg_normal, center_pivot))
+        for vertex, pos in zip(vertices, positions):
+            new_pos: list[float] = project_to_plane(pos, avg_normal, d)
+            cmds.move(*new_pos, vertex, absolute=True, objectSpace=True)  # type: ignore
+
+
+def get_average_normal(faces: list[str]) -> list[float]:
+    """Calculate the average normal vector of the provided faces."""
+    normals: list[list[float]] = [dcc.mesh.face_normals(f) for f in faces]
+    count: int = len(normals)
+    return [sum(n[i] for n in normals) / count for i in range(3)]
+
+
+def project_to_plane(
+    point: list[float], normal: list[float], d: float
+) -> list[float]:
+    """Project a point onto a plane defined by a normal and distance d."""
+    # dist = (normal dot point) - d
+    dist: float = sum(n * p for n, p in zip(normal, point)) - d
+    mag_sq: float = sum(n**2 for n in normal)
+    if mag_sq == 0:
+        return point
+
+    return [p - (dist / mag_sq) * n for p, n in zip(point, normal)]
 
 
 def main() -> None:
-    '''Flatten faces from selected it.'''
-    selection: list[str] = cmds.filterExpand(selectionMask=34)
+    """Execute the flatten faces operation based on user selection."""
+    selection: list[str] = cmds.filterExpand(selectionMask=34) or []
     if not selection:
-        _logger.error('Select polygon faces to flat.')
+        _logger.error("No polygon faces selected.")
         return
 
-    apply(selection)
-    _logger.info('Done.')
+    flatten(selection)
+    _logger.info("Done.")
