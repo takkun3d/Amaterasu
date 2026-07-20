@@ -30,19 +30,19 @@ _logger: utils.Logger = utils.get_logger(__product__)
 
 def expand_mesh_from_uv(
     node: str, auto_split_border: bool = True
-) -> utils.Result:
+) -> utils.DataResult[list[str]]:
     """Expands mesh geometry based on its UV layout coordinates.
 
     Args:
-        node: The transform node to process.
-        auto_split_border: Whether to automatically split vertices at UV
-            borders before processing.
+        node (str): The transform node to process.
+        auto_split_border (bool, optional): Whether to automatically split
+            vertices at UV borders before processing. Defaults to True.
 
     Returns:
-        A Result object containing the status and potential error details of
-        the operation.
+        utils.DataResult[list[str]]: The result object containing the newly
+            created node names as its value payload.
     """
-    result: utils.Result = utils.Result()
+    result: utils.DataResult[list[str]] = utils.DataResult([])
     shapes: list[str] = cmds.listRelatives(node, shapes=True, path=True) or []
     if not shapes or cmds.objectType(shapes[0]) != "mesh":
         result.add_failure(node, "Skipping non-mesh node.")
@@ -65,7 +65,7 @@ def expand_mesh_from_uv(
         uvs: list[str] = dcc.mesh.to_uv(vertex)
         if len(uvs) != 1:
             cmds.delete(new_node)
-            result.add_failure(node, "Vertex has invalid UV count")
+            result.add_failure(node, "Vertex has an invalid UV count.")
             return result
 
         position: list[float] = cmds.polyEditUV(uvs[0], query=True)  # type: ignore
@@ -77,20 +77,23 @@ def expand_mesh_from_uv(
             localSpace=True,
         )
 
+    result.set_value([new_node])
     return result
 
 
 def main() -> None:
     """Executes the mesh expansion process based on the current selection."""
-    selection: list[str] = cmds.ls(selection=True)
+    selection: list[str] = cmds.ls(selection=True, type="transform")
     if not selection:
         _logger.error("Select polygons to expand mesh from UV.")
         return
 
-    result: utils.Result = utils.Result()
+    result: utils.DataResult[list[str]] = utils.DataResult([])
     for node in selection:
-        r: utils.Result = expand_mesh_from_uv(node)
+        r: utils.DataResult[list[str]] = expand_mesh_from_uv(node)
         result.merge(r)
 
-    cmds.select(*selection)
+    if result.value():
+        cmds.select(*result.value())
+
     result.log(_logger)
