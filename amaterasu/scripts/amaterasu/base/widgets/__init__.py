@@ -32,6 +32,7 @@ from amaterasu.base.widgets.color_select_button import ColorSelectButton
 from amaterasu.base.widgets.double_range_widget import DoubleRangeWidget
 from amaterasu.base.widgets.form_label import FormLabel
 from amaterasu.base.widgets.form_layout import FormLayout
+from amaterasu.base.widgets.frame_widget import FrameWidget
 from amaterasu.base.widgets.horizontal_line import HorizontalLine
 from amaterasu.base.widgets.icon_button import IconButton
 from amaterasu.base.widgets.index_color_palette import IndexColorPalette
@@ -53,6 +54,7 @@ __all__: list[str] = [
     "IndexColorPalette",
     "FormLabel",
     "FormLayout",
+    "FrameWidget",
     "HorizontalLine",
     "IconButton",
     "ListWidget",
