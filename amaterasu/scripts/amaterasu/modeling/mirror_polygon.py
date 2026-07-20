@@ -1,264 +1,296 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Mirror Polygon
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Mirrors polygons to easily generate inverted meshes."""
+
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from maya import cmds
 
-try:
-    from PySide2.QtCore import Qt, Slot
-    from PySide2.QtWidgets import QWidget, QLineEdit, QCheckBox, QComboBox
+from amaterasu.base.qt import QtCore, QtWidgets
+from amaterasu.base import dcc, framework, utils, widgets
 
-except ImportError:
-    if not TYPE_CHECKING:
-        from PySide6.QtCore import Qt, Slot
-        from PySide6.QtWidgets import QWidget, QLineEdit, QCheckBox, QComboBox
-from ..lib import logger, parser, widgets
+__product__: str = "Mirror Polygon"
+__version__: str = "1.30"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Mirror Polygon'
-__version__: str = '1.30'
-__doc__ = 'Mirror polygon easily generates inverted meshes.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+class Settings(framework.ToolSettings):
+    """Settings for the tool.
+
+    Attributes:
+        window_geo (framework.Variant[str]): Geometry data of the window.
+        axis (framework.Variant[int]): Mirror axis (0: X, 1: Y, 2: Z).
+        flip_uvs (framework.Variant[bool]): Whether to flip UVs.
+        uv_direction (framework.Variant[int]): UV flip direction.
+        search (framework.Variant[str]): Search string for renaming.
+        replace (framework.Variant[str]): Replace string for renaming.
+    """
+
+    window_geo: framework.Variant[str] = framework.Variant("")
+    axis: framework.Variant[int] = framework.Variant(0)
+    flip_uvs: framework.Variant[bool] = framework.Variant(True)
+    uv_direction: framework.Variant[int] = framework.Variant(2)
+    search: framework.Variant[str] = framework.Variant("_L_")
+    replace: framework.Variant[str] = framework.Variant("_R_")
 
 
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-class Settings(parser.ToolSettings):
-    '''Settings for tool.'''
-
-    window_geo: parser.Variant[str] = parser.Variant('')
-    axis: parser.Variant[int] = parser.Variant(0)
-    flip_uvs: parser.Variant[bool] = parser.Variant(True)
-    uv_direction: parser.Variant[int] = parser.Variant(2)
-    search: parser.Variant[str] = parser.Variant('_L_')
-    replace: parser.Variant[str] = parser.Variant('_R_')
-
-
-class MainWindow(widgets.StandardToolWidget):
-    '''Tool main window'''
+class MainWindow(framework.StandardToolWindow[Settings]):
+    """Main window for the Mirror Polygon tool."""
 
     def __init__(
         self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-        unique_id: str = '',
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Window,
+        unique_id: str = "",
     ) -> None:
-        '''Initialize widget.'''
+        """Initializes the window.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The Qt window flags.
+                Defaults to Window.
+            unique_id (str, optional): A unique ID for restoring window states.
+                Defaults to "".
+        """
         super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
-        self.resize(400, 300)
+        self.resize(400, 200)
 
-        option_widget: QWidget = self.option_widget()
-        main_layout: widgets.FormLayout = widgets.FormLayout(option_widget)
+    def create_ui(self, parent: QtWidgets.QWidget) -> None:
+        """Creates the tool-specific user interface.
 
-        main_layout.addRow(
-            widgets.FrameWidget('Mirror Options', False, False, self)
-        )
-
-        self.__axis: widgets.RadioButtons = widgets.RadioButtons(self)
-        self.__axis.set_labels(('X', 'Y', 'Z'))
-        main_layout.addRow(widgets.FormLabel('Axis'), self.__axis)
+        Args:
+            parent (QtWidgets.QWidget): The parent widget to contain the UI.
+        """
+        main_layout: widgets.FormLayout = widgets.FormLayout(parent)
 
         main_layout.addRow(
-            widgets.FrameWidget('UV Options', False, False, self)
+            widgets.FrameWidget("Mirror Options", False, False, self)
         )
 
-        self.__flip_uvs: QCheckBox = QCheckBox(self)
-        self.__flip_uvs.setText('Flip UVs')
-        self.__flip_uvs.clicked.connect(self.set_valid_options)
-        main_layout.addRow('', self.__flip_uvs)
-
-        self.__uv_direction: QComboBox = QComboBox(self)
-        self.__uv_direction.addItem('Local U')
-        self.__uv_direction.addItem('Local V')
-        self.__uv_direction.addItem('World U')
-        self.__uv_direction.addItem('World V')
-        main_layout.addRow(widgets.FormLabel('Direction'), self.__uv_direction)
-        self.__uv_direction_id: int = main_layout.row_id()
+        axis: QtWidgets.QComboBox = QtWidgets.QComboBox(self)
+        axis.addItems(["X", "Y", "Z"])
+        main_layout.addRow(widgets.FormLabel("Axis"), axis)
 
         main_layout.addRow(
-            widgets.FrameWidget('Rename Options', False, False, self)
+            widgets.FrameWidget("UV Options", False, False, self)
         )
 
-        self.__search: QLineEdit = QLineEdit(self)
-        main_layout.addRow(widgets.FormLabel('Search'), self.__search)
+        flip_uvs: QtWidgets.QCheckBox = QtWidgets.QCheckBox(self)
+        flip_uvs.setText("Flip UVs")
+        main_layout.addRow("", flip_uvs)
 
-        self.__replace: QLineEdit = QLineEdit(self)
-        main_layout.addRow(widgets.FormLabel('Replace'), self.__replace)
+        uv_direction: QtWidgets.QComboBox = QtWidgets.QComboBox(self)
+        uv_direction.addItems(["Local U", "Local V", "World U", "World V"])
+        main_layout.addRow(widgets.FormLabel("Direction"), uv_direction)
+        uv_direction_id: int = main_layout.row_id()
 
-    # override
-    def load_settings(self) -> None:
-        '''Load ui settings from file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.__axis.set_check_id(settings.axis.value())
-        self.__flip_uvs.setChecked(settings.flip_uvs.value())
-        self.__uv_direction.setCurrentIndex(settings.uv_direction.value())
-        self.__search.setText(settings.search.value())
-        self.__replace.setText(settings.replace.value())
-        self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
-        self.set_valid_options()
-
-    # override
-    def save_settings(self) -> None:
-        '''Save ui settings to file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.axis.set_value(self.__axis.check_id())
-        settings.flip_uvs.set_value(self.__flip_uvs.isChecked())
-        settings.uv_direction.set_value(self.__uv_direction.currentIndex())
-        settings.search.set_value(self.__search.text())
-        settings.replace.set_value(self.__replace.text())
-        settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
-        settings.write()
-
-    # override
-    def reset_settings(self) -> None:
-        '''Reset ui settings.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
-
-    # override
-    def about(self) -> None:
-        '''Show a about dialog.[override]'''
-        widgets.AboutDialog.info(
-            self, __product__, __version__, __copyright__, __doc__
+        main_layout.addRow(
+            widgets.FrameWidget("Rename Options", False, False, self)
         )
 
-    @Slot()
-    def set_valid_options(self) -> None:
-        '''Synchronize with valid options.'''
-        layout: widgets.FormLayout = self.option_widget().layout()
-        layout.set_row_enabled(
-            self.__uv_direction_id, self.__flip_uvs.isChecked()
+        search: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
+        main_layout.addRow(widgets.FormLabel("Search"), search)
+
+        replace: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
+        main_layout.addRow(widgets.FormLabel("Replace"), replace)
+
+        settings: Settings = self.tool_settings()
+        settings.window_geo.bind(
+            setter=self.restoreGeometry,
+            getter=self.saveGeometry,
+            encoder=utils.qt_to_ascii,
+            decoder=utils.ascii_to_qt,
+        )
+        settings.axis.bind(
+            setter=axis.setCurrentIndex,
+            getter=axis.currentIndex,
+        )
+        settings.flip_uvs.bind(
+            setter=flip_uvs.setChecked,
+            getter=flip_uvs.isChecked,
+        )
+        settings.uv_direction.bind(
+            setter=uv_direction.setCurrentIndex,
+            getter=uv_direction.currentIndex,
+        )
+        settings.search.bind(
+            setter=search.setText,
+            getter=search.text,
+        )
+        settings.replace.bind(
+            setter=replace.setText,
+            getter=replace.text,
         )
 
-    @widgets.undo
-    def apply(self) -> None:
-        '''Apply[override]'''
-        self.save_settings()
-        main()
-
-
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
-def apply(
-    nodes: list[str],
-    axis: int = 0,  # x=0, y=1, z=2
-    flip_uvs: bool = False,
-    uv_direction: int = 0,  # 0=Local U, 1=Local V, 2=World U, 3=World V
-    search: str = '',
-    replace: str = '',
-) -> list[str]:
-    '''Invert selected polygons.'''
-    mirror_args: list[list[int]] = [[-1, 1, 1], [1, -1, 1], [1, 1, -1]]
-    new_nodes: list[str] = []
-    for node in nodes:
-        shapes: list[str] = (
-            cmds.listRelatives(node, shapes=True, path=True) or []
-        )
-        if not shapes:
-            continue
-
-        shape: str = shapes[0]
-        if cmds.objectType(shape) != 'mesh':
-            continue
-
-        new_node: str = cmds.duplicate(node, returnRootsOnly=True)[0]
-        cmds.scale(
-            mirror_args[axis][0],
-            mirror_args[axis][1],
-            mirror_args[axis][2],
-            new_node,
-            relative=True,
-        )
-        try:
-            cmds.makeIdentity(
-                new_node,
-                apply=True,
-                translate=True,
-                rotate=True,
-                scale=True,
-                normal=False,
+        # Sync UV direction
+        flip_uvs.toggled.connect(
+            lambda checked: main_layout.set_row_enabled(
+                uv_direction_id, checked
             )
-        except RuntimeError:
-            _logger.error('Failed to freeze transform : %s', new_node)
-            cmds.delete(new_node)
-            continue
-
-        cmds.polyNormal(
-            new_node,
-            normalMode=0,
-            userNormalMode=False,
-            constructionHistory=False,
         )
-        cmds.setAttr(f'{new_node}.opposite', False)
-        cmds.setAttr(f'{new_node}.doubleSided', True)
+        main_layout.set_row_enabled(uv_direction_id, flip_uvs.isChecked())
 
-        if flip_uvs:
-            kwargs: dict[str, Any] = {
-                'flipType': uv_direction % 2,
-                'local': True,
-            }
-            if uv_direction in (2, 3):
-                kwargs['usePivot'] = True
-                kwargs['pivotU'] = 0
-                kwargs['pivotV'] = 0
-            cmds.polyFlipUV(new_node, **kwargs)
-
-        if search:
-            try:
-                base_name: str = node.split('|')[-1]
-                new_name: str = base_name.replace(search, replace)
-                new_node = cmds.rename(new_node, new_name)
-            except RuntimeError:
-                _logger.warning(
-                    'New name has no legal characters. : %s', new_name
-                )
-        new_nodes.append(new_node)
-
-    if new_nodes:
-        cmds.select(*new_nodes)
-
-    return new_nodes
+    @dcc.undo
+    def apply(self) -> None:
+        """Applies the mirror operation based on current settings."""
+        self.save_settings()
+        main(self.tool_settings())
 
 
-def option(unique_id: str = '') -> None:
-    '''Show window.'''
+def mirror_polygon(
+    node: str,
+    axis: int = 0,
+    flip_uvs: bool = False,
+    uv_direction: int = 0,
+    search: str = "",
+    replace: str = "",
+) -> utils.DataResult[list[str]]:
+    """Inverts a selected polygon based on specified parameters.
+
+    Args:
+        node (str): Transform node name to apply the mirror to.
+        axis (int, optional): The mirror axis (0: X, 1: Y, 2: Z). Defaults to 0.
+        flip_uvs (bool, optional): Whether to flip UVs. Defaults to False.
+        uv_direction (int, optional): The UV flip direction (0: Local U,
+            1: Local V, 2: World U, 3: World V). Defaults to 0.
+        search (str, optional): Search string for renaming. Defaults to "".
+        replace (str, optional): Replace string for renaming. Defaults to "".
+
+    Returns:
+        utils.DataResult[list[str]]: The result object containing the newly
+            created node names as its value payload.
+    """
+    result: utils.DataResult[list[str]] = utils.DataResult([])
+    mirror_scales: list[list[int]] = [[-1, 1, 1], [1, -1, 1], [1, 1, -1]]
+
+    shapes: list[str] = cmds.listRelatives(node, shapes=True, path=True) or []
+    if not shapes:
+        result.add_failure(node, "Node has no shape.")
+        return result
+
+    shape: str = shapes[0]
+    if cmds.objectType(shape) != "mesh":
+        result.add_failure(node, "Object is not a polygon mesh.")
+        return result
+
+    new_node: str = cmds.duplicate(node, returnRootsOnly=True)[0]
+    cmds.scale(
+        mirror_scales[axis][0],
+        mirror_scales[axis][1],
+        mirror_scales[axis][2],
+        new_node,
+        relative=True,
+    )
+
+    try:
+        cmds.makeIdentity(
+            new_node,
+            apply=True,
+            translate=True,
+            rotate=True,
+            scale=True,
+            normal=False,
+        )
+    except RuntimeError:
+        cmds.delete(new_node)
+        result.add_failure(new_node, "Failed to freeze transformations.")
+        return result
+
+    cmds.polyNormal(
+        new_node,
+        normalMode=0,
+        userNormalMode=False,
+        constructionHistory=False,
+    )
+    cmds.setAttr(f"{new_node}.opposite", False)
+    cmds.setAttr(f"{new_node}.doubleSided", True)
+
+    if flip_uvs:
+        kwargs: dict[str, Any] = {
+            "flipType": uv_direction % 2,
+            "local": True,
+        }
+        if uv_direction in (2, 3):
+            kwargs["usePivot"] = True
+            kwargs["pivotU"] = 0
+            kwargs["pivotV"] = 0
+        cmds.polyFlipUV(new_node, **kwargs)
+
+    if search:
+        try:
+            base_name: str = node.split("|")[-1]
+            new_name: str = base_name.replace(search, replace)
+            new_node = cmds.rename(new_node, new_name)
+
+        except RuntimeError:
+            result.add_failure(
+                base_name, "The new name contains invalid characters."
+            )
+
+    result.set_value([new_node])
+    return result
+
+
+def option(unique_id: str = "") -> None:
+    """Shows the tool option window.
+
+    Args:
+        unique_id (str, optional): A unique ID for restoring window states.
+            Defaults to "".
+    """
     window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()
 
 
-def main() -> None:
-    '''Apply according to the setting.'''
-    selection = cmds.ls(selection=True, type='transform')
+def main(settings: Settings | None = None) -> None:
+    """Applies the mirror operation according to the settings.
+
+    Args:
+        settings (Settings | None, optional): The tool settings instance.
+            Defaults to None, which loads the settings from the current
+            instance.
+    """
+    selection: list[str] = cmds.ls(selection=True, type="transform")
     if not selection:
-        _logger.error('Select polygon to mirror it.')
+        _logger.error("Select a polygon mesh to mirror.")
         return
 
-    settings: Settings = Settings.instance(__name__, True)
-    apply(
-        selection,
-        settings.axis.value(),
-        settings.flip_uvs.value(),
-        settings.uv_direction.value(),
-        settings.search.value(),
-        settings.replace.value(),
-    )
-    _logger.info('Done.')
+    if settings is None:
+        settings = Settings.instance(__name__, True)
+        settings.read()
+
+    result: utils.DataResult[list[str]] = utils.DataResult([])
+    for node in selection:
+        r: utils.DataResult[list[str]] = mirror_polygon(
+            node,
+            settings.axis.value(),
+            settings.flip_uvs.value(),
+            settings.uv_direction.value(),
+            settings.search.value(),
+            settings.replace.value(),
+        )
+        result.merge(r)
+
+    if result.value():
+        cmds.select(*result.value())
+
+    result.log(_logger)
