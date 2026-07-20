@@ -26,8 +26,11 @@ log messages or UI feedback.
 """
 
 from __future__ import annotations
+from typing import Generic, TypeVar, cast
 import enum
 from amaterasu.base.utils import logger
+
+T = TypeVar("T")
 
 
 class ResultStatus(enum.Enum):
@@ -53,22 +56,22 @@ class Result:
     """
 
     def __init__(self) -> None:
-        """Initialize an empty Result object."""
+        """Initializes an empty Result object."""
         self.__infos: dict[str, str] = {}
         self.__failures: dict[str, str] = {}
         self.__error: str = ""
 
     def add_info(self, item: str, reason: str) -> None:
-        """Record an informational message for a specific item.
+        """Records an informational message for a specific item.
 
         Args:
             item (str): The name or identifier of the item.
-            info (str): The informational message to record.
+            reason (str): The informational message to record.
         """
         self.__infos[item] = reason
 
     def infos(self) -> dict[str, str]:
-        """Get the dictionary of items and their informational messages.
+        """Gets the dictionary of items and their informational messages.
 
         Returns:
             dict[str, str]: A dictionary mapping item names to info messages.
@@ -76,7 +79,7 @@ class Result:
         return self.__infos
 
     def set_error(self, message: str) -> None:
-        """Set a global error message.
+        """Sets a global error message.
 
         Setting a global error indicates a critical failure that prevents
         the operation from proceeding, resulting in an ERROR status.
@@ -87,7 +90,7 @@ class Result:
         self.__error = message
 
     def add_failure(self, item: str, reason: str) -> None:
-        """Record a failure for a specific item.
+        """Records a failure for a specific item.
 
         Args:
             item (str): The name or identifier of the failed item.
@@ -96,7 +99,7 @@ class Result:
         self.__failures[item] = reason
 
     def failures(self) -> dict[str, str]:
-        """Get the dictionary of failed items and their reasons.
+        """Gets the dictionary of failed items and their reasons.
 
         Returns:
             dict[str, str]: A dictionary mapping item names to error messages.
@@ -104,7 +107,7 @@ class Result:
         return self.__failures
 
     def error(self) -> str:
-        """Get the global error message.
+        """Gets the global error message.
 
         Returns:
             str: The global error message, or an empty string if none is set.
@@ -112,9 +115,8 @@ class Result:
         return self.__error
 
     def merge(self, other: Result) -> None:
-        """Merge another Result object into this one.
-
-        This method absorbs the failures and global error of the other result.
+        """Merges another Result object into this one.
+        This method absorbs the infos, failures, and global error of the other result.
 
         Args:
             other (Result): Another Result object to merge.
@@ -125,7 +127,7 @@ class Result:
             self.set_error(other.error())
 
     def status(self) -> ResultStatus:
-        """Determine the overall status of the result.
+        """Determines the overall status of the result.
 
         Returns:
             ResultStatus: ERROR if a global error is set, WARNING if there are
@@ -140,7 +142,7 @@ class Result:
         return ResultStatus.SUCCESS
 
     def message(self, success_msg: str = "Done.") -> str:
-        """Generate a formatted message based on the current status.
+        """Generates a formatted message based on the current status.
 
         Args:
             success_msg (str, optional): The message to return if the status
@@ -169,7 +171,7 @@ class Result:
         return "\n".join(lines)
 
     def log(self, _logger: logger.Logger, success_msg: str = "Done.") -> None:
-        """Output the result message to a logger with the appropriate level.
+        """Outputs the result message to a logger with the appropriate level.
 
         This method automatically selects `info`, `warning`, or `error` based
         on the current status of the result.
@@ -190,3 +192,70 @@ class Result:
 
         else:
             _logger.warning(msg)
+
+
+class DataResult(Result, Generic[T]):
+    """Extends Result to support generic types for batch operations.
+
+    This class inherits from the standard Result class but adds strict
+    type hinting for the return value payload.
+    """
+
+    def __init__(self, value: T) -> None:
+        """Initializes a DataResult object with a strictly typed value.
+
+        Args:
+            value (T): The initial value to store.
+        """
+        super().__init__()
+        self.__value: T = value
+
+    def value(self) -> T:
+        """Gets the stored value.
+
+        Returns:
+            T: The stored value.
+        """
+        return self.__value
+
+    def set_value(self, value: T) -> None:
+        """Sets the return value for this result.
+
+        Args:
+            value (T): The value to store.
+        """
+        self.__value = value
+
+    def merge(self, other: DataResult[T]) -> None:  # type: ignore[override]
+        """Merges another Result object into this one.
+
+        This method absorbs the infos, failures, and global error of the
+        other result. If both results hold collections (list, dict, or set)
+        as their values, they are combined. Otherwise, the current value is
+        kept unless it is None.
+
+        Args:
+            other (DataResult[T]): Another Result object to merge.
+        """
+        super().merge(other)
+        value: T = other.value()
+        if value is not None:
+            if self.__value is None:
+                self.__value = value
+            elif isinstance(self.__value, list) and isinstance(value, list):
+                self.__value.extend(value)
+
+            elif isinstance(self.__value, dict) and isinstance(value, dict):
+                self.__value.update(value)
+
+            elif isinstance(self.__value, set) and isinstance(value, set):
+                self.__value.update(value)
+
+            elif isinstance(self.__value, int) and isinstance(value, int):
+                self.__value = cast(T, self.__value + value)
+
+            elif isinstance(self.__value, float) and isinstance(value, float):
+                self.__value = cast(T, self.__value + value)
+
+            elif isinstance(self.__value, str) and isinstance(value, str):
+                self.__value = cast(T, self.__value + value)
