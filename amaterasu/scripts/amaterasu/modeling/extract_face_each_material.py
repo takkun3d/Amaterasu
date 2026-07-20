@@ -17,7 +17,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Extract face each material from selected polygon."""
+"""Extracts faces from selected polygons for each assigned material."""
 
 from __future__ import annotations
 from maya import cmds
@@ -28,7 +28,7 @@ __version__: str = "1.20"
 _logger: utils.Logger = utils.get_logger(__product__)
 
 
-def extract_faces_by_material(node: str) -> utils.Result:
+def extract_faces_by_material(node: str) -> utils.DataResult[list[str]]:
     """Extracts faces from a polygon mesh grouped by their assigned materials.
 
     Identifies all shading engines assigned to the mesh, separates the faces
@@ -36,12 +36,13 @@ def extract_faces_by_material(node: str) -> utils.Result:
     material group.
 
     Args:
-        node: The name of the polygon mesh node to process.
+        node (str): The name of the polygon mesh node to process.
 
     Returns:
-        A utils.Result object containing the status of the extraction process.
+        utils.DataResult[list[str]]: The result object containing the newly
+            created node names as its value payload.
     """
-    result: utils.Result = utils.Result()
+    result: utils.DataResult[list[str]] = utils.DataResult([])
     shapes: list[str] = cmds.listRelatives(node, shapes=True, path=True) or []
     if not shapes:
         result.add_failure(node, "No shape found.")
@@ -59,20 +60,26 @@ def extract_faces_by_material(node: str) -> utils.Result:
         result.add_failure(node, "Only one material assigned, skipping.")
         return result
 
+    new_nodes: list[str] = [node]
     for shading_group in shading_groups[1:]:
-        extract_faces: list[str] = []
-        faces: list[str] = dcc.mesh.to_face(node)
-        for face in faces:
-            if cmds.sets(face, isMember=shading_group):
-                extract_faces.append(face)
+        # extract_faces: list[str] = []
+        # faces: list[str] = dcc.mesh.to_face(node)
+        # for face in faces:
+        #     if cmds.sets(face, isMember=shading_group):
+        #         extract_faces.append(face)
+        members: list[str] = cmds.sets(shading_group, query=True) or []  # type: ignore
+        extract_faces: list[str] = cmds.ls(*members, flatten=True)
+        extract_faces = [f for f in extract_faces if f.startswith(f"{node}.f[")]
 
         new_node: list[str] = dcc.mesh.extract_faces(extract_faces)
         if not new_node:
             continue
 
         cmds.sets(new_node[0], edit=True, forceElement=shading_group)
+        new_nodes.append(new_node[0])
 
     cmds.sets(node, edit=True, forceElement=shading_groups[0])
+    result.set_value(new_nodes)
     return result
 
 
@@ -82,15 +89,17 @@ def main() -> None:
     Validates the user selection and iterates through nodes to perform the
     extraction process. Logs the final result.
     """
-    selection: list[str] = cmds.ls(selection=True)
+    selection: list[str] = cmds.ls(selection=True, type="transform")
     if not selection:
         _logger.error("Select polygon meshes to extract faces by material.")
         return
 
-    result: utils.Result = utils.Result()
+    result: utils.DataResult[list[str]] = utils.DataResult([])
     for node in selection:
-        r: utils.Result = extract_faces_by_material(node)
+        r: utils.DataResult[list[str]] = extract_faces_by_material(node)
         result.merge(r)
 
-    cmds.select(*selection)
+    if result.value():
+        cmds.select(*result.value())
+
     result.log(_logger)
