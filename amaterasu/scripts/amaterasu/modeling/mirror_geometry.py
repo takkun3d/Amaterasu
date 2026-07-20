@@ -202,8 +202,8 @@ class MainWindow(framework.StandardToolWindow[Settings]):
         main(self.tool_settings())
 
 
-def apply(
-    nodes: list[str],
+def mirror_geometry(
+    node: str,
     cut_mesh: bool = True,
     axis: int = 0,  # x=0, y=1, z=2
     direction: int = 1,  # Positive(+)=0, Negative(-)=1
@@ -212,11 +212,11 @@ def apply(
     threshold: float = 0.001,
     flip_uvs: bool = False,
     uv_direction: int = 0,
-) -> bool:
+) -> utils.Result:
     """Inverts selected polygons based on specified parameters.
 
     Args:
-        nodes (list[str]): List of transform node names to apply the mirror to.
+        node (str): The transform node name to apply the mirror to.
         cut_mesh (bool): Whether to cut the mesh along the mirror axis.
         axis (int): The mirror axis (0: X, 1: Y, 2: Z).
         direction (int): The mirror direction (0: Positive, 1: Negative).
@@ -227,40 +227,39 @@ def apply(
         uv_direction (int): The UV flip direction.
 
     Returns:
-        bool: True if the operation was successful, False otherwise.
+        utils.Result: The result object containing success or failure details.
     """
+    result: utils.Result = utils.Result()
+
     smoothing_angle: float = 180.0 if soft_edge else 0.0
     uv_direction = uv_direction + 1 if flip_uvs else 0
-    for node in nodes:
-        shapes: list[str] = (
-            cmds.listRelatives(node, shapes=True, path=True) or []
-        )
-        if not shapes:
-            _logger.warning("Node has no shape: %s", node)
-            continue
 
-        shape: str = shapes[0]
-        if cmds.objectType(shape) != "mesh":
-            _logger.warning("Object is not a polygon mesh: %s", shape)
-            continue
+    shapes: list[str] = cmds.listRelatives(node, shapes=True, path=True) or []
+    if not shapes:
+        result.add_failure(node, "Node has no shape")
+        return result
 
-        cmds.polyMirrorFace(
-            shape,
-            cutMesh=cut_mesh,
-            axis=axis,
-            axisDirection=direction,
-            mirrorAxis=1,  # object
-            mirrorPosition=0.0,
-            mergeMode=merge,
-            mergeThresholdType=1,  # Custom
-            mergeThreshold=threshold,
-            smoothingAngle=smoothing_angle,
-            flipUVs=uv_direction,
-            constructionHistory=False,
-        )  # type: ignore
+    shape: str = shapes[0]
+    if cmds.objectType(shape) != "mesh":
+        result.add_failure(node, "Object is not a polygon mesh.")
+        return result
 
-    cmds.select(*nodes)
-    return True
+    cmds.polyMirrorFace(
+        shape,
+        cutMesh=cut_mesh,
+        axis=axis,
+        axisDirection=direction,
+        mirrorAxis=1,  # object
+        mirrorPosition=0.0,
+        mergeMode=merge,
+        mergeThresholdType=1,  # Custom
+        mergeThreshold=threshold,
+        smoothingAngle=smoothing_angle,
+        flipUVs=uv_direction,
+        constructionHistory=False,
+    )  # type: ignore
+
+    return result
 
 
 def option(unique_id: str = "") -> None:
@@ -289,16 +288,20 @@ def main(settings: Settings | None = None) -> None:
         settings = Settings.instance(__name__, True)
         settings.read()
 
-    result: bool = apply(
-        selection,
-        settings.cut_mesh.value(),
-        settings.axis.value(),
-        settings.direction.value(),
-        settings.merge.value(),
-        settings.soft_edge.value(),
-        settings.threshold.value(),
-        settings.flip_uvs.value(),
-        settings.uv_direction.value(),
-    )
-    if result:
-        _logger.info("Done.")
+    result: utils.Result = utils.Result()
+    for node in selection:
+        r: utils.Result = mirror_geometry(
+            node,
+            settings.cut_mesh.value(),
+            settings.axis.value(),
+            settings.direction.value(),
+            settings.merge.value(),
+            settings.soft_edge.value(),
+            settings.threshold.value(),
+            settings.flip_uvs.value(),
+            settings.uv_direction.value(),
+        )
+        result.merge(r)
+
+    cmds.select(*selection)
+    result.log(_logger)
