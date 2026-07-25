@@ -104,6 +104,20 @@ def to_face(sources: str | list[str]) -> list[str]:
     return cmds.filterExpand(*faces, selectionMask=34) or []
 
 
+def to_vertex_face(sources: str | list[str]) -> list[str]:
+    """"""
+    if not sources:
+        return []
+
+    if isinstance(sources, str):
+        sources = [sources]
+
+    faces: list[str] = cmds.polyListComponentConversion(
+        *sources, toVertexFace=True
+    )
+    return cmds.filterExpand(*faces, selectionMask=70) or []
+
+
 def to_uv(sources: str | list[str]) -> list[str]:
     """Converts the given nodes or components to a UV list.
 

@@ -29,6 +29,7 @@ from amaterasu.base.dcc.mesh.component import (
     to_edge,
     to_contained_edge,
     to_face,
+    to_vertex_face,
     to_uv,
     to_border_uv,
     to_uv_border_edges,
@@ -58,6 +59,7 @@ __all__: list[str] = [
     "to_edge",
     "to_contained_edge",
     "to_face",
+    "to_vertex_face",
     "to_uv",
     "to_border_uv",
     "to_uv_border_edges",
@@ -69,7 +71,7 @@ __all__: list[str] = [
     "get_nth_edges",
     "edge_length_2d",
     "edge_length_3d",
-    # facce
+    # face
     "get_hard_edge_shells",
     "duplicate_faces",
     "extract_faces",

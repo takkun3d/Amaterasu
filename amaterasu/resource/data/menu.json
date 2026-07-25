@@ -106,7 +106,7 @@
       "items": [
         {"divider": "Edge"},
         {"label": "Apply Crease Edge", "module": "amaterasu.modeling.apply_crease_edge", "option_func": "option()"},
-        {"label": "Recovery Edge Type", "module": "amaterasu.modeling.recovery_edge_type"},
+        {"label": "Recover Edge Type", "module": "amaterasu.modeling.recover_edge_type"},
         {"divider": "Face"},
         {"label": "Duplicate Face", "module": "amaterasu.modeling.duplicate_face"},
         {"label": "Extract Face", "module": "amaterasu.modeling.extract_face"},
