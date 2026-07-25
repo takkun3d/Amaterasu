@@ -25,6 +25,7 @@ palettes, layouts, and sliders, ensuring a consistent interface across
 the application.
 """
 
+from amaterasu.base.widgets.actionable_check_box import ActionableCheckBox
 from amaterasu.base.widgets.browse_widget import BrowseWidget
 from amaterasu.base.widgets.color_button import ColorButton
 from amaterasu.base.widgets.color_palette import ColorPalette
@@ -46,6 +47,7 @@ from amaterasu.base.widgets.vertical_line import VerticalLine
 from amaterasu.base.widgets.image_drop_widget import ImageDropImage
 
 __all__: list[str] = [
+    "ActionableCheckBox",
     "BrowseWidget",
     "ColorButton",
     "ColorPalette",

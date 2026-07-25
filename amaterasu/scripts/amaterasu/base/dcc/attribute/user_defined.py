@@ -239,3 +239,19 @@ def add_separator(node: str, name: str, **kwargs: Any) -> None:
     )
     if kwargs:
         cmds.setAttr(f"{node}.{name}", edit=True, **kwargs)
+
+
+def delete_user_defined(nodes: list[str]) -> None:
+    """Deletes all user-defined attributes on the given nodes and shapes."""
+    for node in nodes:
+        attrs: list[str] = cmds.listAttr(node, userDefined=True) or []
+        for attr in attrs:
+            if not cmds.attributeQuery(attr, node=node, exists=True):
+                continue
+
+            cmds.deleteAttr(node, attribute=attr)
+
+        shapes: list[str] = (
+            cmds.listRelatives(node, shapes=True, path=True) or []
+        )
+        delete_user_defined(shapes)
