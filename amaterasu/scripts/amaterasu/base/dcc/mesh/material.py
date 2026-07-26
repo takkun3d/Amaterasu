@@ -17,27 +17,21 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Duplicate face from selected face."""
+"""Provides material utilities for Maya meshes."""
 
 from __future__ import annotations
 from maya import cmds
-from amaterasu.base import dcc, utils
-
-__product__: str = "Duplicate Face"
-__version__: str = "1.10"
-_logger: utils.Logger = utils.get_logger(__product__)
 
 
-def main() -> None:
-    """Entry point to duplicate faces based on the current selection.
+def get_shading_groups(node: str) -> list[str]:
+    """Gets shading groups associated with the specified node.
 
-    Validates that polygon faces are selected before triggering the apply
-    process.
+    Args:
+        node (str): The name of the node.
+
+    Returns:
+        list[str]: A list of shading group names.
     """
-    selection: list[str] = cmds.filterExpand(selectionMask=34) or []
-    if not selection:
-        _logger.error("Select polygon faces to duplicate.")
-        return
-
-    dcc.mesh.duplicate_faces(selection)
-    _logger.info("Done.")
+    all_nodes: list[str] = cmds.listHistory(node, future=True) or []  # type: ignore
+    shading_group: list[str] = cmds.ls(*all_nodes, type="shadingEngine")
+    return shading_group

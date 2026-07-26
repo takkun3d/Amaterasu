@@ -25,8 +25,14 @@ and edge/face/vertex evaluations from its internal modules for convenient access
 
 from __future__ import annotations
 from amaterasu.base.dcc.mesh.component import (
+    to_vertex,
     to_edge,
+    to_contained_edge,
     to_face,
+    to_vertex_face,
+    to_uv,
+    to_border_uv,
+    to_uv_border_edges,
     group_by_node,
     get_index,
 )
@@ -34,22 +40,46 @@ from amaterasu.base.dcc.mesh.edge import (
     get_crease_edges,
     get_hard_edges,
     get_nth_edges,
+    edge_length_2d,
+    edge_length_3d,
 )
-from amaterasu.base.dcc.mesh.face import get_hard_edge_shells
+from amaterasu.base.dcc.mesh.face import (
+    get_hard_edge_shells,
+    duplicate_faces,
+    extract_faces,
+    face_normals,
+)
 from amaterasu.base.dcc.mesh.uv import get_inverted_uv_faces
+from amaterasu.base.dcc.mesh.material import get_shading_groups
+from amaterasu.base.dcc.mesh.node import get_polygon_transforms
 
 __all__: list[str] = [
     # component
+    "to_vertex",
     "to_edge",
+    "to_contained_edge",
     "to_face",
+    "to_vertex_face",
+    "to_uv",
+    "to_border_uv",
+    "to_uv_border_edges",
     "group_by_node",
     "get_index",
     # edge
     "get_crease_edges",
     "get_hard_edges",
     "get_nth_edges",
-    # facce
+    "edge_length_2d",
+    "edge_length_3d",
+    # face
     "get_hard_edge_shells",
+    "duplicate_faces",
+    "extract_faces",
+    "face_normals",
     # uv
     "get_inverted_uv_faces",
+    # material
+    "get_shading_groups",
+    # node
+    "get_polygon_transforms",
 ]

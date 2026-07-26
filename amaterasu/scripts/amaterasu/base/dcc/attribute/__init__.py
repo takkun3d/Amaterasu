@@ -27,7 +27,8 @@ and decoupled from direct DCC API calls.
 """
 
 from __future__ import annotations
-from amaterasu.base.dcc.attribute.create import (
+from amaterasu.base.dcc.attribute.connection import break_transform_connections
+from amaterasu.base.dcc.attribute.user_defined import (
     add_integer,
     add_float,
     add_string,
@@ -36,6 +37,7 @@ from amaterasu.base.dcc.attribute.create import (
     add_vector,
     add_color,
     add_separator,
+    delete_user_defined,
 )
 from amaterasu.base.dcc.attribute.query import get_default_value, get_range
 from amaterasu.base.dcc.attribute.lock import (
@@ -52,7 +54,9 @@ from amaterasu.base.dcc.attribute.transfer import (
 )
 
 __all__: list[str] = [
-    # create
+    # connection
+    "break_transform_connections",
+    # user_defined
     "add_integer",
     "add_float",
     "add_string",
@@ -61,6 +65,7 @@ __all__: list[str] = [
     "add_vector",
     "add_color",
     "add_separator",
+    "delete_user_defined",
     # query
     "get_default_value",
     "get_range",

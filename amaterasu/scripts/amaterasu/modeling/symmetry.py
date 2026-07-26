@@ -1,133 +1,129 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Symmetry
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Generates a flipped or mirrored mesh from a base mesh."""
+
 from __future__ import annotations
-from typing import TYPE_CHECKING
-
-try:
-    from PySide2.QtCore import Qt, QSize
-    from PySide2.QtGui import QStandardItemModel, QStandardItem
-    from PySide2.QtWidgets import (
-        QWidget,
-        QVBoxLayout,
-        QHBoxLayout,
-        QComboBox,
-        QDoubleSpinBox,
-        QSpinBox,
-        QTreeView,
-        QPushButton,
-        QMessageBox,
-    )
-
-except ImportError:
-    if not TYPE_CHECKING:
-        from PySide6.QtCore import Qt, QSize
-        from PySide6.QtGui import QStandardItemModel, QStandardItem
-        from PySide6.QtWidgets import (
-            QWidget,
-            QVBoxLayout,
-            QHBoxLayout,
-            QComboBox,
-            QDoubleSpinBox,
-            QSpinBox,
-            QTreeView,
-            QPushButton,
-            QMessageBox,
-        )
 from maya import cmds
-from ..lib import logger, parser, utility, widgets
+from amaterasu.base.qt import QtCore, QtWidgets
+from amaterasu.base import dcc, framework, widgets, utils
+
+__product__: str = "Symmetry"
+__version__: str = "1.20"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Symmetry'
-__version__: str = '1.10'
-__doc__ = 'Generate fliped mesh or mirrored mesh from base mesh.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+class Settings(framework.ToolSettings):
+    """Settings for the Symmetry tool.
+
+    Attributes:
+        window_geo (framework.Variant[str]): The saved window geometry.
+        axis (framework.Variant[int]): The axis index (0: X, 1: Y, 2: Z).
+        direction (framework.Variant[int]): The direction index (0: +, 1: -).
+        threshold (framework.Variant[float]): The distance threshold.
+        weight (framework.Variant[int]): The revert weight percentage.
+    """
+
+    window_geo: framework.Variant[str] = framework.Variant("")
+    axis: framework.Variant[int] = framework.Variant(0)
+    direction: framework.Variant[int] = framework.Variant(1)
+    threshold: framework.Variant[float] = framework.Variant(0.001)
+    weight: framework.Variant[int] = framework.Variant(100)
 
 
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-class Settings(parser.ToolSettings):
-    '''Settings for tool.'''
-
-    window_geo: parser.Variant[str] = parser.Variant('')
-    axis: parser.Variant[int] = parser.Variant(0)
-    direction: parser.Variant[int] = parser.Variant(1)
-    threshold: parser.Variant[float] = parser.Variant(0.001)
-    weight: parser.Variant[int] = parser.Variant(100)
-
-
-class GeometryList(QWidget):
-    '''Geometry list widget.'''
+class MeshListWidget(QtWidgets.QWidget):
+    """Widget for displaying and managing a list of geometries."""
 
     def __init__(
         self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Widget,
     ) -> None:
-        '''Initialize widget.'''
+        """Initializes the widget.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The Qt window flags.
+                Defaults to Widget.
+        """
         super().__init__(parent, flag)
 
-        main_layout = QVBoxLayout(self)
+        main_layout = QtWidgets.QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(2)
 
-        self.__model = QStandardItemModel(0, 1, self)
+        self.__tree = QtWidgets.QTreeWidget(self)
+        self.__tree.setColumnCount(1)
+        self.__tree.setHeaderLabel("")
+        self.__tree.setSelectionMode(
+            QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection
+        )
+        self.__tree.setAlternatingRowColors(True)
+        self.__tree.setRootIsDecorated(False)
+        self.__tree.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        main_layout.addWidget(self.__tree)
 
-        self.__view = QTreeView(self)
-        self.__view.setModel(self.__model)
-        self.__view.setSelectionMode(QTreeView.ExtendedSelection)
-        self.__view.setAlternatingRowColors(True)
-        self.__view.setRootIsDecorated(False)
-        self.__view.setFocusPolicy(Qt.NoFocus)
-        main_layout.addWidget(self.__view)
-
-        button_layout = QHBoxLayout(self)
+        button_layout = QtWidgets.QHBoxLayout()
         button_layout.addStretch(True)
         main_layout.addLayout(button_layout)
 
         button = widgets.IconButton(self)
-        button.set_icon(widgets.icon_from_file_name('a_add.png'))
-        button.setIconSize(QSize(16, 16))
-        button.clicked.connect(self.add_item)
+        button.set_icon(dcc.get_icon_path("a_add.png"))
+        button.setIconSize(QtCore.QSize(16, 16))
+        button.clicked.connect(self.add_items)  # pylint: disable=no-member
         button_layout.addWidget(button)
 
         button = widgets.IconButton(self)
-        button.set_icon(widgets.icon_from_file_name('a_remove.png'))
-        button.setIconSize(QSize(16, 16))
-        button.clicked.connect(self.remove_item)
+        button.set_icon(dcc.get_icon_path("a_remove.png"))
+        button.setIconSize(QtCore.QSize(16, 16))
+        button.clicked.connect(self.remove_items)  # pylint: disable=no-member
         button_layout.addWidget(button)
 
         button = widgets.IconButton(self)
-        button.set_icon(widgets.icon_from_file_name('a_trash.png'))
-        button.setIconSize(QSize(16, 16))
-        button.clicked.connect(self.clear_item)
+        button.set_icon(dcc.get_icon_path("a_trash.png"))
+        button.setIconSize(QtCore.QSize(16, 16))
+        button.clicked.connect(self.clear_items)  # pylint: disable=no-member
         button_layout.addWidget(button)
 
     def set_header_text(self, text: str) -> None:
-        '''Set header text.'''
-        self.__model.setHeaderData(0, Qt.Horizontal, text)
+        """Sets the header text for the list view.
 
-    def get_mesh(self, root: str = '') -> list[str]:
-        '''Return mesh list from selected node.'''
+        Args:
+            text (str): The header text to display.
+        """
+        self.__tree.setHeaderLabel(text)
+
+    def get_meshes(self, root: str = "") -> list[str]:
+        """Returns a list of meshes from the selected node.
+
+        Args:
+            root (str, optional): The root node to query. Defaults to "".
+
+        Returns:
+            list[str]: A list of mesh node names.
+        """
         result: list[str] = []
         if not root:
-            selection: list[str] = cmds.ls(selection=True, type='transform')
+            selection: list[str] = cmds.ls(selection=True, type="transform")
             if not selection:
                 return result
-
         else:
             selection = cmds.listRelatives(root, children=True, path=True) or []
             if not selection:
@@ -138,178 +134,192 @@ class GeometryList(QWidget):
                 cmds.listRelatives(node, shapes=True, path=True) or []
             )
             if not shapes:
-                result.extend(self.get_mesh(node))
-
+                result.extend(self.get_meshes(node))
             else:
                 result.append(node)
 
         return result
 
-    def add_item(self, root: str = '') -> None:
-        '''Add item from selected nodes.'''
-        selection: list[str] = self.get_mesh()
+    def add_items(self) -> None:
+        """Adds items from the current selection to the list."""
+        selection: list[str] = self.get_meshes()
         for node in selection:
-            item = QStandardItem(node)
-            self.__model.appendRow(item)
+            # Prevent duplicates
+            if not self.__tree.findItems(
+                node, QtCore.Qt.MatchFlag.MatchExactly, 0
+            ):
+                item = QtWidgets.QTreeWidgetItem([node])
+                self.__tree.addTopLevelItem(item)
 
-    def remove_item(self) -> None:
-        '''Remove selected item on view.'''
-        selection_model = self.__view.selectionModel()
-        while True:
-            indexes = selection_model.selectedIndexes()
-            if not indexes:
-                break
-            self.__model.removeRow(indexes[0].row())
+    def remove_items(self) -> None:
+        """Removes the selected items from the view."""
+        for item in self.__tree.selectedItems():
+            index: int = self.__tree.indexOfTopLevelItem(item)
+            self.__tree.takeTopLevelItem(index)
 
-    def clear_item(self) -> None:
-        '''Clear item.'''
-        self.__model.removeRows(0, self.__model.rowCount())
+    def clear_items(self) -> None:
+        """Clears all items from the list."""
+        self.__tree.clear()
 
     def items(self) -> list[str]:
-        '''Return item list.'''
-        result: list[str] = []
-        for i in range(self.__model.rowCount()):
-            result.append(self.__model.item(i, 0).text())
-        return result
+        """Returns the list of item text entries.
+
+        Returns:
+            list[str]: A list of item strings currently in the view.
+        """
+        return [
+            self.__tree.topLevelItem(i).text(0)
+            for i in range(self.__tree.topLevelItemCount())
+        ]
 
 
-class MainWindow(widgets.ToolWidget):
-    '''Tool main window'''
+class MainWindow(framework.ToolWindow[Settings]):
+    """Main window for the Symmetry tool."""
 
     def __init__(
         self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-        unique_id: str = '',
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Window,
+        unique_id: str = "",
     ) -> None:
-        '''Initialize widget.'''
+        """Initializes the window.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The Qt window flags.
+                Defaults to Window.
+            unique_id (str, optional): A unique ID for restoring window states.
+                Defaults to "".
+        """
         super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
-        self.resize(400, 200)
+        self.resize(400, 400)
+        self.__src_view: MeshListWidget
+        self.__dst_view: MeshListWidget
 
-        main_layout = QVBoxLayout(self.option_widget())
+    def create_ui(self, parent: QtWidgets.QWidget) -> None:
+        """Creates the tool-specific user interface.
+
+        Args:
+            parent (QtWidgets.QWidget): The parent widget to contain the UI.
+        """
+        main_layout = QtWidgets.QVBoxLayout(parent)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
-        option_layout = widgets.FormLayout(self)
+        option_layout = widgets.FormLayout(parent)
         main_layout.addLayout(option_layout)
 
-        self.__axis: widgets.RadioButtons = widgets.RadioButtons(self)
-        self.__axis.set_labels(('X', 'Y', 'Z'))
-        option_layout.addRow(widgets.FormLabel('Axis'), self.__axis)
+        axis: QtWidgets.QComboBox = QtWidgets.QComboBox(parent)
+        axis.addItems(["X", "Y", "Z"])
+        option_layout.addRow(widgets.FormLabel("Axis"), axis)
 
-        self.__direction: QComboBox = QComboBox(self)
-        self.__direction.addItem('+')
-        self.__direction.addItem('-')
-        option_layout.addRow(widgets.FormLabel('Direction'), self.__direction)
+        direction: QtWidgets.QComboBox = QtWidgets.QComboBox(parent)
+        direction.addItems(["+", "-"])
+        option_layout.addRow(widgets.FormLabel("Direction"), direction)
 
-        self.__threshold = QDoubleSpinBox(self)
-        self.__threshold.setRange(0, 9999)
-        self.__threshold.setDecimals(4)
-        self.__threshold.setButtonSymbols(QDoubleSpinBox.NoButtons)
-        self.__threshold.setMinimumWidth(80)
-        option_layout.addRow(widgets.FormLabel('Threthold'), self.__threshold)
+        threshold = QtWidgets.QDoubleSpinBox(parent)
+        threshold.setRange(0, 9999)
+        threshold.setDecimals(4)
+        threshold.setMinimumWidth(80)
+        option_layout.addRow(widgets.FormLabel("Threshold"), threshold)
 
-        self.__weight = QSpinBox(self)
-        self.__weight.setRange(0, 100)
-        self.__weight.setButtonSymbols(QDoubleSpinBox.NoButtons)
-        self.__weight.setMinimumWidth(80)
-        option_layout.addRow(widgets.FormLabel('Revert Weight'), self.__weight)
+        weight = QtWidgets.QSpinBox(parent)
+        weight.setRange(0, 100)
+        weight.setMinimumWidth(80)
+        option_layout.addRow(widgets.FormLabel("Revert Weight"), weight)
 
-        view_layout = QHBoxLayout(self)
+        main_layout.addWidget(widgets.HorizontalLine(parent))
+
+        view_layout = QtWidgets.QHBoxLayout()
         main_layout.addLayout(view_layout)
 
-        self.__src_view = GeometryList(self)
-        self.__src_view.set_header_text('Source Geometrys')
+        self.__src_view = MeshListWidget(parent)
+        self.__src_view.set_header_text("Source Geometries")
         view_layout.addWidget(self.__src_view)
 
-        self.__dst_view = GeometryList(self)
-        self.__dst_view.set_header_text('Destination Geometrys')
+        self.__dst_view = MeshListWidget(parent)
+        self.__dst_view.set_header_text("Destination Geometries")
         view_layout.addWidget(self.__dst_view)
 
-        main_layout.addWidget(widgets.HorizontalLine(self))
+        main_layout.addWidget(widgets.HorizontalLine(parent))
 
-        button_layout = QHBoxLayout(self)
+        button_layout = QtWidgets.QHBoxLayout()
         main_layout.addLayout(button_layout)
 
-        button = QPushButton('Mirror', self)
-        button.clicked.connect(self.mirror)
-        button_layout.addWidget(button)
+        mirror_btn = QtWidgets.QPushButton("Mirror", parent)
+        mirror_btn.clicked.connect(self.mirror_action)
+        button_layout.addWidget(mirror_btn)
 
-        button = QPushButton('Flip', self)
-        button.clicked.connect(self.flip)
-        button_layout.addWidget(button)
+        flip_btn = QtWidgets.QPushButton("Flip", parent)
+        flip_btn.clicked.connect(self.flip_action)
+        button_layout.addWidget(flip_btn)
 
-        button = QPushButton('Revert', self)
-        button.clicked.connect(self.revert)
-        button_layout.addWidget(button)
+        revert_btn = QtWidgets.QPushButton("Revert", parent)
+        revert_btn.clicked.connect(self.revert_action)
+        button_layout.addWidget(revert_btn)
 
-    # override
-    def load_settings(self) -> None:
-        '''Load ui settings from file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
-        self.__axis.set_check_id(settings.axis.value())
-        self.__direction.setCurrentIndex(settings.direction.value())
-        self.__threshold.setValue(settings.threshold.value())
-        self.__weight.setValue(settings.weight.value())
-
-    # override
-    def save_settings(self) -> None:
-        '''Save ui settings to file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
-        settings.axis.set_value(self.__axis.check_id())
-        settings.direction.set_value(self.__direction.currentIndex())
-        settings.threshold.set_value(self.__threshold.value())
-        settings.weight.set_value(self.__weight.value())
-        settings.write()
-
-    # override
-    def reset_settings(self) -> None:
-        '''Reset ui settings.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
-
-    # override
-    def about(self) -> None:
-        '''Show a about dialog.[override]'''
-        widgets.AboutDialog.info(
-            self, __product__, __version__, __copyright__, __doc__
+        settings: Settings = self.tool_settings()
+        settings.window_geo.bind(
+            setter=self.restoreGeometry,
+            getter=self.saveGeometry,
+            encoder=utils.qt_to_ascii,
+            decoder=utils.ascii_to_qt,
+        )
+        settings.axis.bind(
+            setter=axis.setCurrentIndex,
+            getter=axis.currentIndex,
+        )
+        settings.direction.bind(
+            setter=direction.setCurrentIndex,
+            getter=direction.currentIndex,
+        )
+        settings.threshold.bind(
+            setter=threshold.setValue,
+            getter=threshold.value,
+        )
+        settings.weight.bind(
+            setter=weight.setValue,
+            getter=weight.value,
         )
 
-    def check_item(self) -> bool:
-        '''Check item on view'''
+    def validate_geometries(self) -> bool:
+        """Checks if the required items are set in the views.
+
+        Returns:
+            bool: True if validation passes, False otherwise.
+        """
         src: list[str] = self.__src_view.items()
         dst: list[str] = self.__dst_view.items()
+
         if not src:
-            QMessageBox.critical(
-                self, 'Error', 'Set node(s) to Source Geometry.'
+            QtWidgets.QMessageBox.critical(
+                self, "Error", "Set node(s) for the source geometry."
             )
             return False
 
         if not dst:
-            QMessageBox.critical(
-                self, 'Error', 'Set node(s) to Destination Geometry.'
+            QtWidgets.QMessageBox.critical(
+                self, "Error", "Set node(s) for the destination geometry."
             )
             return False
 
         if len(src) != len(dst):
-            QMessageBox.critical(
+            QtWidgets.QMessageBox.critical(
                 self,
-                'Error',
-                'Match the number of Source Geometry and Destination Geometry.',
+                "Error",
+                "The number of source and destination geometries must match.",
             )
             return False
 
         return True
 
-    @widgets.undo
-    def mirror(self) -> None:
-        '''Mirror'''
+    @dcc.undo
+    def mirror_action(self) -> None:
+        """Executes the mirror operation."""
         self.save_settings()
-        if self.check_item():
-            settings: Settings = Settings.instance(__name__, True)
+        if self.validate_geometries():
+            settings: Settings = self.tool_settings()
             mirror(
                 self.__src_view.items(),
                 self.__dst_view.items(),
@@ -318,12 +328,12 @@ class MainWindow(widgets.ToolWidget):
                 settings.threshold.value(),
             )
 
-    @widgets.undo
-    def flip(self) -> None:
-        '''Flip'''
+    @dcc.undo
+    def flip_action(self) -> None:
+        """Executes the flip operation."""
         self.save_settings()
-        if self.check_item():
-            settings: Settings = Settings.instance(__name__, True)
+        if self.validate_geometries():
+            settings: Settings = self.tool_settings()
             flip(
                 self.__src_view.items(),
                 self.__dst_view.items(),
@@ -332,11 +342,12 @@ class MainWindow(widgets.ToolWidget):
                 settings.threshold.value(),
             )
 
-    @widgets.undo
-    def revert(self) -> None:
-        '''Revert'''
-        if self.check_item():
-            settings: Settings = Settings.instance(__name__, True)
+    @dcc.undo
+    def revert_action(self) -> None:
+        """Executes the revert operation."""
+        self.save_settings()
+        if self.validate_geometries():
+            settings: Settings = self.tool_settings()
             revert(
                 self.__src_view.items(),
                 self.__dst_view.items(),
@@ -344,59 +355,55 @@ class MainWindow(widgets.ToolWidget):
             )
 
 
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
-def pair_vertex_list(
+def get_vertex_pairs(
     node: str, axis: int, direction: int, threshold: float
-) -> list[tuple[str, str]]:
-    pos_vertexes: list[tuple[str, list[float]]] = []
-    neg_vertexes: list[tuple[str, list[float]]] = []
-    result: list[tuple[str, str]] = []
+) -> list[tuple[int, int]]:
+    """Finds matching vertex pairs across a specified axis.
 
-    if axis == 0:
-        axis2: int = 1
-        axis3: int = 2
+    Args:
+        node (str): The name of the polygon mesh node.
+        axis (int): The axis to mirror across (0: X, 1: Y, 2: Z).
+        direction (int): The search direction (0: positive, 1: negative).
+        threshold (float): The distance threshold for matching vertices.
 
-    elif axis == 1:
-        axis2 = 2
-        axis3 = 0
+    Returns:
+        list[tuple[str, str]]: A list of paired vertex string IDs.
+    """
+    pos_vertices: list[tuple[str, list[float]]] = []
+    neg_vertices: list[tuple[str, list[float]]] = []
+    result: list[tuple[int, int]] = []
 
-    else:
-        axis2 = 0
-        axis3 = 1
+    axis2: int = (axis + 1) % 3
+    axis3: int = (axis + 2) % 3
 
     pivots: list[float] = cmds.xform(
         node, query=True, pivots=True, objectSpace=True
-    )
+    )  # type: ignore
     center: float = pivots[axis]
 
     for i in range(cmds.polyEvaluate(node, vertex=True)):
-        vertex = f'{node}.vtx[{i}]'
+        vertex: str = f"{node}.vtx[{i}]"
         vertex_position: list[float] = cmds.pointPosition(vertex, local=True)
 
         if vertex_position[axis] > center:
-            pos_vertexes.append((vertex, vertex_position))
-
+            pos_vertices.append((vertex, vertex_position))
         elif vertex_position[axis] < center:
-            neg_vertexes.append((vertex, vertex_position))
+            neg_vertices.append((vertex, vertex_position))
 
-    for i, pos_vertex in enumerate(pos_vertexes):
-        for j, neg_vertex in enumerate(neg_vertexes):
-            diff1 = abs(
+    for i, pos_vertex in enumerate(pos_vertices):
+        for j, neg_vertex in enumerate(neg_vertices):
+            diff1: float = abs(
                 abs(center - pos_vertex[1][axis])
                 - abs(center - neg_vertex[1][axis])
             )
-            diff2 = abs(pos_vertex[1][axis2] - neg_vertex[1][axis2])
-            diff3 = abs(pos_vertex[1][axis3] - neg_vertex[1][axis3])
+            diff2: float = abs(pos_vertex[1][axis2] - neg_vertex[1][axis2])
+            diff3: float = abs(pos_vertex[1][axis3] - neg_vertex[1][axis3])
 
             if diff1 <= threshold and diff2 <= threshold and diff3 <= threshold:
-                id1: str = utility.poly_component_id(pos_vertex[0])
-                id2: str = utility.poly_component_id(neg_vertex[0])
+                id1: int = dcc.mesh.get_index(pos_vertex[0])
+                id2: int = dcc.mesh.get_index(neg_vertex[0])
                 result.append((id1, id2) if direction else (id2, id1))
-                neg_vertexes.pop(j)
+                neg_vertices.pop(j)
                 break
 
     return result
@@ -409,17 +416,27 @@ def mirror(
     direction: int = 1,
     threshold: float = 0.001,
 ) -> None:
-    '''Mirror vertexes from specific axis.'''
+    """Mirrors vertices from a specific axis.
+
+    Args:
+        src_nodes (list[str]): The source polygon mesh nodes.
+        dst_nodes (list[str]): The destination polygon mesh nodes.
+        axis (int, optional): The axis index. Defaults to 0.
+        direction (int, optional): The direction index. Defaults to 1.
+        threshold (float, optional): The distance threshold. Defaults to 0.001.
+    """
     for src_node, dst_node in zip(src_nodes, dst_nodes):
-        pair_vertexes = pair_vertex_list(src_node, axis, direction, threshold)
-        for pair_vertex in pair_vertexes:
-            vertex_a: str = f'{dst_node}.vtx[{pair_vertex[0]}]'
-            vertex_b: str = f'{dst_node}.vtx[{pair_vertex[1]}]'
+        pair_vertices: list[tuple[int, int]] = get_vertex_pairs(
+            src_node, axis, direction, threshold
+        )
+        for pair_vertex in pair_vertices:
+            vertex_a: str = f"{dst_node}.vtx[{pair_vertex[0]}]"
+            vertex_b: str = f"{dst_node}.vtx[{pair_vertex[1]}]"
             position: list[float] = cmds.pointPosition(vertex_a, local=True)
             position[axis] *= -1.0
-            cmds.xform(vertex_b, translation=position, objectSpace=True)
+            cmds.xform(vertex_b, translation=position, objectSpace=True)  # type: ignore
 
-    _logger.info('Done.')
+    _logger.info("Done.")
 
 
 def flip(
@@ -429,20 +446,30 @@ def flip(
     direction: int = 1,
     threshold: float = 0.001,
 ) -> None:
-    '''Flip vertexes from specific axis.'''
+    """Flips vertices from a specific axis.
+
+    Args:
+        src_nodes (list[str]): The source polygon mesh nodes.
+        dst_nodes (list[str]): The destination polygon mesh nodes.
+        axis (int, optional): The axis index. Defaults to 0.
+        direction (int, optional): The direction index. Defaults to 1.
+        threshold (float, optional): The distance threshold. Defaults to 0.001.
+    """
     for src_node, dst_node in zip(src_nodes, dst_nodes):
-        pair_vertexes = pair_vertex_list(src_node, axis, direction, threshold)
-        for pair_vertex in pair_vertexes:
-            vertex_a: str = f'{dst_node}.vtx[{pair_vertex[0]}]'
-            vertex_b: str = f'{dst_node}.vtx[{pair_vertex[1]}]'
+        pair_vertices: list[tuple[int, int]] = get_vertex_pairs(
+            src_node, axis, direction, threshold
+        )
+        for pair_vertex in pair_vertices:
+            vertex_a: str = f"{dst_node}.vtx[{pair_vertex[0]}]"
+            vertex_b: str = f"{dst_node}.vtx[{pair_vertex[1]}]"
             position_a: list[float] = cmds.pointPosition(vertex_a, local=True)
             position_b: list[float] = cmds.pointPosition(vertex_b, local=True)
             position_a[axis] *= -1.0
             position_b[axis] *= -1.0
-            cmds.xform(vertex_a, translation=position_b, objectSpace=True)
-            cmds.xform(vertex_b, translation=position_a, objectSpace=True)
+            cmds.xform(vertex_a, translation=position_b, objectSpace=True)  # type: ignore
+            cmds.xform(vertex_b, translation=position_a, objectSpace=True)  # type: ignore
 
-    _logger.info('Done.')
+    _logger.info("Done.")
 
 
 def revert(
@@ -450,13 +477,20 @@ def revert(
     dst_nodes: list[str],
     weight: int = 100,
 ) -> None:
-    '''Revert vertexes from specific axis.'''
-    bias: float = 1 - (weight / 100.0)
+    """Reverts vertices from a specific axis based on the provided weight.
+
+    Args:
+        src_nodes (list[str]): The source polygon mesh nodes.
+        dst_nodes (list[str]): The destination polygon mesh nodes.
+        weight (int, optional): The weight percentage for reverting.
+            Defaults to 100.
+    """
+    bias: float = 1.0 - (weight / 100.0)
 
     for src_node, dst_node in zip(src_nodes, dst_nodes):
         for i in range(cmds.polyEvaluate(src_node, vertex=True)):
-            vertex_a: str = f'{src_node}.vtx[{i}]'
-            vertex_b: str = f'{dst_node}.vtx[{i}]'
+            vertex_a: str = f"{src_node}.vtx[{i}]"
+            vertex_b: str = f"{dst_node}.vtx[{i}]"
             position_a: list[float] = cmds.pointPosition(vertex_a, local=True)
             position_b: list[float] = cmds.pointPosition(vertex_b, local=True)
             new_position: list[float] = [
@@ -464,12 +498,17 @@ def revert(
                 position_a[1] + ((position_b[1] - position_a[1]) * bias),
                 position_a[2] + ((position_b[2] - position_a[2]) * bias),
             ]
-            cmds.xform(vertex_b, t=new_position, objectSpace=True)
+            cmds.xform(vertex_b, t=new_position, objectSpace=True)  # type: ignore
 
-    _logger.info('Done.')
+    _logger.info("Done.")
 
 
-def main(unique_id: str = '') -> None:
-    '''Show window.'''
+def option(unique_id: str = "") -> None:
+    """Shows the tool's main window.
+
+    Args:
+        unique_id (str, optional): A unique identifier for the window instance.
+            Defaults to "".
+    """
     window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()

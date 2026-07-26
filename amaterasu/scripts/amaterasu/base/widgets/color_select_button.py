@@ -23,6 +23,7 @@ This module provides the `ColorSelectButton` class, an interactive color
 button that opens a standard color dialog when clicked, allowing users
 to pick and set a new color.
 """
+
 from __future__ import annotations
 from amaterasu.base.qt import QtGui, QtWidgets
 from amaterasu.base.widgets.color_button import ColorButton
@@ -52,4 +53,4 @@ class ColorSelectButton(ColorButton):
             QtWidgets.QColorDialog.ColorDialogOption.DontUseNativeDialog,
         )
         if color.isValid():
-            self.set_color(color.redF(), color.greenF(), color.blueF())
+            self.set_color([color.redF(), color.greenF(), color.blueF()])

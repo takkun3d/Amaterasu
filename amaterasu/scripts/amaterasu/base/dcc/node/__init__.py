@@ -33,7 +33,12 @@ from amaterasu.base.dcc.node.drawing import (
     set_drawing_rgb_color,
     clear_drawing_color,
 )
-from amaterasu.base.dcc.node.hide_history import show_history, hide_history
+from amaterasu.base.dcc.node.history import (
+    show_history,
+    hide_history,
+    delete_history,
+    remove_intermediate_objects,
+)
 from amaterasu.base.dcc.node.name import (
     normalize_shape_name,
     normalize_shading_engine_name,
@@ -53,9 +58,11 @@ __all__: list[str] = [
     "set_drawing_index_color",
     "set_drawing_rgb_color",
     "clear_drawing_color",
-    # hide_history
+    # history
     "show_history",
     "hide_history",
+    "delete_history",
+    "remove_intermediate_objects",
     # name
     "normalize_shape_name",
     "normalize_shading_engine_name",

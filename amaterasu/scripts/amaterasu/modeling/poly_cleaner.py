@@ -1,366 +1,238 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Poly Cleaner
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Clean up unwanted data and optimize selected polygons."""
+
 from __future__ import annotations
-from typing import TYPE_CHECKING
-import itertools
-
-try:
-    from PySide2.QtCore import Qt, Signal
-    from PySide2.QtWidgets import (
-        QWidget,
-        QHBoxLayout,
-        QVBoxLayout,
-        QCheckBox,
-        QPushButton,
-        QMessageBox,
-    )
-
-except ImportError:
-    if not TYPE_CHECKING:
-        from PySide6.QtCore import Qt, Signal
-        from PySide6.QtWidgets import (
-            QWidget,
-            QHBoxLayout,
-            QVBoxLayout,
-            QCheckBox,
-            QPushButton,
-            QMessageBox,
-        )
+from typing import Callable
+import functools
 from maya import cmds
-from ..lib import logger, parser, widgets
+from amaterasu.base.qt import QtCore, QtGui, QtWidgets
+from amaterasu.base import dcc, framework, utils, widgets
+
+__product__: str = "Poly Cleaner"
+__version__: str = "1.20"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Poly Cleaner'
-__version__: str = '1.10'
-__doc__ = 'Remove dust data from selected polygons.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+class Settings(framework.ToolSettings):
+    """Settings for the Poly Cleaner tool.
+
+    Attributes:
+        window_geo (framework.Variant[str]): Saved window geometry data.
+        unlock_transformations (framework.Variant[bool]): State for unlock.
+        break_connections (framework.Variant[bool]): State for break connections.
+        freeze_transformations (framework.Variant[bool]): State for freeze.
+        reset_transformations (framework.Variant[bool]): State for reset.
+        delete_history (framework.Variant[bool]): State for history deletion.
+        delete_user_defined_attr (framework.Variant[bool]): State for attr.
+        remove_intermediate_obj (framework.Variant[bool]): State for obj.
+        freeze_vertex (framework.Variant[bool]): State for freeze vertex.
+    """
+
+    window_geo: framework.Variant[str] = framework.Variant("")
+    unlock_transformations: framework.Variant[bool] = framework.Variant(True)
+    break_connections: framework.Variant[bool] = framework.Variant(True)
+    freeze_transformations: framework.Variant[bool] = framework.Variant(True)
+    reset_transformations: framework.Variant[bool] = framework.Variant(True)
+    delete_history: framework.Variant[bool] = framework.Variant(True)
+    delete_user_defined_attr: framework.Variant[bool] = framework.Variant(True)
+    remove_intermediate_obj: framework.Variant[bool] = framework.Variant(True)
+    freeze_vertex: framework.Variant[bool] = framework.Variant(True)
 
 
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-class Settings(parser.ToolSettings):
-    '''Settings for tool.'''
-
-    window_geo: parser.Variant[str] = parser.Variant('')
-    unlock_transformations: parser.Variant[bool] = parser.Variant(True)
-    break_connections: parser.Variant[bool] = parser.Variant(True)
-    freeze_transformations: parser.Variant[bool] = parser.Variant(True)
-    reset_transformations: parser.Variant[bool] = parser.Variant(True)
-    delete_history: parser.Variant[bool] = parser.Variant(True)
-    delete_user_defined_attr: parser.Variant[bool] = parser.Variant(True)
-    remove_intermediate_obj: parser.Variant[bool] = parser.Variant(True)
-    freeze_vertex: parser.Variant[bool] = parser.Variant(True)
-
-
-class OptionItem(QWidget):
-    clicked = Signal()
+class MainWindow(framework.StandardToolWindow[Settings]):
+    """Main window for the Poly Cleaner tool."""
 
     def __init__(
         self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Window,
+        unique_id: str = "",
     ) -> None:
-        super().__init__(parent, flag)
-        layout: QHBoxLayout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        """Initializes the window.
 
-        self.__check: QCheckBox = QCheckBox(self)
-        layout.addWidget(self.__check, True)
-
-        self.__apply: QPushButton = QPushButton(self)
-        self.__apply.setMinimumWidth(80)
-        self.__apply.clicked.connect(self.clicked)
-        layout.addWidget(self.__apply, False)
-
-    def set_label_text(self, text: str) -> None:
-        '''Set text to label.'''
-        self.__check.setText(text)
-
-    def set_button_text(self, text: str) -> None:
-        '''Set text to button.'''
-        self.__apply.setText(text)
-
-    def set_checked(self, value: bool) -> None:
-        '''Set check.'''
-        self.__check.setChecked(value)
-
-    def is_checked(self) -> bool:
-        '''Return checked.'''
-        return self.__check.isChecked()
-
-
-class MainWindow(widgets.StandardToolWidget):
-    '''Tool main window'''
-
-    def __init__(
-        self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-        unique_id: str = '',
-    ) -> None:
-        '''Initialize widget.'''
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The Qt window flags.
+                Defaults to Window.
+            unique_id (str, optional): A unique ID for restoring states.
+                Defaults to "".
+        """
         super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
         self.resize(400, 200)
 
-        # ======================================================================
-        # Widget
-        # ======================================================================
-        option_widget: QWidget = self.option_widget()
-        main_layout: QVBoxLayout = QVBoxLayout(option_widget)
+    def create_ui(self, parent: QtWidgets.QWidget) -> None:
+        """Creates the tool-specific user interface.
 
-        self.__freeze_vertex: OptionItem = OptionItem(self)
-        self.__freeze_vertex.set_label_text('Freeze Vertex')
-        self.__freeze_vertex.set_button_text('Optimize Now')
-        self.__freeze_vertex.clicked.connect(self.freeze_vertex_callback)
-        main_layout.addWidget(self.__freeze_vertex)
+        Args:
+            parent (QtWidgets.QWidget): The parent widget to contain the UI.
+        """
+        main_layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(parent)
 
-        self.__unlock_transformations: OptionItem = OptionItem(self)
-        self.__unlock_transformations.set_label_text('Unlock Transformations')
-        self.__unlock_transformations.set_button_text('Optimize Now')
-        self.__unlock_transformations.clicked.connect(
-            self.unlock_transformations_callback
+        settings: Settings = self.tool_settings()
+        settings.window_geo.bind(
+            setter=self.restoreGeometry,
+            getter=self.saveGeometry,
+            encoder=utils.qt_to_ascii,
+            decoder=utils.ascii_to_qt,
         )
-        main_layout.addWidget(self.__unlock_transformations)
 
-        self.__break_connections: OptionItem = OptionItem(self)
-        self.__break_connections.set_label_text('Break Connections')
-        self.__break_connections.set_button_text('Optimize Now')
-        self.__break_connections.clicked.connect(self.break_connectionsCallback)
-        main_layout.addWidget(self.__break_connections)
+        # Define UI generation data mapped to specific functions
+        options_data: list[
+            tuple[
+                str,
+                framework.Variant[bool],
+                Callable[[list[str]], bool],
+            ]
+        ] = [
+            (
+                "Freeze Vertex",
+                settings.freeze_vertex,
+                freeze_vertex,
+            ),
+            (
+                "Unlock Transformations",
+                settings.unlock_transformations,
+                unlock_transformations,
+            ),
+            (
+                "Break Connections",
+                settings.break_connections,
+                break_connections,
+            ),
+            (
+                "Freeze Transformations",
+                settings.freeze_transformations,
+                freeze_transformations,
+            ),
+            (
+                "Reset Transformations",
+                settings.reset_transformations,
+                reset_transformations,
+            ),
+            (
+                "Delete History",
+                settings.delete_history,
+                delete_history,
+            ),
+            (
+                "Delete User Defined Attribute",
+                settings.delete_user_defined_attr,
+                delete_user_defined_attribute,
+            ),
+            (
+                "Remove Intermediate Objects",
+                settings.remove_intermediate_obj,
+                remove_intermediate_objects,
+            ),
+        ]
 
-        self.__freeze_transformations: OptionItem = OptionItem(self)
-        self.__freeze_transformations.set_label_text('Freeze Transformations')
-        self.__freeze_transformations.set_button_text('Optimize Now')
-        self.__freeze_transformations.clicked.connect(
-            self.freeze_transformations_callback
-        )
-        main_layout.addWidget(self.__freeze_transformations)
+        # Dynamically generate UI items and connect callbacks
+        for label, setting_prop, func in options_data:
+            item: widgets.ActionableCheckBox = widgets.ActionableCheckBox(
+                label, "Optimize Now", self
+            )
+            item.clicked.connect(
+                functools.partial(self.execute_single_optimization, func)
+            )
+            main_layout.addWidget(item)
 
-        self.__reset_transformations: OptionItem = OptionItem(self)
-        self.__reset_transformations.set_label_text('Reset Transformations')
-        self.__reset_transformations.set_button_text('Optimize Now')
-        self.__reset_transformations.clicked.connect(
-            self.reset_transformations_callback
-        )
-        main_layout.addWidget(self.__reset_transformations)
+            setting_prop.bind(
+                setter=item.set_checked,
+                getter=item.is_checked,
+            )
 
-        self.__delete_history: OptionItem = OptionItem(self)
-        self.__delete_history.set_label_text('Delete History')
-        self.__delete_history.set_button_text('Optimize Now')
-        self.__delete_history.clicked.connect(self.delete_history_callback)
-        main_layout.addWidget(self.__delete_history)
-
-        self.__delete_user_defined_attr: OptionItem = OptionItem(self)
-        self.__delete_user_defined_attr.set_label_text(
-            'Delete User Defined Attribute'
-        )
-        self.__delete_user_defined_attr.set_button_text('Optimize Now')
-        self.__delete_user_defined_attr.clicked.connect(
-            self.delete_user_defined_attr_callback
-        )
-        main_layout.addWidget(self.__delete_user_defined_attr)
-
-        self.__remove_intermediate_obj: OptionItem = OptionItem(self)
-        self.__remove_intermediate_obj.set_label_text(
-            'Remove Intermediate Objects'
-        )
-        self.__remove_intermediate_obj.set_button_text('Optimize Now')
-        self.__remove_intermediate_obj.clicked.connect(
-            self.removeIntermediateObjCallback
-        )
-        main_layout.addWidget(self.__remove_intermediate_obj)
-
-        # button: QPushButton = QPushButton('Check Facets Assign', self)
-        # button.clicked.connect(self.check_facets_assign_callback)
-        # main_layout.addWidget(button)
         main_layout.addStretch()
 
-        # ======================================================================
-        # Menu
-        # ======================================================================
-        menu_bar = self.menu_bar()
-        view_menu = menu_bar.addMenu('Tool')
-        menu_bar.insertMenu(self.help_menu().menuAction(), view_menu)
-        action = view_menu.addAction('Check Facets Assign')
-        action.triggered.connect(self.check_facets_assign_callback)
+    def create_custom_menu(self, menu_bar: QtWidgets.QMenuBar) -> None:
+        """Creates a custom tool menu and appends it to the main menu bar.
 
-    # override
-    def load_settings(self) -> None:
-        '''Load ui settings from file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
-        self.__freeze_vertex.set_checked(settings.freeze_vertex.value())
-        self.__unlock_transformations.set_checked(
-            settings.unlock_transformations.value()
+        Args:
+            menu_bar (QtWidgets.QMenuBar): The main menu bar of the window
+                where the custom menu will be added.
+        """
+        tool_menu: QtWidgets.QMenu = menu_bar.addMenu("Tool")
+        action: QtGui.QAction = tool_menu.addAction(
+            "Check Face Material Assignments"
         )
-        self.__break_connections.set_checked(settings.break_connections.value())
-        self.__freeze_transformations.set_checked(
-            settings.freeze_transformations.value()
-        )
-        self.__reset_transformations.set_checked(
-            settings.reset_transformations.value()
-        )
-        self.__delete_history.set_checked(settings.delete_history.value())
-        self.__delete_user_defined_attr.set_checked(
-            settings.delete_user_defined_attr.value()
-        )
-        self.__remove_intermediate_obj.set_checked(
-            settings.remove_intermediate_obj.value()
-        )
+        action.triggered.connect(self.check_face_material_assignments_callback)
 
-    # override
-    def save_settings(self) -> None:
-        '''Save ui settings to file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
-        settings.freeze_vertex.set_value(self.__freeze_vertex.is_checked())
-        settings.unlock_transformations.set_value(
-            self.__unlock_transformations.is_checked()
-        )
-        settings.break_connections.set_value(
-            self.__break_connections.is_checked()
-        )
-        settings.freeze_transformations.set_value(
-            self.__freeze_transformations.is_checked()
-        )
-        settings.reset_transformations.set_value(
-            self.__reset_transformations.is_checked()
-        )
-        settings.delete_history.set_value(self.__delete_history.is_checked())
-        settings.delete_user_defined_attr.set_value(
-            self.__delete_user_defined_attr.is_checked()
-        )
-        settings.remove_intermediate_obj.set_value(
-            self.__remove_intermediate_obj.is_checked()
-        )
-        settings.write()
+    @dcc.undo
+    def execute_single_optimization(
+        self, optimize_func: Callable[[list[str]], bool]
+    ) -> None:
+        """Executes a specific optimization function on the valid selection.
 
-    # override
-    def reset_settings(self) -> None:
-        '''Reset ui settings.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
-
-    # override
-    def about(self) -> None:
-        '''Show a about dialog.[override]'''
-        widgets.AboutDialog.info(
-            self, __product__, __version__, __copyright__, __doc__
-        )
-
-    @widgets.undo
-    def freeze_vertex_callback(self) -> None:
-        '''Freeze vertex.'''
+        Args:
+            optimize_func (Callable[[list[str]], bool]): The target function.
+        """
         selection: list[str] = self.__selection_list()
         if selection:
-            freeze_vertex(selection)
-            _logger.info('Done.')
+            result: bool = optimize_func(selection)
+            if result:
+                _logger.info("Done.")
 
-    @widgets.undo
-    def unlock_transformations_callback(self) -> None:
-        '''Unlock transformations.'''
-        selection: list[str] = self.__selection_list()
-        if selection:
-            unlock_transformations(selection)
-            _logger.info('Done.')
-
-    @widgets.undo
-    def break_connectionsCallback(self) -> None:
-        '''Break connections.'''
-        selection: list[str] = self.__selection_list()
-        if selection:
-            break_connections(selection)
-            _logger.info('Done.')
-
-    @widgets.undo
-    def freeze_transformations_callback(self) -> None:
-        '''Freeze transformations.'''
-        selection: list[str] = self.__selection_list()
-        if selection:
-            freeze_transformations(selection)
-            _logger.info('Done.')
-
-    @widgets.undo
-    def reset_transformations_callback(self) -> None:
-        '''Reset transformations.'''
-        selection: list[str] = self.__selection_list()
-        if selection:
-            reset_transformations(selection)
-            _logger.info('Done.')
-
-    @widgets.undo
-    def delete_history_callback(self) -> None:
-        '''Delete history.'''
-        selection: list[str] = self.__selection_list()
-        if selection:
-            delete_history(selection)
-            _logger.info('Done.')
-
-    @widgets.undo
-    def delete_user_defined_attr_callback(self) -> None:
-        '''Delete user defined attr.'''
-        selection: list[str] = self.__selection_list()
-        if selection:
-            delete_user_defined_attribute(selection)
-            _logger.info('Done.')
-
-    @widgets.undo
-    def removeIntermediateObjCallback(self) -> None:
-        '''Remove intermediate object.'''
-        selection: list[str] = self.__selection_list()
-        if selection:
-            remove_intermediate_objects(selection)
-            _logger.info('Done.')
-
-    @widgets.undo
-    def check_facets_assign_callback(self) -> None:
-        '''Check facets assign.'''
-        result: list[str] = check_facets_assign()
+    @dcc.undo
+    def check_face_material_assignments_callback(self) -> None:
+        """Callback to check face material assignments."""
+        result: list[str] = check_face_material_assignments()
         if result:
-            QMessageBox.critical(
-                self, __product__, 'Selected that, so correct it.'
+            QtWidgets.QMessageBox.critical(
+                self, __product__, "Issues found. Correction required."
             )
         else:
-            QMessageBox.information(self, __product__, 'Done. No problem.')
+            QtWidgets.QMessageBox.information(
+                self, __product__, "No issues found."
+            )
 
-    @widgets.undo
+    @dcc.undo
     def apply(self) -> None:
-        '''Apply'''
+        """Executes the main tool logic and saves current settings."""
         self.save_settings()
-        main()
+        main(self.tool_settings())
 
     def __selection_list(self) -> list[str]:
-        selection: list[str] = cmds.ls(selection=True, type='transform')
+        """Gets the current valid selection list.
+
+        Returns:
+            list[str]: A list of selected transform nodes.
+        """
+        selection: list[str] = cmds.ls(selection=True, type="transform")
         if not selection:
-            _logger.error('Select objects to cleanup')
+            _logger.error("Select objects to clean up.")
             return []
 
         return selection
 
 
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
 def freeze_vertex(nodes: list[str]) -> bool:
-    '''Freeze vertex.'''
+    """Freezes the vertices of the given meshes.
+
+    Args:
+        nodes (list[str]): A list of transform nodes to process.
+
+    Returns:
+        bool: True if the operation was successful.
+    """
     for node in nodes:
         shapes: list[str] = (
             cmds.listRelatives(node, shapes=True, path=True) or []
@@ -369,23 +241,23 @@ def freeze_vertex(nodes: list[str]) -> bool:
             continue
 
         shape: str = shapes[0]
-        if cmds.objectType(shape) != 'mesh':
+        if cmds.objectType(shape) != "mesh":
             continue
 
         temp: str = cmds.duplicate(node, returnRootsOnly=True)[0]
         temp_mesh: str = cmds.listRelatives(temp, shapes=True, path=True)[0]
 
-        empty_mesh: str = cmds.createNode('mesh')
+        empty_mesh: str = cmds.createNode("mesh")
         empty_mesh_transform: str = cmds.listRelatives(
             empty_mesh, parent=True, path=True
         )[0]
 
-        cmds.connectAttr(f'{empty_mesh}.outMesh', f'{shape}.inMesh', force=True)
-        cmds.disconnectAttr(f'{empty_mesh}.outMesh', f'{shape}.inMesh')
-        cmds.connectAttr(f'{empty_mesh}.pnts', f'{shape}.pnts', force=True)
-        cmds.disconnectAttr(f'{empty_mesh}.pnts', f'{shape}.pnts')
-        cmds.connectAttr(f'{temp_mesh}.outMesh', f'{shape}.inMesh', force=True)
-        cmds.disconnectAttr(f'{temp_mesh}.outMesh', f'{shape}.inMesh')
+        cmds.connectAttr(f"{empty_mesh}.outMesh", f"{shape}.inMesh", force=True)
+        cmds.disconnectAttr(f"{empty_mesh}.outMesh", f"{shape}.inMesh")
+        cmds.connectAttr(f"{empty_mesh}.pnts", f"{shape}.pnts", force=True)
+        cmds.disconnectAttr(f"{empty_mesh}.pnts", f"{shape}.pnts")
+        cmds.connectAttr(f"{temp_mesh}.outMesh", f"{shape}.inMesh", force=True)
+        cmds.disconnectAttr(f"{temp_mesh}.outMesh", f"{shape}.inMesh")
 
         cmds.delete(temp)
         cmds.delete(empty_mesh_transform)
@@ -397,44 +269,40 @@ def freeze_vertex(nodes: list[str]) -> bool:
 
 
 def unlock_transformations(nodes: list[str]) -> bool:
-    '''Unlock transformations.'''
-    for node in nodes:
-        attrs: list[str] = ['t', 'r', 's']
-        axiss: list[str] = ['', 'x', 'y', 'z']
-        for attr, axis in itertools.product(attrs, axiss):
-            try:
-                cmds.setAttr(f'{node}.{attr}{axis}', lock=False, keyable=True)
+    """Unlocks transformation attributes on the given nodes.
 
-            except RuntimeError:
-                _logger.error('Failed to unlock attribute : %s', node)
+    Args:
+        nodes (list[str]): A list of transform nodes to process.
 
+    Returns:
+        bool: True if the operation was successful.
+    """
+    dcc.attribute.unlock_and_show(nodes, True, True, True, True)
     return True
 
 
 def break_connections(nodes: list[str]) -> bool:
-    '''Break connections.'''
-    for node in nodes:
-        attrs: list[str] = ['t', 'r', 's']
-        axiss: list[str] = ['', 'x', 'y', 'z']
-        for attr, axis in itertools.product(attrs, axiss):
-            dst_plug: str = f'{node}.{attr}{axis}'
-            if not cmds.connectionInfo(dst_plug, id=True):
-                continue
+    """Breaks incoming connections to transformation attributes.
 
-            src_plug: str = cmds.connectionInfo(
-                dst_plug, sourceFromDestination=True
-            )
-            try:
-                cmds.disconnectAttr(src_plug, dst_plug)
+    Args:
+        nodes (list[str]): A list of transform nodes to process.
 
-            except RuntimeError:
-                _logger.error('Failed to break connection : %s', dst_plug)
-
+    Returns:
+        bool: True if the operation was successful.
+    """
+    dcc.attribute.break_transform_connections(nodes, True, True, True, True)
     return True
 
 
 def freeze_transformations(nodes: list[str]) -> bool:
-    '''Freeze transformations'''
+    """Freezes transformation values on the given nodes.
+
+    Args:
+        nodes (list[str]): A list of transform nodes to process.
+
+    Returns:
+        bool: True if the operation was successful.
+    """
     for node in nodes:
         try:
             cmds.makeIdentity(
@@ -447,13 +315,20 @@ def freeze_transformations(nodes: list[str]) -> bool:
             )
 
         except RuntimeError:
-            _logger.error('Failed to freeze transform : %s', node)
+            _logger.error("Failed to freeze transform : %s", node)
 
     return True
 
 
 def reset_transformations(nodes: list[str]) -> bool:
-    '''Reset transformations.'''
+    """Resets transformation values on the given nodes.
+
+    Args:
+        nodes (list[str]): A list of transform nodes to process.
+
+    Returns:
+        bool: True if the operation was successful.
+    """
     for node in nodes:
         try:
             cmds.makeIdentity(
@@ -461,67 +336,68 @@ def reset_transformations(nodes: list[str]) -> bool:
             )
 
         except RuntimeError:
-            _logger.error('Failed to reset transform : %s', node)
+            _logger.error("Failed to reset transform : %s", node)
 
     return True
 
 
 def delete_history(nodes: list[str]) -> bool:
-    '''Delete history.'''
-    for node in nodes:
-        try:
-            cmds.delete(node, channels=True)
+    """Deletes construction history for the given nodes.
 
-        except RuntimeError:
-            _logger.error('Failed to delete node : %s', node)
+    Args:
+        nodes (list[str]): A list of nodes to process.
 
+    Returns:
+        bool: True if the operation was successful.
+    """
+    dcc.node.delete_history(nodes)
     return True
 
 
 def delete_user_defined_attribute(nodes: list[str]) -> bool:
-    '''Delete user defined attribute.'''
-    for node in nodes:
-        attrs: list[str] = cmds.listAttr(node, userDefined=True) or []
-        for attr in attrs:
-            try:
-                cmds.deleteAttr(node, attribute=attr)
+    """Deletes all user-defined attributes on the given nodes and shapes.
 
-            except RuntimeError:
-                _logger.error('Failed to delete attribute : %s', node)
+    Args:
+        nodes (list[str]): A list of nodes to process.
 
-        shapes = cmds.listRelatives(node, shapes=True, path=True) or []
-        delete_user_defined_attribute(shapes)
-
+    Returns:
+        bool: True if the operation was successful.
+    """
+    dcc.attribute.delete_user_defined(nodes)
     return True
 
 
 def remove_intermediate_objects(nodes: list[str]) -> bool:
-    '''Remove intermediate objects.'''
-    for node in nodes:
-        shapes: list[str] = (
-            cmds.listRelatives(node, shapes=True, path=True) or []
-        )
-        for shape in shapes:
-            if cmds.getAttr(f'{shape}.io'):
-                cmds.delete(shape)
+    """Removes intermediate objects from the given nodes.
 
+    Args:
+        nodes (list[str]): A list of transform nodes to process.
+
+    Returns:
+        bool: True if the operation was successful.
+    """
+    dcc.node.remove_intermediate_objects(nodes)
     return True
 
 
-def check_facets_assign() -> list[str]:
-    '''Check object of facets assign.'''
+def check_face_material_assignments() -> list[str]:
+    """Checks for face-level material assignments on selected objects.
+
+    Returns:
+        list[str]: A list of paths with face-level material assignments.
+    """
     result: list[str] = []
     materials: list[str] = cmds.ls(materials=True)
 
     for material in materials:
-        facets_assign: list[str] = []
+        face_assignments: list[str] = []
         cmds.hyperShade(objects=material)
         for dag_path in cmds.ls(selection=True):
-            if len(dag_path.split('.')) != 1:
-                facets_assign.append(dag_path)
+            if len(dag_path.split(".")) != 1:
+                face_assignments.append(dag_path)
 
-        if facets_assign:
-            result += facets_assign
+        if face_assignments:
+            result += face_assignments
 
     if result:
         cmds.select(*result)
@@ -531,42 +407,49 @@ def check_facets_assign() -> list[str]:
     return result
 
 
-def option(unique_id: str = '') -> None:
-    '''Show window.'''
+def option(unique_id: str = "") -> None:
+    """Entry point for launching the tool window.
+
+    Args:
+        unique_id (str, optional): A unique ID for restoring states.
+            Defaults to "".
+    """
     window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()
 
 
-def main() -> None:
-    '''Apply according to the setting.'''
-    selection: list[str] = cmds.ls(selection=True, type='transform')
+def main(settings: Settings | None = None) -> None:
+    """Applies clean up operations according to the provided settings.
+
+    Args:
+        settings (Settings | None, optional): Tool settings instance.
+            If None, the default settings will be acquired and read.
+            Defaults to None.
+    """
+    selection: list[str] = cmds.ls(selection=True, type="transform")
     if not selection:
-        _logger.error('Select objects to cleanup')
+        _logger.error("Select objects to clean up")
         return
 
-    settings: Settings = Settings.instance(__name__, True)
-    if settings.unlock_transformations.value():
-        unlock_transformations(selection)
+    if settings is None:
+        settings = Settings.instance(__name__, True)
+        settings.read()
 
-    if settings.break_connections.value():
-        break_connections(selection)
+    execution_map: list[
+        tuple[framework.Variant[bool], Callable[[list[str]], bool]]
+    ] = [
+        (settings.unlock_transformations, unlock_transformations),
+        (settings.break_connections, break_connections),
+        (settings.freeze_transformations, freeze_transformations),
+        (settings.reset_transformations, reset_transformations),
+        (settings.delete_history, delete_history),
+        (settings.delete_user_defined_attr, delete_user_defined_attribute),
+        (settings.remove_intermediate_obj, remove_intermediate_objects),
+        (settings.freeze_vertex, freeze_vertex),
+    ]
 
-    if settings.freeze_transformations.value():
-        freeze_transformations(selection)
+    for setting_prop, func in execution_map:
+        if setting_prop.value():
+            func(selection)
 
-    if settings.reset_transformations.value():
-        reset_transformations(selection)
-
-    if settings.delete_history.value():
-        delete_history(selection)
-
-    if settings.delete_user_defined_attr.value():
-        delete_user_defined_attribute(selection)
-
-    if settings.remove_intermediate_obj.value():
-        remove_intermediate_objects(selection)
-
-    if settings.freeze_vertex.value():
-        freeze_vertex(selection)
-
-    _logger.info('Done.')
+    _logger.info("Done.")

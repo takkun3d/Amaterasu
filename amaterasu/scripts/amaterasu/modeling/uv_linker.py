@@ -1,246 +1,264 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# UV Linker
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Connects UV links for multiple specified nodes."""
+
 from __future__ import annotations
-from typing import TYPE_CHECKING
-
-try:
-    from PySide2.QtCore import Qt, Signal, QItemSelectionModel, QModelIndex
-    from PySide2.QtGui import QStandardItemModel, QStandardItem
-    from PySide2.QtWidgets import (
-        QWidget,
-        QGridLayout,
-        QVBoxLayout,
-        QHBoxLayout,
-        QTreeView,
-        QMessageBox,
-        QPushButton,
-    )
-
-except ImportError:
-    if not TYPE_CHECKING:
-        from PySide6.QtCore import Qt, Signal, QItemSelectionModel, QModelIndex
-        from PySide6.QtGui import QStandardItemModel, QStandardItem
-        from PySide6.QtWidgets import (
-            QWidget,
-            QGridLayout,
-            QVBoxLayout,
-            QHBoxLayout,
-            QTreeView,
-            QMessageBox,
-            QPushButton,
-        )
 from maya import cmds
-from ..lib import logger, parser, widgets
+from amaterasu.base.qt import QtCore, QtGui, QtWidgets
+from amaterasu.base import dcc, framework, utils
+
+__product__: str = "UV Linker"
+__version__: str = "1.20"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'UV Linker'
-__version__: str = '1.10'
-__doc__ = 'Connect uv links from multiple specified nodes.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+class Settings(framework.ToolSettings):
+    """Settings for the tool.
+
+    Attributes:
+        window_geo (framework.Variant[str]): The saved window geometry.
+    """
+
+    window_geo: framework.Variant[str] = framework.Variant("")
 
 
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-class Settings(parser.ToolSettings):
-    '''Settings for tool.'''
+class ItemListWidget(QtWidgets.QWidget):
+    """Widget for displaying and managing a list of items.
 
-    window_geo: parser.Variant[str] = parser.Variant('')
+    Attributes:
+        current_changed (QtCore.Signal): Signal emitted when the current item
+            selection changes.
+    """
 
-
-class ItemList(QWidget):
-    '''Item list widget.'''
-
-    currentChanged: Signal = Signal(str)
+    current_changed: QtCore.Signal = QtCore.Signal(str)
 
     def __init__(
         self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Widget,
     ) -> None:
-        '''Initialize widget.'''
+        """Initializes the widget.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The Qt window flags.
+                Defaults to Widget.
+        """
         super().__init__(parent, flag)
 
-        main_layout = QVBoxLayout(self)
+        main_layout = QtWidgets.QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(2)
 
-        self.__model = QStandardItemModel(0, 1, self)
-        self.__selection_model = QItemSelectionModel(self.__model)
-        self.__selection_model.currentChanged.connect(self.currentChange)
+        self.__tree = QtWidgets.QTreeWidget(self)
+        self.__tree.setColumnCount(1)
+        self.__tree.setHeaderLabel("")
+        self.__tree.setAlternatingRowColors(True)
+        self.__tree.setRootIsDecorated(False)
+        self.__tree.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        self.__tree.currentItemChanged.connect(self.on_current_changed)
+        main_layout.addWidget(self.__tree)
 
-        self.__view = QTreeView(self)
-        self.__view.setModel(self.__model)
-        self.__view.setSelectionModel(self.__selection_model)
-        self.__view.setAlternatingRowColors(True)
-        self.__view.setRootIsDecorated(False)
-        self.__view.setFocusPolicy(Qt.NoFocus)
-        main_layout.addWidget(self.__view)
-
-    def currentChange(
-        self, current: QModelIndex, previous: QModelIndex
+    def on_current_changed(
+        self,
+        current: QtWidgets.QTreeWidgetItem | None,
+        _previous: QtWidgets.QTreeWidgetItem | None,
     ) -> None:
-        '''Current change.'''
-        item: QStandardItem | None = self.__model.itemFromIndex(current)
-        if item is None:
+        """Handles the current item change event.
+
+        Args:
+            current (QtWidgets.QTreeWidgetItem | None): The newly selected item.
+            previous (QtWidgets.QTreeWidgetItem | None): The previously selected
+                item.
+        """
+        if current is None:
             return
 
-        self.currentChanged.emit(item.text())
+        self.current_changed.emit(current.text(0))
 
     def set_header_text(self, text: str) -> None:
-        '''Set header text.'''
-        self.__model.setHeaderData(0, Qt.Horizontal, text)
+        """Sets the header text for the list view.
 
-    def items(self) -> list[str]:
-        '''Return text of items.'''
-        result: list[str] = []
-        for row in range(self.__model.rowCount()):
-            result.append(self.__model.item(row, 0).text())
-        return result
+        Args:
+            text (str): The header text to display.
+        """
+        self.__tree.setHeaderLabel(text)
+
+    def get_items(self) -> list[str]:
+        """Returns the text of all items in the widget.
+
+        Returns:
+            list[str]: A list of item strings.
+        """
+        return [
+            self.__tree.topLevelItem(i).text(0)
+            for i in range(self.__tree.topLevelItemCount())
+        ]
 
     def set_items(self, texts: list[str]) -> None:
-        '''Set item from selected nodes.'''
-        self.clear_item()
+        """Sets the items in the widget based on the provided text list.
+
+        Args:
+            texts (list[str]): A list of string labels for the items.
+        """
+        self.clear_items()
+        icon_path: str = dcc.get_icon_path("view/a_null.png")
+        icon: QtGui.QIcon = QtGui.QIcon(icon_path)
+
         for text in texts:
-            item: QStandardItem = QStandardItem(text)
-            item.setEditable(False)
-            item.setIcon(widgets.pixmap_from_file_name('view/a_null.png'))
-            self.__model.appendRow(item)
+            item = QtWidgets.QTreeWidgetItem([text])
+            item.setIcon(0, icon)
+            self.__tree.addTopLevelItem(item)
 
     def set_icon(self, target_label: str, icon_name: str) -> None:
-        '''Set icon of item for specificed label.'''
-        items: list[QStandardItem] = self.__model.findItems(target_label)
+        """Sets the icon of an item matching the specified label.
+
+        Args:
+            target_label (str): The text label of the target item.
+            icon_name (str): The name of the icon file to apply.
+        """
+        items: list[QtWidgets.QTreeWidgetItem] = self.__tree.findItems(
+            target_label, QtCore.Qt.MatchFlag.MatchExactly, 0
+        )
+        icon_path: str = dcc.get_icon_path(icon_name)
+        icon: QtGui.QIcon = QtGui.QIcon(icon_path)
         for item in items:
-            item.setIcon(widgets.pixmap_from_file_name(icon_name))
+            item.setIcon(0, icon)
 
-    def clear_item(self) -> None:
-        '''Clear item.'''
-        self.__model.removeRows(0, self.__model.rowCount())
+    def clear_items(self) -> None:
+        """Clears all items from the widget."""
+        self.__tree.clear()
 
-    def selected_item(self) -> str:
-        '''Return label from selected item.'''
-        index: QModelIndex = self.__selection_model.currentIndex()
-        item: QStandardItem | None = self.__model.itemFromIndex(index)
+    def get_selected_item(self) -> str:
+        """Returns the label of the currently selected item.
+
+        Returns:
+            str: The text of the selected item, or an empty string if nothing
+                is selected.
+        """
+        item: QtWidgets.QTreeWidgetItem | None = self.__tree.currentItem()
         if item is None:
-            return ''
+            return ""
 
-        return item.text()
+        return item.text(0)
 
 
-class MainWindow(widgets.ToolWidget):
-    '''Tool main window'''
+class MainWindow(framework.ToolWindow[Settings]):
+    """Main window for the UV Linker tool."""
 
     def __init__(
         self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-        unique_id: str = '',
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Window,
+        unique_id: str = "",
     ) -> None:
-        '''Initialize widget.'''
+        """Initializes the window.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The Qt window flags.
+                Defaults to Window.
+            unique_id (str, optional): A unique ID for restoring window states.
+                Defaults to "".
+        """
         super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
         self.resize(400, 200)
 
-        self.__geometrys: list[str] = []
+        self.__geometries: list[str] = []
+        self.__uv_set_view: ItemListWidget
+        self.__texture_view: ItemListWidget
 
-        option_widget: QWidget = self.option_widget()
-        main_layout: QGridLayout = QGridLayout(option_widget)
+    def create_ui(self, parent: QtWidgets.QWidget) -> None:
+        """Creates the tool-specific user interface.
+
+        Args:
+            parent (QtWidgets.QWidget): The parent widget to contain the UI.
+        """
+        main_layout = QtWidgets.QGridLayout(parent)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.__uv_set_view: ItemList = ItemList(self)
-        self.__uv_set_view.set_header_text('UV Sets')
-        self.__uv_set_view.currentChanged.connect(self.__update_link_icon)
+        self.__uv_set_view = ItemListWidget(parent)
+        self.__uv_set_view.set_header_text("UV Sets")
+        self.__uv_set_view.current_changed.connect(self.__update_link_icon)
         main_layout.addWidget(self.__uv_set_view, 0, 0)
 
-        self.__texture_view: ItemList = ItemList(self)
-        self.__texture_view.set_header_text('Textures')
+        self.__texture_view = ItemListWidget(parent)
+        self.__texture_view.set_header_text("Textures")
         main_layout.addWidget(self.__texture_view, 0, 1)
 
-        button_layout = QHBoxLayout(self)
+        button_layout = QtWidgets.QHBoxLayout()
         main_layout.addLayout(button_layout, 1, 0, 1, 2)
 
-        button: QPushButton = QPushButton('Analyze', self)
-        button.clicked.connect(self.analyze)
-        button_layout.addWidget(button)
+        analyze_btn = QtWidgets.QPushButton("Analyze", parent)
+        analyze_btn.clicked.connect(self.analyze_action)
+        button_layout.addWidget(analyze_btn)
 
-        button = QPushButton('Connect', self)
-        button.clicked.connect(self.connect_uv_link)
-        button_layout.addWidget(button)
+        connect_btn = QtWidgets.QPushButton("Connect", parent)
+        connect_btn.clicked.connect(self.connect_action)
+        button_layout.addWidget(connect_btn)
 
-        button = QPushButton('Disconnect', self)
-        button.clicked.connect(self.disconnect_uv_link)
-        button_layout.addWidget(button)
+        disconnect_btn = QtWidgets.QPushButton("Disconnect", parent)
+        disconnect_btn.clicked.connect(self.disconnect_action)
+        button_layout.addWidget(disconnect_btn)
 
-        button = QPushButton('Clear', self)
-        button.clicked.connect(self.clear)
-        button_layout.addWidget(button)
+        clear_btn = QtWidgets.QPushButton("Clear", parent)
+        clear_btn.clicked.connect(self.clear_action)
+        button_layout.addWidget(clear_btn)
 
-        button = QPushButton('Close', self)
-        button.clicked.connect(self.close)
-        button_layout.addWidget(button)
+        close_btn = QtWidgets.QPushButton("Close", parent)
+        close_btn.clicked.connect(self.close)
+        button_layout.addWidget(close_btn)
 
-    # override
-    def load_settings(self) -> None:
-        '''Load ui settings from file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
-
-    # override
-    def save_settings(self) -> None:
-        '''Save ui settings to file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
-        settings.write()
-
-    # override
-    def reset_settings(self) -> None:
-        '''Reset ui settings.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
-
-    # override
-    def about(self) -> None:
-        '''Show a about dialog.[override]'''
-        widgets.AboutDialog.info(
-            self, __product__, __version__, __copyright__, __doc__
+        settings: Settings = self.tool_settings()
+        settings.window_geo.bind(
+            setter=self.restoreGeometry,
+            getter=self.saveGeometry,
+            encoder=utils.qt_to_ascii,
+            decoder=utils.ascii_to_qt,
         )
 
     def __update_link_icon(self, uv_set_name: str) -> None:
-        '''Update link icon.'''
+        """Updates the link icons based on the selected UV set.
 
-        # Set null icon for all item.
-        textures: list[str] = self.__texture_view.items()
+        Args:
+            uv_set_name (str): The name of the selected UV set.
+        """
+        textures: list[str] = self.__texture_view.get_items()
         for texture in textures:
-            self.__texture_view.set_icon(texture, 'view/a_null.png')
+            self.__texture_view.set_icon(texture, "view/a_null.png")
 
-        # Set link icon for linked uv set.
         all_linked_textures: list[list[str]] = []
-        for node in self.__geometrys:
+        for node in self.__geometries:
             index: int = find_uv_set_id_from_name(node, uv_set_name)
             linked_textures: list[str] = cmds.uvLink(
                 query=True,
-                uvSet=f'{node}.uvSet[{index}].uvSetName',
-            )  # type:ignore
+                uvSet=f"{node}.uvSet[{index}].uvSetName",
+            )  # type: ignore
             all_linked_textures.append(linked_textures)
 
-            for texture in linked_textures:
-                self.__texture_view.set_icon(texture, 'view/a_link.png')
+        for texture in linked_textures:
+            self.__texture_view.set_icon(texture, "view/a_link.png")
 
-        # Find different uv links for each geometry.
         incomplete_link: list[str] = []
         for i in range(0, len(all_linked_textures) - 1, 1):
             incomplete_link.extend(
@@ -248,102 +266,124 @@ class MainWindow(widgets.ToolWidget):
             )
 
         for texture in incomplete_link:
-            self.__texture_view.set_icon(texture, 'view/a_incomplete_link.png')
+            self.__texture_view.set_icon(texture, "view/a_incomplete_link.png")
 
-    @widgets.undo
-    def analyze(self) -> None:
-        '''Analyze selected node and display uv set and texture in list.'''
+    @dcc.undo
+    def analyze_action(self) -> None:
+        """Analyzes selected nodes and displays UV sets and textures."""
         selection: list[str] = cmds.ls(selection=True)
         if not selection:
-            QMessageBox.warning(
-                self, __product__, 'Select geometrys to be uv linked.'
+            QtWidgets.QMessageBox.warning(
+                self, __product__, "Select geometries to be UV linked."
             )
             return
 
         uv_sets: list[str] = get_same_uv_set_names(selection)
         uv_sets.sort()
 
-        materials: list[str] = find_material_from_geometry(selection)
+        materials: list[str] = get_materials_from_geometries(selection)
         textures: list[str] = []
         for material in materials:
-            textures.extend(find_texture_from_material(material))
+            textures.extend(get_textures_from_material(material))
 
         textures.sort()
-        self.__geometrys = selection
+        self.__geometries = selection
         self.__uv_set_view.set_items(uv_sets)
         self.__texture_view.set_items(textures)
 
-    @widgets.undo
-    def clear(self) -> None:
-        '''Clear item in list.'''
-        self.__geometrys.clear()
-        self.__uv_set_view.clear_item()
-        self.__texture_view.clear_item()
+    @dcc.undo
+    def clear_action(self) -> None:
+        """Clears all items in the lists and resets geometries."""
+        self.__geometries.clear()
+        self.__uv_set_view.clear_items()
+        self.__texture_view.clear_items()
 
-    @widgets.undo
-    def connect_uv_link(self) -> None:
-        '''Connect uv link from selected item in view.'''
+    @dcc.undo
+    def connect_action(self) -> None:
+        """Connects the UV link based on the selected items in the views."""
         self.save_settings()
         connect_uv_links(
-            self.__geometrys,
-            self.__uv_set_view.selected_item(),
-            self.__texture_view.selected_item(),
+            self.__geometries,
+            self.__uv_set_view.get_selected_item(),
+            self.__texture_view.get_selected_item(),
         )
-        self.__update_link_icon(self.__uv_set_view.selected_item())
+        self.__update_link_icon(self.__uv_set_view.get_selected_item())
 
-    @widgets.undo
-    def disconnect_uv_link(self) -> None:
-        '''Disconnect uv link from selected item in view.'''
+    @dcc.undo
+    def disconnect_action(self) -> None:
+        """Disconnects the UV link based on the selected items in the views."""
         self.save_settings()
         disconnect_uv_links(
-            self.__geometrys,
-            self.__uv_set_view.selected_item(),
-            self.__texture_view.selected_item(),
+            self.__geometries,
+            self.__uv_set_view.get_selected_item(),
+            self.__texture_view.get_selected_item(),
         )
-        self.__update_link_icon(self.__uv_set_view.selected_item())
+        self.__update_link_icon(self.__uv_set_view.get_selected_item())
 
 
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
 def connect_uv_link(node: str, uv_set_name: str, texture: str) -> bool:
-    '''Connect uv link from specified node and uv set name.'''
+    """Connects a UV link for a specified node and UV set name.
+
+    Args:
+        node (str): The target node name.
+        uv_set_name (str): The name of the UV set.
+        texture (str): The name of the texture node.
+
+    Returns:
+        bool: True if successful, False otherwise.
+    """
     index: int = find_uv_set_id_from_name(node, uv_set_name)
     if index == -1:
         return False
 
-    cmds.uvLink(uvSet=f'{node}.uvSet[{index}].uvSetName', texture=texture)
+    cmds.uvLink(uvSet=f"{node}.uvSet[{index}].uvSetName", texture=texture)
     return True
 
 
 def connect_uv_links(nodes: list[str], uv_set_name: str, texture: str) -> bool:
-    '''Connect uv links from multiple specified nodes and uv set name.'''
+    """Connects UV links for multiple specified nodes and a UV set name.
+
+    Args:
+        nodes (list[str]): A list of target node names.
+        uv_set_name (str): The name of the UV set.
+        texture (str): The name of the texture node.
+
+    Returns:
+        bool: True if all connections were successful, False otherwise.
+    """
     result: list[bool] = []
     for node in nodes:
         r: bool = connect_uv_link(node, uv_set_name, texture)
         if not r:
-            _logger.error('Does not found uv name : %s / %s', node, uv_set_name)
+            _logger.error("UV set name not found: %s / %s", node, uv_set_name)
             continue
 
         result.append(r)
 
     if all(result):
-        _logger.info('Done.')
+        _logger.info("Done.")
         return True
 
     return False
 
 
 def disconnect_uv_link(node: str, uv_set_name: str, texture: str) -> bool:
-    '''Disconnect uv link from specified node and uv set name.'''
+    """Disconnects a UV link from a specified node and UV set name.
+
+    Args:
+        node (str): The target node name.
+        uv_set_name (str): The name of the UV set.
+        texture (str): The name of the texture node.
+
+    Returns:
+        bool: True if successful, False otherwise.
+    """
     index: int = find_uv_set_id_from_name(node, uv_set_name)
     if index == -1:
         return False
 
     cmds.uvLink(
-        b=True, uvSet=f'{node}.uvSet[{index}].uvSetName', texture=texture
+        b=True, uvSet=f"{node}.uvSet[{index}].uvSetName", texture=texture
     )
     return True
 
@@ -351,33 +391,49 @@ def disconnect_uv_link(node: str, uv_set_name: str, texture: str) -> bool:
 def disconnect_uv_links(
     nodes: list[str], uv_set_name: str, texture: str
 ) -> bool:
-    '''Disconnect uv links from multiple specified nodes and uv set name.'''
+    """Disconnects UV links for multiple specified nodes and a UV set name.
+
+    Args:
+        nodes (list[str]): A list of target node names.
+        uv_set_name (str): The name of the UV set.
+        texture (str): The name of the texture node.
+
+    Returns:
+        bool: True if all disconnections were successful, False otherwise.
+    """
     result: list[bool] = []
     for node in nodes:
         r: bool = disconnect_uv_link(node, uv_set_name, texture)
         if not r:
-            _logger.error('Does not found uv name : %s / %s', node, uv_set_name)
+            _logger.error("UV set name not found: %s / %s", node, uv_set_name)
             continue
 
         result.append(r)
 
     if all(result):
-        _logger.info('Done.')
+        _logger.info("Done.")
         return True
 
     return False
 
 
 def get_uv_set_names(node: str) -> list[str]:
-    '''Return uv set names.'''
-    uv_indexes: list[int] = cmds.getAttr(f'{node}.uvSet', multiIndices=True)
+    """Retrieves all UV set names associated with the given node.
+
+    Args:
+        node (str): The target node name.
+
+    Returns:
+        list[str]: A list of UV set names.
+    """
+    uv_indexes: list[int] = cmds.getAttr(f"{node}.uvSet", multiIndices=True)
     if not uv_indexes:
         return []
 
     result: list[str] = []
     for index in uv_indexes:
         uv_set_name: str = get_uv_set_name(node, index)
-        if uv_set_name == '':
+        if uv_set_name == "":
             continue
 
         result.append(uv_set_name)
@@ -386,12 +442,27 @@ def get_uv_set_names(node: str) -> list[str]:
 
 
 def get_uv_set_name(node: str, index: int) -> str:
-    '''Return uv set name from id.'''
-    return cmds.getAttr(f'{node}.uvSet[{index}].uvSetName') or ''
+    """Retrieves the UV set name from a specific ID.
+
+    Args:
+        node (str): The target node name.
+        index (int): The UV set ID index.
+
+    Returns:
+        str: The UV set name.
+    """
+    return cmds.getAttr(f"{node}.uvSet[{index}].uvSetName") or ""
 
 
 def get_same_uv_set_names(nodes: list[str]) -> list[str]:
-    '''Return same uv set name from specific nodes.'''
+    """Returns common UV set names shared among specified nodes.
+
+    Args:
+        nodes (list[str]): A list of target node names.
+
+    Returns:
+        list[str]: A list of shared UV set names.
+    """
     result: list[str] = []
     for node in nodes:
         uv_set_names: list[str] = get_uv_set_names(node)
@@ -400,7 +471,6 @@ def get_same_uv_set_names(nodes: list[str]) -> list[str]:
 
         if not result:
             result = uv_set_names
-
         else:
             result = list(set(result) & set(uv_set_names))
 
@@ -408,9 +478,17 @@ def get_same_uv_set_names(nodes: list[str]) -> list[str]:
 
 
 def find_uv_set_id_from_name(node: str, uv_set_name: str) -> int:
-    '''Return uv set id from uv set name.'''
+    """Returns the UV set ID corresponding to a given UV set name.
+
+    Args:
+        node (str): The target node name.
+        uv_set_name (str): The name of the UV set.
+
+    Returns:
+        int: The matching UV set index, or -1 if not found.
+    """
     result = -1
-    uv_indexes: list[int] = cmds.getAttr(f'{node}.uvSet', multiIndices=True)
+    uv_indexes: list[int] = cmds.getAttr(f"{node}.uvSet", multiIndices=True)
     if not uv_indexes:
         return result
 
@@ -421,31 +499,50 @@ def find_uv_set_id_from_name(node: str, uv_set_name: str) -> int:
     return result
 
 
-def find_texture_from_material(node: str) -> list[str]:
-    '''Return textures from material.'''
+def get_textures_from_material(node: str) -> list[str]:
+    """Retrieves texture nodes connected to a specified material.
+
+    Args:
+        node (str): The target material node name.
+
+    Returns:
+        list[str]: A list of connected texture node names.
+    """
     result: list[str] = []
-    connected_nodes: list[str] = cmds.listHistory(node)  # type:ignore
+    connected_nodes: list[str] = cmds.listHistory(node)  # type: ignore
     for connected_node in connected_nodes:
         node_type: str = cmds.nodeType(connected_node, derived=True)[0]
         classification: list[str] = cmds.getClassification(node_type) or []
         if not classification:
             continue
 
-        if classification[0].find('texture/2d') != -1:
+        if classification[0].find("texture/2d") != -1:
             result.append(connected_node)
 
     return result
 
 
-def find_material_from_geometry(node: list[str]) -> list[str]:
-    '''Return materials from geometry.'''
+def get_materials_from_geometries(nodes: list[str]) -> list[str]:
+    """Retrieves materials assigned to the specified geometries.
+
+    Args:
+        nodes (list[str]): A list of geometry node names.
+
+    Returns:
+        list[str]: A list of material node names.
+    """
     cmds.hyperShade(shaderNetworksSelectMaterialNodes=True)
     result: list[str] = cmds.ls(selection=True)
-    cmds.select(*node)
+    cmds.select(*nodes)
     return result
 
 
-def main(unique_id: str = '') -> None:
-    '''Show window.'''
+def main(unique_id: str = "") -> None:
+    """Shows the tool window.
+
+    Args:
+        unique_id (str, optional): A unique identifier for the window.
+            Defaults to "".
+    """
     window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()
