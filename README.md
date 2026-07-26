@@ -9,9 +9,7 @@
 </div>
 
 # Amaterasu
-<div align="center">
-  <img src="./amaterasu/icons/splash/startup_image.png" width="600">
-</div>
+![Amaterasu](./amaterasu/icons/splash/startup_image.png)
 In CG work, you often lose time on repeating tasks and complex steps. Amaterasu is a growing collection of tools made to change this.
 
 Created from my own experience, it turns hours of hard work into just a few clicks. This gives artists more time to focus on creating.
