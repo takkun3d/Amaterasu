@@ -1,279 +1,232 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Smooth Mesh Preview
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Applies smooth mesh preview settings to selected polygon meshes."""
+
 from __future__ import annotations
-from typing import TYPE_CHECKING
-import dataclasses
-
-try:
-    from PySide2.QtCore import Qt, Slot
-    from PySide2.QtWidgets import QWidget, QComboBox, QCheckBox, QSpinBox
-
-except ImportError:
-    if not TYPE_CHECKING:
-        from PySide6.QtCore import Qt, Slot
-        from PySide6.QtWidgets import QWidget, QComboBox, QCheckBox, QSpinBox
 from maya import cmds
-from ..lib import logger, parser, widgets
+from amaterasu.base.qt import QtCore, QtWidgets
+from amaterasu.base import dcc, framework, widgets, utils
+
+__product__: str = "Smooth Mesh Preview"
+__version__: str = "1.20"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Smooth Mesh Preview'
-__version__: str = '1.10'
-__doc__ = 'Set parameter of smooth mesh preview to selected it.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+class Settings(framework.ToolSettings):
+    """Settings for the Smooth Mesh Preview tool.
 
+    Attributes:
+        window_geo (framework.Variant[str]): The saved geometry of the window.
+        display_smooth_mesh (framework.Variant[int]): Display state index.
+        use_global_smooth_draw_type (framework.Variant[bool]): Global draw flag.
+        smooth_draw_type (framework.Variant[int]): Subdivision method index.
+        display_subd_comps (framework.Variant[bool]): Display components flag.
+        smooth_level (framework.Variant[int]): Preview division levels.
+        use_smooth_preview_for_render (framework.Variant[bool]): Render flag.
+        render_smooth_level (framework.Variant[int]): Render division levels.
+        smooth_uvs (framework.Variant[bool]): Smooth UVs flag.
+        propagate_edge_hardness (framework.Variant[bool]): Propagate edge flag.
+    """
 
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-class Settings(parser.ToolSettings):
-    '''Settings for tool.'''
+    window_geo: framework.Variant[str] = framework.Variant("")
+    display_smooth_mesh: framework.Variant[int] = framework.Variant(2)
+    use_global_smooth_draw_type: framework.Variant[bool] = framework.Variant(
+        False
+    )
+    smooth_draw_type: framework.Variant[int] = framework.Variant(0)
 
-    window_geo: parser.Variant[str] = parser.Variant('')
-    display_smooth_mesh: parser.Variant[int] = parser.Variant(2)  # 0, 1, 2
-    use_global_smooth_draw_type: parser.Variant[bool] = parser.Variant(False)
-    smooth_draw_type: parser.Variant[int] = parser.Variant(0)  # 0, 2, 3
-
-    # Subdivition Levels
-    display_subd_comps: parser.Variant[bool] = parser.Variant(False)
-    smooth_level: parser.Variant[int] = parser.Variant(2)
-    use_smooth_preview_for_render: parser.Variant[bool] = parser.Variant(True)
-    render_smooth_level: parser.Variant[int] = parser.Variant(2)
-
-    # OpenSubdiv Controls
-    # TODO: more param
+    # Subdivision Levels
+    display_subd_comps: framework.Variant[bool] = framework.Variant(False)
+    smooth_level: framework.Variant[int] = framework.Variant(2)
+    use_smooth_preview_for_render: framework.Variant[bool] = framework.Variant(
+        True
+    )
+    render_smooth_level: framework.Variant[int] = framework.Variant(2)
 
     # Maya Catmull-Clark Controls
-    smooth_uvs: parser.Variant[bool] = parser.Variant(True)
-    propagate_edge_hardness: parser.Variant[bool] = parser.Variant(False)
-    # TODO: more param
+    smooth_uvs: framework.Variant[bool] = framework.Variant(True)
+    propagate_edge_hardness: framework.Variant[bool] = framework.Variant(False)
 
 
-@dataclasses.dataclass
-class SmoothMeshPreviewParam:
-    '''Smooth mesh preview parameter.'''
-
-    display_smooth_mesh: int = 2
-    use_global_smooth_draw_type: bool = False
-    smooth_draw_type: int = 0
-    display_subd_comps: bool = False
-    smooth_level: int = 2
-    use_smooth_preview_for_render: bool = True
-    render_smooth_level: int = 2
-    smooth_uvs: bool = True
-    propagate_edge_hardness: bool = False
-
-    def from_settings(self, settings: Settings) -> None:
-        '''Set value from settings.'''
-        self.display_smooth_mesh = settings.display_smooth_mesh.value()
-        self.use_global_smooth_draw_type = (
-            settings.use_global_smooth_draw_type.value()
-        )
-        self.smooth_draw_type = settings.smooth_draw_type.value()
-        self.display_subd_comps = settings.display_subd_comps.value()
-        self.smooth_level = settings.smooth_level.value()
-        self.use_smooth_preview_for_render = (
-            settings.use_smooth_preview_for_render.value()
-        )
-        self.render_smooth_level = settings.render_smooth_level.value()
-        self.smooth_uvs = settings.smooth_uvs.value()
-        self.propagate_edge_hardness = settings.propagate_edge_hardness.value()
-
-
-class MainWindow(widgets.StandardToolWidget):
-    '''Tool main window'''
+class MainWindow(framework.StandardToolWindow[Settings]):
+    """Main window for the Smooth Mesh Preview tool."""
 
     def __init__(
         self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-        unique_id: str = '',
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Window,
+        unique_id: str = "",
     ) -> None:
-        '''Initialize widget.'''
+        """Initializes the window.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The Qt window flags.
+                Defaults to Window.
+            unique_id (str, optional): A unique ID for restoring window states.
+                Defaults to "".
+        """
         super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
-        self.resize(400, 200)
+        self.resize(400, 350)
 
-        option_widget: QWidget = self.option_widget()
-        main_layout: widgets.FormLayout = widgets.FormLayout(option_widget)
+    def create_ui(self, parent: QtWidgets.QWidget) -> None:
+        """Creates the tool-specific user interface.
 
+        Args:
+            parent (QtWidgets.QWidget): The parent widget to contain the UI.
+        """
+        main_layout: widgets.FormLayout = widgets.FormLayout(parent)
+
+        # Smooth Mesh Preview Options
         main_layout.addRow(
             widgets.FrameWidget(
-                'Smooth Mesh Preview Options', False, False, self
+                "Smooth Mesh Preview Options", False, False, parent
             )
         )
 
-        self.__display_smooth_mesh: QComboBox = QComboBox(self)
-        self.__display_smooth_mesh.addItem('OFF')
-        self.__display_smooth_mesh.addItem('Cage + Smooth Mesh')
-        self.__display_smooth_mesh.addItem('Smooth Mesh')
+        display_smooth_mesh = QtWidgets.QComboBox(parent)
+        display_smooth_mesh.addItems(
+            ["OFF", "Cage + Smooth Mesh", "Smooth Mesh"]
+        )
         main_layout.addRow(
-            widgets.FormLabel('Smooth Mesh Preview'), self.__display_smooth_mesh
+            widgets.FormLabel("Smooth Mesh Preview"), display_smooth_mesh
         )
 
-        self.__use_global_smooth_draw_type: QCheckBox = QCheckBox(
-            'Use global subdivision method', self
+        use_global_draw = QtWidgets.QCheckBox(
+            "Use global subdivision method", parent
         )
-        main_layout.addRow('', self.__use_global_smooth_draw_type)
+        main_layout.addRow("", use_global_draw)
 
-        self.__smooth_draw_type: QComboBox = QComboBox(self)
-        self.__smooth_draw_type.addItem('Maya Catmull-Clark', 0)
-        self.__smooth_draw_type.addItem('OpenSubdiv Catmull-Clark', 2)
-        self.__smooth_draw_type.addItem('OpenSubdiv Catmull-Clark Adaptive', 3)
+        smooth_draw_type = QtWidgets.QComboBox(parent)
+        smooth_draw_type.addItem("Maya Catmull-Clark", 0)
+        smooth_draw_type.addItem("OpenSubdiv Catmull-Clark", 2)
+        smooth_draw_type.addItem("OpenSubdiv Catmull-Clark Adaptive", 3)
         main_layout.addRow(
-            widgets.FormLabel('Subdivision Method'), self.__smooth_draw_type
+            widgets.FormLabel("Subdivision Method"), smooth_draw_type
         )
 
+        # Smooth Options
         main_layout.addRow(
-            widgets.FrameWidget('Smooth Options', False, False, self)
+            widgets.FrameWidget("Smooth Options", False, False, parent)
         )
 
-        self.__display_subd_comps: QCheckBox = QCheckBox(
-            'Display Subdivisions', self
-        )
-        main_layout.addRow('', self.__display_subd_comps)
+        display_subd = QtWidgets.QCheckBox("Display Subdivisions", parent)
+        main_layout.addRow("", display_subd)
 
-        self.__smooth_level: QSpinBox = QSpinBox(self)
-        self.__smooth_level.setRange(0, 10)
-        self.__smooth_level.setMinimumWidth(70)
-        self.__smooth_level.setButtonSymbols(QSpinBox.NoButtons)
+        smooth_level = QtWidgets.QSpinBox(parent)
+        smooth_level.setRange(0, 10)
+        smooth_level.setMinimumWidth(70)
+        smooth_level.setButtonSymbols(
+            QtWidgets.QSpinBox.ButtonSymbols.NoButtons
+        )
         main_layout.addRow(
-            widgets.FormLabel('Preview Division Levels'), self.__smooth_level
+            widgets.FormLabel("Preview Division Levels"), smooth_level
         )
 
-        self.__use_smooth_preview_for_render: QCheckBox = QCheckBox(
-            'Use Preview Level for Rendering', self
+        use_preview = QtWidgets.QCheckBox(
+            "Use Preview Level for Rendering", parent
         )
-        main_layout.addRow('', self.__use_smooth_preview_for_render)
+        main_layout.addRow("", use_preview)
 
-        self.__render_smooth_level: QSpinBox = QSpinBox(self)
-        self.__render_smooth_level.setRange(0, 10)
-        self.__render_smooth_level.setMinimumWidth(70)
-        self.__render_smooth_level.setButtonSymbols(QSpinBox.NoButtons)
+        render_level = QtWidgets.QSpinBox(parent)
+        render_level.setRange(0, 10)
+        render_level.setMinimumWidth(70)
+        render_level.setButtonSymbols(
+            QtWidgets.QSpinBox.ButtonSymbols.NoButtons
+        )
         main_layout.addRow(
-            widgets.FormLabel('Render Division Levels'),
-            self.__render_smooth_level,
+            widgets.FormLabel("Render Division Levels"), render_level
         )
 
+        # Maya Catmull-Clark Options
         main_layout.addRow(
             widgets.FrameWidget(
-                'Maya Catmull-Clark Options', False, False, self
+                "Maya Catmull-Clark Options", False, False, parent
             )
         )
 
-        self.__smooth_uvs: QCheckBox = QCheckBox('Smooth UVs', self)
-        main_layout.addRow('', self.__smooth_uvs)
+        smooth_uvs = QtWidgets.QCheckBox("Smooth UVs", parent)
+        main_layout.addRow("", smooth_uvs)
 
-        self.__propagate_edge_hardness: QCheckBox = QCheckBox(
-            'Propagate Edge Hardness', self
-        )
-        main_layout.addRow('', self.__propagate_edge_hardness)
+        propagate_edge = QtWidgets.QCheckBox("Propagate Edge Hardness", parent)
+        main_layout.addRow("", propagate_edge)
 
-    # override
-    def load_settings(self) -> None:
-        '''Load ui settings from file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
-        self.__display_smooth_mesh.setCurrentIndex(
-            settings.display_smooth_mesh.value()
+        settings: Settings = self.tool_settings()
+        settings.window_geo.bind(
+            setter=self.restoreGeometry,
+            getter=self.saveGeometry,
+            encoder=utils.qt_to_ascii,
+            decoder=utils.ascii_to_qt,
         )
-        self.__use_global_smooth_draw_type.setChecked(
-            settings.use_global_smooth_draw_type.value()
+        settings.display_smooth_mesh.bind(
+            setter=display_smooth_mesh.setCurrentIndex,
+            getter=display_smooth_mesh.currentIndex,
         )
-        self.__smooth_draw_type.setCurrentIndex(
-            settings.smooth_draw_type.value()
+        settings.use_global_smooth_draw_type.bind(
+            setter=use_global_draw.setChecked, getter=use_global_draw.isChecked
         )
-        self.__display_subd_comps.setChecked(
-            settings.display_subd_comps.value()
+        settings.smooth_draw_type.bind(
+            setter=smooth_draw_type.setCurrentIndex,
+            getter=smooth_draw_type.currentIndex,
         )
-        self.__smooth_level.setValue(settings.smooth_level.value())
-        self.__use_smooth_preview_for_render.setChecked(
-            settings.use_smooth_preview_for_render.value()
+        settings.display_subd_comps.bind(
+            setter=display_subd.setChecked, getter=display_subd.isChecked
         )
-        self.__render_smooth_level.setValue(
-            settings.render_smooth_level.value()
+        settings.smooth_level.bind(
+            setter=smooth_level.setValue, getter=smooth_level.value
         )
-        self.__smooth_uvs.setChecked(settings.smooth_uvs.value())
-        self.__propagate_edge_hardness.setChecked(
-            settings.propagate_edge_hardness.value()
+        settings.use_smooth_preview_for_render.bind(
+            setter=use_preview.setChecked, getter=use_preview.isChecked
         )
-        self.set_valid_options()
-
-    # override
-    def save_settings(self) -> None:
-        '''Save ui settings to file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
-        settings.display_smooth_mesh.set_value(
-            self.__display_smooth_mesh.currentIndex()
+        settings.render_smooth_level.bind(
+            setter=render_level.setValue, getter=render_level.value
         )
-        settings.use_global_smooth_draw_type.set_value(
-            self.__use_global_smooth_draw_type.isChecked()
+        settings.smooth_uvs.bind(
+            setter=smooth_uvs.setChecked, getter=smooth_uvs.isChecked
         )
-        settings.smooth_draw_type.set_value(
-            self.__smooth_draw_type.currentIndex()
-        )
-        settings.display_subd_comps.set_value(
-            self.__display_subd_comps.isChecked()
-        )
-        settings.smooth_level.set_value(self.__smooth_level.value())
-        settings.use_smooth_preview_for_render.set_value(
-            self.__use_smooth_preview_for_render.isChecked()
-        )
-        settings.render_smooth_level.set_value(
-            self.__render_smooth_level.value()
-        )
-        settings.smooth_uvs.set_value(self.__smooth_uvs.isChecked())
-        settings.propagate_edge_hardness.set_value(
-            self.__propagate_edge_hardness.isChecked()
-        )
-        settings.write()
-
-    # override
-    def reset_settings(self) -> None:
-        '''Reset ui settings.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
-
-    # override
-    def about(self) -> None:
-        '''Show a about dialog.[override]'''
-        widgets.AboutDialog.info(
-            self, __product__, __version__, __copyright__, __doc__
+        settings.propagate_edge_hardness.bind(
+            setter=propagate_edge.setChecked, getter=propagate_edge.isChecked
         )
 
-    @Slot()
-    def set_valid_options(self) -> None:
-        '''Synchronize with valid options.'''
-
-    @widgets.undo
+    @dcc.undo
     def apply(self) -> None:
-        '''Apply'''
+        """Applies the smooth mesh preview operation."""
         self.save_settings()
-        main()
+        main(self.tool_settings())
 
 
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
-def apply(nodes: list[str], param: SmoothMeshPreviewParam) -> bool:
-    '''Set parameter of smooth mesh preview.'''
-    param.smooth_draw_type = [0, 2, 3][param.smooth_draw_type]
+def apply(nodes: list[str], settings: Settings) -> bool:
+    """Applies smooth mesh preview parameters to the given nodes.
+
+    Args:
+        nodes (list[str]): A list of polygon nodes to modify.
+        settings (Settings): The tool settings containing preview parameters.
+
+    Returns:
+        bool: True if the operation was successful, False otherwise.
+    """
+    draw_type_mapping: list[int] = [0, 2, 3]
+    mapped_draw_type: int = draw_type_mapping[settings.smooth_draw_type.value()]
+
     for node in nodes:
         shapes: list[str] = (
             cmds.listRelatives(node, shapes=True, path=True) or []
@@ -282,56 +235,71 @@ def apply(nodes: list[str], param: SmoothMeshPreviewParam) -> bool:
             continue
 
         shape: str = shapes[0]
-        if cmds.objectType(shape) != 'mesh':
+        if cmds.objectType(shape) != "mesh":
             continue
 
         try:
             cmds.setAttr(
-                f'{shape}.displaySmoothMesh', param.display_smooth_mesh
+                f"{shape}.displaySmoothMesh",
+                settings.display_smooth_mesh.value(),
             )
             cmds.setAttr(
-                f'{shape}.displaySmoothMesh', param.display_smooth_mesh
+                f"{shape}.useGlobalSmoothDrawType",
+                settings.use_global_smooth_draw_type.value(),
+            )
+            cmds.setAttr(f"{shape}.smoothDrawType", mapped_draw_type)
+            cmds.setAttr(
+                f"{shape}.displaySubdComps",
+                settings.display_subd_comps.value(),
+            )
+            cmds.setAttr(f"{shape}.smoothLevel", settings.smooth_level.value())
+            cmds.setAttr(
+                f"{shape}.useSmoothPreviewForRender",
+                settings.use_smooth_preview_for_render.value(),
             )
             cmds.setAttr(
-                f'{shape}.useGlobalSmoothDrawType',
-                param.use_global_smooth_draw_type,
+                f"{shape}.renderSmoothLevel",
+                settings.render_smooth_level.value(),
             )
-            cmds.setAttr(f'{shape}.smoothDrawType', param.smooth_draw_type)
-            cmds.setAttr(f'{shape}.displaySubdComps', param.display_subd_comps)
-            cmds.setAttr(f'{shape}.smoothLevel', param.smooth_level)
+            cmds.setAttr(f"{shape}.smoothUVs", settings.smooth_uvs.value())
             cmds.setAttr(
-                f'{shape}.useSmoothPreviewForRender',
-                param.use_smooth_preview_for_render,
+                f"{shape}.propagateEdgeHardness",
+                settings.propagate_edge_hardness.value(),
             )
-            cmds.setAttr(
-                f'{shape}.renderSmoothLevel', param.render_smooth_level
-            )
-            cmds.setAttr(f'{shape}.smoothUVs', param.smooth_uvs)
-            cmds.setAttr(
-                f'{shape}.propagateEdgeHardness', param.propagate_edge_hardness
-            )
-
         except RuntimeError:
             pass
 
     return True
 
 
-def option(unique_id: str = '') -> None:
-    '''Show window.'''
+def option(unique_id: str = "") -> None:
+    """Shows the tool's main window.
+
+    Args:
+        unique_id (str, optional): A unique identifier for the window instance.
+            Defaults to "".
+    """
     window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()
 
 
-def main() -> None:
-    '''Apply according to the setting.'''
+def main(settings: Settings | None = None) -> None:
+    """Applies the smooth mesh preview based on the current UI settings.
+
+    Args:
+        settings (Settings | None, optional): The tool settings instance to use.
+            If None, it initializes settings from the module name and reads
+            them from the file. Defaults to None.
+    """
     selection: list[str] = cmds.ls(selection=True)
     if not selection:
-        _logger.error('Select polygon node to set Smooth Mesh Preview.')
+        _logger.error("Select polygon node to set Smooth Mesh Preview.")
         return
 
-    param: SmoothMeshPreviewParam = SmoothMeshPreviewParam()
-    param.from_settings(Settings.instance(__name__, True))
-    result: bool = apply(selection, param)
+    if settings is None:
+        settings = Settings.instance(__name__, True)
+        settings.read()
+
+    result: bool = apply(selection, settings)
     if result:
-        _logger.info('Done.')
+        _logger.info("Done.")
