@@ -57,8 +57,8 @@ def main() -> None:
     """The main startup sequence."""
     if not cmds.about(batch=True):
         cmds.setStartupMessage(f"Loading {__product__}...")
-        settings: env.Settings = env.Settings.instance(env.__product__, True)
-        if settings.override_splash_screen.value():
-            splash.override_splash_screen()
+        # settings: env.Settings = env.Settings.instance(env.__product__, True)
+        # if settings.override_splash_screen.value():
+        #     splash.override_splash_screen()
 
         utils.executeDeferred(execute_deferred)
