@@ -101,3 +101,35 @@ def displayed_nodes() -> list[str]:
     OpenMaya.MGlobal.setSelectionMode(current_selection_mode)
     OpenMaya.MGlobal.setActiveSelectionList(old_sel)
     return nodes
+
+
+def get_current_viewport_engine() -> str:
+    """Determines the current Maya Viewport 2.0 rendering engine.
+
+    Returns:
+        str: "HLSL" if the viewport uses DirectX, otherwise "GLSL".
+    """
+    engine: str = cmds.optionVar(query="vp2RenderingEngine")  # type: ignore
+    return "HLSL" if "DirectX" in engine else "GLSL"
+
+
+def get_current_camera() -> str:
+    """Gets the currently active viewport camera.
+
+    Returns:
+        str: The name of the active camera.
+    """
+    camera: str = "persp"
+    ignored_cameras: tuple[str, ...] = ("top", "side", "front", "persp")
+
+    panels: list[str] = cmds.getPanel(type="modelPanel") or []
+    for panel in panels:
+        cam: str = cmds.modelEditor(
+            panel, query=True, activeView=True, camera=True
+        )  # type: ignore
+        cam = cmds.ls(cam)[0]
+        if cam not in ignored_cameras:
+            camera = cam
+            break
+
+    return camera

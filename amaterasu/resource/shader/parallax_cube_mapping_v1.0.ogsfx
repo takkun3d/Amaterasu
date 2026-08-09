@@ -1,0 +1,527 @@
+// Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+#define BLEND_MODE_LIST "Normal:Darken:Multiply:Color Burn:Linear Burn:Lighten:Screen:Color Dodge:Add:Overlay:Soft Light:Hard Light:Difference:Exclusion:Subtract:Divide"
+#define BLEND_MODE_MAX 15
+
+uniform mat4 WorldViewProj : WorldViewProjection;
+uniform mat4 World : World;
+uniform mat4 WorldInverseTranspose : WorldInverseTranspose;
+uniform mat4 ViewInverse : ViewInverse;
+
+uniform texture2D MainTexture <
+    string Object = "Main";
+    string UIName = "Texture";
+>;
+
+uniform sampler2D MainSampler = sampler_state {
+    Texture = <MainTexture>;
+    TEXTURE_MIN_FILTER = LINEAR;
+    TEXTURE_MAG_FILTER = LINEAR;
+    TEXTURE_WRAP_S = CLAMP_TO_EDGE;
+    TEXTURE_WRAP_T = CLAMP_TO_EDGE;
+    TEXTURE_WRAP_R = CLAMP_TO_EDGE;
+};
+
+uniform float UVMargin <
+    string Object = "Main";
+    string UIName = "UV Margin";
+    string UIWidget = "Slider";
+    float UIMin = 0.0;
+    float UIMax = 0.02;
+> = 0.005;
+
+uniform float MainDepth <
+    string Object = "Main";
+    string UIName = "Depth";
+    string UIWidget = "Slider";
+    float UIMin = 0.0001;
+    float UIMax = 10.0;
+> = 1.0;
+
+uniform bool Layer0_Enable <
+    string Object = "Layer 0";
+    string UIName = "Enable 0";
+> = true;
+
+uniform float Layer0_Depth <
+    string Object = "Layer 0";
+    string UIName = "Depth 0";
+    string UIWidget = "Slider";
+    float UIMin = -1.0;
+    float UIMax = 1.0;
+> = 0.0;
+
+uniform float Layer0_OffsetX <
+    string Object = "Layer 0";
+    string UIName = "Offset X 0";
+    string UIWidget = "Slider";
+    float UIMin = -1.0;
+    float UIMax = 1.0;
+> = 0.0;
+
+uniform float Layer0_OffsetY <
+    string Object = "Layer 0";
+    string UIName = "Offset Y 0";
+    string UIWidget = "Slider";
+    float UIMin = -1.0;
+    float UIMax = 1.0;
+> = 0.0;
+
+uniform int Layer0_BlendMode <
+    string Object = "Layer 0";
+    string UIName = "Blend Mode 0";
+    string UIFieldNames = BLEND_MODE_LIST;
+    int UIMin = 0;
+    int UIMax = BLEND_MODE_MAX;
+> = 0;
+
+uniform float Layer0_Opacity <
+    string Object = "Layer 0";
+    string UIName = "Opacity 0";
+    string UIWidget = "Slider";
+    float UIMin = 0.0;
+    float UIMax = 1.0;
+> = 1.0;
+
+
+uniform bool Layer1_Enable <
+    string Object = "Layer 1";
+    string UIName = "Enable 1";
+> = true;
+
+uniform float Layer1_Depth <
+    string Object = "Layer 1";
+    string UIName = "Depth 1";
+    string UIWidget = "Slider";
+    float UIMin = -1.0;
+    float UIMax = 1.0;
+> = 0.25;
+
+uniform float Layer1_OffsetX <
+    string Object = "Layer 1";
+    string UIName = "Offset X 1";
+    string UIWidget = "Slider";
+    float UIMin = -1.0;
+    float UIMax = 1.0;
+> = 0.0;
+
+uniform float Layer1_OffsetY <
+    string Object = "Layer 1";
+    string UIName = "Offset Y 1";
+    string UIWidget = "Slider";
+    float UIMin = -1.0;
+    float UIMax = 1.0;
+> = 0.0;
+
+uniform int Layer1_BlendMode <
+    string Object = "Layer 1";
+    string UIName = "Blend Mode 1";
+    string UIFieldNames = BLEND_MODE_LIST;
+    int UIMin = 0;
+    int UIMax = BLEND_MODE_MAX;
+> = 0;
+
+uniform float Layer1_Opacity <
+    string Object = "Layer 1";
+    string UIName = "Opacity 1";
+    string UIWidget = "Slider";
+    float UIMin = 0.0;
+    float UIMax = 1.0;
+> = 1.0;
+
+uniform bool Layer2_Enable <
+    string Object = "Layer 2";
+    string UIName = "Enable 2";
+> = true;
+
+uniform float Layer2_Depth <
+    string Object = "Layer 2";
+    string UIName = "Depth 2";
+    string UIWidget = "Slider";
+    float UIMin = -1.0;
+    float UIMax = 1.0;
+> = 0.5;
+
+uniform float Layer2_OffsetX <
+    string Object = "Layer 2";
+    string UIName = "Offset X 2";
+    string UIWidget = "Slider";
+    float UIMin = -1.0;
+    float UIMax = 1.0;
+> = 0.0;
+
+uniform float Layer2_OffsetY <
+    string Object = "Layer 2";
+    string UIName = "Offset Y 2";
+    string UIWidget = "Slider";
+    float UIMin = -1.0;
+    float UIMax = 1.0;
+> = 0.0;
+
+uniform int Layer2_BlendMode <
+    string Object = "Layer 2";
+    string UIName = "Blend Mode 2";
+    string UIFieldNames = BLEND_MODE_LIST;
+    int UIMin = 0;
+    int UIMax = BLEND_MODE_MAX;
+> = 0;
+
+uniform float Layer2_Opacity <
+    string Object = "Layer 2";
+    string UIName = "Opacity 2";
+    string UIWidget = "Slider";
+    float UIMin = 0.0;
+    float UIMax = 1.0;
+> = 1.0;
+
+uniform bool Layer3_Enable <
+    string Object = "Layer 3";
+    string UIName = "Enable 3";
+> = true;
+
+uniform float Layer3_Depth <
+    string Object = "Layer 3";
+    string UIName = "Depth 3";
+    string UIWidget = "Slider";
+    float UIMin = -1.0;
+    float UIMax = 1.0;
+> = 0.75;
+
+uniform float Layer3_OffsetX <
+    string Object = "Layer 3";
+    string UIName = "Offset X 3";
+    string UIWidget = "Slider";
+    float UIMin = -1.0;
+    float UIMax = 1.0;
+> = 0.0;
+
+uniform float Layer3_OffsetY <
+    string Object = "Layer 3";
+    string UIName = "Offset Y 3";
+    string UIWidget = "Slider";
+    float UIMin = -1.0;
+    float UIMax = 1.0;
+> = 0.0;
+
+uniform int Layer3_BlendMode <
+    string Object = "Layer 3";
+    string UIName = "Blend Mode 3";
+    string UIFieldNames = BLEND_MODE_LIST;
+    int UIMin = 0;
+    int UIMax = BLEND_MODE_MAX;
+> = 0;
+
+uniform float Layer3_Opacity <
+    string Object = "Layer 3";
+    string UIName = "Opacity 3";
+    string UIWidget = "Slider";
+    float UIMin = 0.0;
+    float UIMax = 1.0;
+> = 1.0;
+
+attribute VS_INPUT {
+    vec3 Pos : POSITION;
+    vec3 Normal : NORMAL;
+    vec3 Tangent : TANGENT;
+    vec2 UV : TEXCOORD0;
+};
+
+attribute VS_OUTPUT {
+    vec2 vUV : TEXCOORD0;
+    vec3 vWorldPos : POSITION;
+    vec3 vNormal : NORMAL;
+    vec3 vTangent : TANGENT;
+};
+
+attribute PS_OUTPUT {
+    vec4 outColor : COLOR0;
+};
+
+GLSLShader VS {
+    void main() {
+        // Transform the vertex position from object space to clip space
+        gl_Position = WorldViewProj * vec4(Pos, 1.0);
+
+        // Pass through the texture coordinates (UVs) to the pixel shader
+        vUV = UV;
+
+        // Calculate the 3D world space position of the vertex
+        vWorldPos = (World * vec4(Pos, 1.0)).xyz;
+
+        // Transform the normal vector to world space
+        // using InverseTranspose to safely handle non-uniform scaling
+        vNormal = normalize((WorldInverseTranspose * vec4(Normal, 0.0)).xyz);
+
+        // Transform the tangent vector to world space
+        vTangent = normalize((World * vec4(Tangent, 0.0)).xyz);
+    }
+}
+
+GLSLShader PS {
+    const float ONE_THIRD = 1.0 / 3.0;
+    const float TWO_THIRDS = 2.0 / 3.0;
+
+    vec3 calcTangentViewDir(
+        vec3 worldPos,
+        vec3 camPos,
+        vec3 normal,
+        vec3 tangent
+    ) {
+        // Calculate the normalized view ray direction from camera to the pixel
+        vec3 V = normalize(worldPos - camPos);
+
+        // Compute the bitangent vector to complete the TBN basis
+        vec3 B = cross(normal, tangent);
+
+        // Flip the normal if looking at the backface to ensure
+        vec3 N = (dot(V, normal) > 0.0) ? -normal : normal;
+
+        // Transform the view ray direction into tangent space
+        return vec3(dot(V, tangent), dot(V, B), dot(V, N));
+    }
+
+    vec3 applyBlendMode(int mode, vec3 a, vec3 b, float alpha) {
+        vec3 c = a;
+        if (mode == 0) { // Normal
+            c = b;
+
+        } else if (mode == 1) { // Darken
+            c = min(a, b);
+
+        } else if (mode == 2) { // Multiply
+            c = a * b;
+
+        } else if (mode == 3) { // Color Burn
+            c = max(1.0 - (1.0 - a) / (b + 0.000001), 0.0);
+
+        } else if (mode == 4) { // Linear Burn
+            c = max(a + b - 1.0, 0.0);
+
+        } else if (mode == 5) { // Lighten
+            c = max(a, b);
+
+        } else if (mode == 6) { // Screen
+            c = 1.0 - (1.0 - a) * (1.0 - b);
+
+        } else if (mode == 7) { // Color Dodge
+            c = min(a / (1.0 - b + 0.000001), 1.0);
+
+        } else if (mode == 8) { // Add
+            c = min(a + b, 1.0);
+
+        } else if (mode == 9) { // Overlay
+            c = mix(
+                2.0 * a * b,
+                1.0 - 2.0 * (1.0 - a) * (1.0 - b),
+                step(0.5, a)
+            );
+
+        } else if (mode == 10) { // Soft Light
+            c = mix(
+                2.0 * a * b + a * a * (1.0 - 2.0 * b),
+                sqrt(a) * (2.0 * b - 1.0) + 2.0 * a * (1.0 - b),
+                step(0.5, b)
+            );
+
+        } else if (mode == 11) { // Hard Light
+            c = mix(
+                2.0 * a * b,
+                1.0 - 2.0 * (1.0 - b) * (1.0 - a),
+                step(0.5, b)
+                );
+
+        } else if (mode == 12) { // Difference
+            c = abs(a - b);
+
+        } else if (mode == 13) { // Exclusion
+            c = a + b - 2.0 * a * b;
+
+        } else if (mode == 14) { // Subtract
+            c = max(a - b, 0.0);
+
+        } else if (mode == 15) { // Divide
+            c = min(a / (b + 0.000001), 1.0);
+        }
+        return mix(a, c, alpha);
+    }
+
+    vec2 calcCubeUV(vec2 startUV, vec3 rayDir, float depth) {
+        // Initialize the ray origin on the 2D surface (Z = 0.0)
+        vec3 rayPos = vec3(startUV, 0.0);
+
+        // Precompute the inverse ray direction tooptimize intersection calculations
+        vec3 invRay = 1.0 / rayDir;
+
+        // Determine the target wall coordinates (0.0 or 1.0) based on ray direction
+        vec3 wallTarget = step(0.0, rayDir);
+
+        // Calculate the distance to each plane using the slab method (tx, ty, tz)
+        float tx = (wallTarget.x - rayPos.x) * invRay.x;
+        float ty = (wallTarget.y - rayPos.y) * invRay.y;
+        float tz = (depth - rayPos.z) * invRay.z;
+
+        // Select the closest intersection distance
+        float tHit = min(tx, min(ty, tz));
+
+        // Calculate the exact 3D intersection point
+        vec3 hitPos = rayPos + rayDir * tHit;
+
+        // Normalize the Z depth for texture mapping (0.0 to 1.0 range)
+        float normZ = hitPos.z / depth;
+
+        // Apply UV margin to prevent texture bleeding from adjacent atlas tiles.
+        normZ = mix(UVMargin, 1.0 - UVMargin, normZ);
+        hitPos.xy = mix(vec2(UVMargin), vec2(1.0 - UVMargin), hitPos.xy);
+
+        // Calc uv
+        if (step(tx, tHit) == 1.0) {
+            if (wallTarget.x >= 0.5) { // Right
+                return vec2(3.0 - normZ, 2.0 - hitPos.y) * ONE_THIRD;
+
+            } else {
+                return vec2(normZ, 2.0 - hitPos.y) * ONE_THIRD;
+            }
+        }
+
+        if (step(ty, tHit) == 1.0) {
+            if (wallTarget.y >= 0.5) { // Top
+                return vec2(hitPos.x + 1.0, normZ) * ONE_THIRD;
+
+            } else {
+                return vec2(hitPos.x + 1.0, 3.0 - normZ) * ONE_THIRD;
+            }
+        }
+
+        // Back
+        return vec2(hitPos.x + 1.0, 2.0 - hitPos.y) * ONE_THIRD;
+    }
+
+    vec3 calcPlaneUV(vec2 startUV, vec3 rayDir, float depth, vec2 offset) {
+        // Calculate the intersection point of the view ray with the layer plane
+        vec2 hitPos = startUV - (rayDir.xy / rayDir.z) * depth;
+
+        // Apply the custom 2D texture offset
+        vec2 offsetBaseUv = hitPos + offset;
+
+        // Create a clipping mask to prevent texture repeating
+        // 1.0 if inside [0, 1] bounds
+        // 0.0 if outside
+        float maskX = step(0.0, offsetBaseUv.x) * step(offsetBaseUv.x, 1.0);
+        float maskY = step(0.0, offsetBaseUv.y) * step(offsetBaseUv.y, 1.0);
+        float mask = maskX * maskY;
+
+        // Apply UV margin to prevent texture bleeding from adjacent atlas tiles.
+        offsetBaseUv = mix(vec2(UVMargin), vec2(1.0 - UVMargin), offsetBaseUv);
+
+        // Invert the Y-axis for correct texture orientation and scale down for
+        // the 3x3 texture atlas
+        vec2 uv = vec2(offsetBaseUv.x, 1.0 - offsetBaseUv.y) * ONE_THIRD;
+        return vec3(uv.x, uv.y, mask);
+    }
+
+    void main() {
+        vec3 rayDir = calcTangentViewDir(
+            vWorldPos,
+            ViewInverse[3].xyz,
+            vNormal,
+            vTangent
+        );
+        ivec2 texSize = textureSize(MainSampler, 0);
+        float aspect = float(texSize.x) / float(texSize.y);
+        rayDir.y *= aspect;
+
+        vec2 mainUv = calcCubeUV(vUV, rayDir, -MainDepth);
+        vec3 finalRgb = texture2D(MainSampler, mainUv).rgb;
+
+        bvec4 enables = bvec4(
+            Layer0_Enable,
+            Layer1_Enable,
+            Layer2_Enable,
+            Layer3_Enable
+        );
+        float depths[4] = float[4](
+            MainDepth * Layer0_Depth,
+            MainDepth * Layer1_Depth,
+            MainDepth * Layer2_Depth,
+            MainDepth * Layer3_Depth
+        );
+        float opacities[4] = float[4](
+            Layer0_Opacity,
+            Layer1_Opacity,
+            Layer2_Opacity,
+            Layer3_Opacity
+        );
+        int modes[4] = int[4](
+            Layer0_BlendMode,
+            Layer1_BlendMode,
+            Layer2_BlendMode,
+            Layer3_BlendMode
+        );
+        vec2 offsets[4] = vec2[4](
+            vec2(Layer0_OffsetX, Layer0_OffsetY),
+            vec2(Layer1_OffsetX, Layer1_OffsetY),
+            vec2(Layer2_OffsetX, Layer2_OffsetY),
+            vec2(Layer3_OffsetX, Layer3_OffsetY)
+        );
+        vec2 uvTiles[4] = vec2[4](
+            vec2(0.0, 0.0),
+            vec2(TWO_THIRDS, 0.0),
+            vec2(0.0, TWO_THIRDS),
+            vec2(TWO_THIRDS, TWO_THIRDS)
+        );
+
+        // Sorting Network
+        int indices[4] = int[4](0, 1, 2, 3);
+        int tmp;
+        #define SORT(i, j) if(depths[indices[i]] < depths[indices[j]]) { tmp = indices[i]; indices[i] = indices[j]; indices[j] = tmp; }
+        SORT(0, 1); // tier 1
+        SORT(2, 3);
+        SORT(0, 2); // tier 2
+        SORT(1, 3);
+        SORT(1, 2); // tier 3
+        #undef SORT
+
+        for (int j = 0; j < 4; ++j) {
+            int i = indices[j];
+            if (!enables[i]) {
+                continue;
+            }
+
+            vec3 layerUv = calcPlaneUV(vUV, rayDir, depths[i], -offsets[i]);
+            if (layerUv.z == 0.0) {
+                continue;
+            }
+
+            vec2 finalLayerUv = layerUv.xy + uvTiles[i];
+            vec4 layerTex = texture2D(MainSampler, finalLayerUv);
+            float alpha = layerTex.a * opacities[i];
+            finalRgb = applyBlendMode(modes[i], finalRgb, layerTex.rgb, alpha);
+        }
+
+        outColor = vec4(finalRgb, 1.0);
+    }
+}
+
+technique Main{
+    pass P0 {
+        VertexShader (in VS_INPUT, out VS_OUTPUT) = VS;
+        PixelShader (in VS_OUTPUT, out PS_OUTPUT) = PS;
+    }
+}

@@ -31,7 +31,7 @@ from maya.api import OpenMaya
 from amaterasu.base import framework
 
 __product__: str = "Amaterasu"
-__version__: int = 20260607
+__version__: int = 20260809
 
 DEFAULT_LICENSE: str = """Copyright (c) 2014-2026 takkun (takkun3d).<br />
 <br />

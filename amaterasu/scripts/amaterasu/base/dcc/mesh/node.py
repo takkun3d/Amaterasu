@@ -17,27 +17,43 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-"""Duplicate face from selected face."""
+"""Provides node utilities for Maya meshes."""
 
 from __future__ import annotations
 from maya import cmds
-from amaterasu.base import dcc, utils
-
-__product__: str = "Duplicate Face"
-__version__: str = "1.10"
-_logger: utils.Logger = utils.get_logger(__product__)
 
 
-def main() -> None:
-    """Entry point to duplicate faces based on the current selection.
+def get_polygon_transforms(
+    nodes: list[str], result: list[str] | None = None
+) -> list[str]:
+    """Searches for polygon transform nodes within the given hierarchy.
 
-    Validates that polygon faces are selected before triggering the apply
-    process.
+    Args:
+        nodes (list[str]): A list of node names to search.
+
+    Returns:
+        list[str]: A list of transform nodes that contain mesh shapes.
     """
-    selection: list[str] = cmds.filterExpand(selectionMask=34) or []
-    if not selection:
-        _logger.error("Select polygon faces to duplicate.")
-        return
+    if not result:
+        result = []
 
-    dcc.mesh.duplicate_faces(selection)
-    _logger.info("Done.")
+    for node in nodes:
+        if cmds.objectType(node) != "transform":
+            continue
+
+        shapes: list[str] = (
+            cmds.listRelatives(node, shapes=True, path=True) or []
+        )
+        if not shapes:
+            children: list[str] = (
+                cmds.listRelatives(node, children=True, path=True) or []
+            )
+            if children:
+                result = get_polygon_transforms(children, result)
+
+        else:
+            shape: str = shapes[0]
+            if cmds.objectType(shape) == "mesh":
+                result.append(node)
+
+    return result

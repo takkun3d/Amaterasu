@@ -20,6 +20,7 @@
 """Provides utilities for managing Maya projects and workspaces."""
 
 from __future__ import annotations
+import shutil
 import pathlib
 from maya import mel, cmds
 from amaterasu.base import utils
@@ -80,3 +81,41 @@ def set_project(project_path: str) -> utils.Result:
         result.set_error(str(e))
 
     return result
+
+
+def deploy_resources(
+    source_files: dict[str, pathlib.Path],
+    sub_dir: str = "",
+) -> dict[str, pathlib.Path]:
+    """Copies the specified resource files to a subdirectory within the current project.
+
+    This function ensures the destination directory exists within the active
+    Maya project workspace and copies the provided files into it. If a file
+    already exists at the destination, it will be skipped to prevent overwriting.
+
+    Args:
+        source_files (dict[str, pathlib.Path]): A dictionary mapping resource keys
+            to their absolute source file paths.
+        sub_dir (str, optional): The relative path to the destination subdirectory
+            within the project workspace. Defaults to "data/shader".
+
+    Returns:
+        dict[str, pathlib.Path]: A dictionary mapping the resource keys to their
+            copied destination paths within the project.
+    """
+    project_dir: pathlib.Path = pathlib.Path(get_workspace())
+    dest_dir: pathlib.Path = project_dir / sub_dir
+
+    if not dest_dir.exists():
+        dest_dir.mkdir(parents=True)
+
+    dest_paths: dict[str, pathlib.Path] = {}
+    for key, src_path in source_files.items():
+        dest_path: pathlib.Path = dest_dir / src_path.name
+
+        if not dest_path.exists() and src_path.exists():
+            shutil.copy2(src_path, dest_path)
+
+        dest_paths[key] = dest_path
+
+    return dest_paths

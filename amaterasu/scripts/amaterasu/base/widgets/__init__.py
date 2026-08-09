@@ -25,6 +25,7 @@ palettes, layouts, and sliders, ensuring a consistent interface across
 the application.
 """
 
+from amaterasu.base.widgets.actionable_check_box import ActionableCheckBox
 from amaterasu.base.widgets.browse_widget import BrowseWidget
 from amaterasu.base.widgets.color_button import ColorButton
 from amaterasu.base.widgets.color_palette import ColorPalette
@@ -32,6 +33,7 @@ from amaterasu.base.widgets.color_select_button import ColorSelectButton
 from amaterasu.base.widgets.double_range_widget import DoubleRangeWidget
 from amaterasu.base.widgets.form_label import FormLabel
 from amaterasu.base.widgets.form_layout import FormLayout
+from amaterasu.base.widgets.frame_widget import FrameWidget
 from amaterasu.base.widgets.horizontal_line import HorizontalLine
 from amaterasu.base.widgets.icon_button import IconButton
 from amaterasu.base.widgets.index_color_palette import IndexColorPalette
@@ -42,8 +44,10 @@ from amaterasu.base.widgets.tab_widget import TabBarPlus, TabWidget
 from amaterasu.base.widgets.toast import ToastWidget, ToastSignalEmitter
 from amaterasu.base.widgets.tree_widget import TreeWidget
 from amaterasu.base.widgets.vertical_line import VerticalLine
+from amaterasu.base.widgets.image_drop_widget import ImageDropImage
 
 __all__: list[str] = [
+    "ActionableCheckBox",
     "BrowseWidget",
     "ColorButton",
     "ColorPalette",
@@ -52,6 +56,7 @@ __all__: list[str] = [
     "IndexColorPalette",
     "FormLabel",
     "FormLayout",
+    "FrameWidget",
     "HorizontalLine",
     "IconButton",
     "ListWidget",
@@ -63,4 +68,5 @@ __all__: list[str] = [
     "ToastSignalEmitter",
     "TreeWidget",
     "VerticalLine",
+    "ImageDropImage",
 ]

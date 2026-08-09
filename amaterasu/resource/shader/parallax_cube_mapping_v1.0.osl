@@ -1,0 +1,334 @@
+// Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+#define BLEND_MODE_LIST "Normal:0|Darken:1|Multiply:2|Color Burn:3|Linear Burn:4|Lighten:5|Screen:6|Color Dodge:7|Add:8|Overlay:9|Soft Light:10|Hard Light:11|Difference:12|Exclusion:13|Subtract:14|Divide:15"
+
+#define ONE_THIRD (1.0 / 3.0)
+#define TWO_THIRDS (2.0 / 3.0)
+
+vector calcTangentViewDir() {
+    // Calculate the normalized view ray direction from camera to the pixel
+    vector V = normalize(I);
+
+    // Use OSL's built-in derivatives to form the Tangent Basis
+    vector T = normalize(dPdu);
+
+    // The built-in N is always front-facing
+    vector N_org = backfacing() ? -N : N;
+
+    // Compute the bitangent vector to complete the TBN basis
+    vector B = cross(N_org, T);
+
+    // Transform the view ray direction into tangent space
+    return vector(dot(V, T), dot(V, B), dot(V, N));
+}
+
+color applyBlendMode(int mode, color a, color b, float alpha) {
+    color c = a;
+    if (mode == 0) { // Normal
+        c = b;
+
+    } else if (mode == 1) { // Darken
+        c = min(a, b);
+
+    } else if (mode == 2) { // Multiply
+        c = a * b;
+
+    } else if (mode == 3) { // Color Burn
+        c = max(1.0 - (1.0 - a) / (b + 0.000001), 0.0);
+
+    } else if (mode == 4) { // Linear Burn
+        c = max(a + b - 1.0, 0.0);
+
+    } else if (mode == 5) { // Lighten
+        c = max(a, b);
+    } else if (mode == 6) { // Screen
+        c = 1.0 - (1.0 - a) * (1.0 - b);
+
+    } else if (mode == 7) { // Color Dodge
+        c = min(a / (1.0 - b + 0.000001), 1.0);
+
+    } else if (mode == 8) { // Add
+        c = min(a + b, 1.0);
+
+    } else if (mode == 9) { // Overlay
+        c = mix(
+            2.0 * a * b,
+            1.0 - 2.0 * (1.0 - a) * (1.0 - b),
+            step(0.5, a)
+        );
+
+    } else if (mode == 10) { // Soft Light
+        c = mix(
+            2.0 * a * b + a * a * (1.0 - 2.0 * b),
+            sqrt(a) * (2.0 * b - 1.0) + 2.0 * a * (1.0 - b),
+            step(0.5, b)
+        );
+
+    } else if (mode == 11) { // Hard Light
+        c = mix(
+            2.0 * a * b,
+            1.0 - 2.0 * (1.0 - b) * (1.0 - a),
+            step(0.5, b)
+        );
+
+    } else if (mode == 12) { // Difference
+        c = abs(a - b);
+
+    } else if (mode == 13) { // Exclusion
+        c = a + b - 2.0 * a * b;
+
+    } else if (mode == 14) { // Subtract
+        c = max(a - b, 0.0);
+
+    } else if (mode == 15) { // Divide
+        c = min(a / (b + 0.000001), 1.0);
+    }
+    return mix(a, c, alpha);
+}
+
+vector calcCubeUV(
+    vector startUV,
+    vector rayDir,
+    float depth,
+    float UVMargin
+) {
+    // Initialize the ray origin on the 2D surface (Z = 0.0)
+    vector rayPos = vector(startUV[0], startUV[1], 0.0);
+
+    // Precompute the inverse ray direction to optimize intersection calculations
+    vector invRay = 1.0 / rayDir;
+
+    // Determine the target wall coordinates (0.0 or 1.0) based on ray direction
+    vector wallTarget = step(0.0, rayDir);
+
+    // Calculate the distance to each plane using the slab method (tx, ty, tz)
+    float tx = (wallTarget[0] - rayPos[0]) * invRay[0];
+    float ty = (wallTarget[1] - rayPos[1]) * invRay[1];
+    float tz = (depth - rayPos[2]) * invRay[2];
+
+    // Select the closest intersection distance
+    float tHit = min(tx, min(ty, tz));
+
+    // Calculate the exact 3D intersection point
+    vector hitPos = rayPos + rayDir * tHit;
+
+    // Normalize the Z depth for texture mapping (0.0 to 1.0 range)
+    float normZ = hitPos[2] / depth;
+
+    // Apply UV margin to prevent texture bleeding from adjacent atlas tiles.
+    normZ = mix(UVMargin, 1.0 - UVMargin, normZ);
+    hitPos[0] = mix(UVMargin, 1.0 - UVMargin, hitPos[0]);
+    hitPos[1] = mix(UVMargin, 1.0 - UVMargin, hitPos[1]);
+
+    // Calc uv
+    if (step(tx, tHit) == 1.0) {
+        if (wallTarget[0] >= 0.5) { // Right
+            return vector(3.0 - normZ, 2.0 - hitPos[1], 0.0) * ONE_THIRD;
+
+        } else {
+            return vector(normZ, 2.0 - hitPos[1], 0.0) * ONE_THIRD;
+        }
+    }
+
+    if (step(ty, tHit) == 1.0) {
+        if (wallTarget[1] >= 0.5) { // Top
+            return vector(hitPos[0] + 1.0, normZ, 0.0) * ONE_THIRD;
+
+        } else {
+            return vector(hitPos[0] + 1.0, 3.0 - normZ, 0.0) * ONE_THIRD;
+        }
+    }
+
+    // Back
+    return vector(hitPos[0] + 1.0, 2.0 - hitPos[1], 0.0) * ONE_THIRD;
+}
+
+vector calcPlaneUV(
+    vector startUV,
+    vector rayDir,
+    float depth,
+    vector offset,
+    float UVMargin
+) {
+    // Calculate the intersection point of the view ray with the layer plane
+    vector hitPos = startUV - (rayDir / rayDir[2]) * depth;
+
+    // Apply the custom 2D texture offset
+    vector offsetBaseUv = hitPos + offset;
+
+    // Create a clipping mask to prevent texture repeating
+    // 1.0 if inside [0, 1] bounds
+    // 0.0 if outside
+    float maskX = step(0.0, offsetBaseUv[0]) * step(offsetBaseUv[0], 1.0);
+    float maskY = step(0.0, offsetBaseUv[1]) * step(offsetBaseUv[1], 1.0);
+    float mask = maskX * maskY;
+
+    // Apply UV margin to prevent texture bleeding from adjacent atlas tiles.
+    offsetBaseUv = mix(
+        vector(UVMargin, UVMargin, 0.0),
+        vector(1.0 - UVMargin, 1.0 - UVMargin, 0.0),
+        offsetBaseUv
+    );
+
+    // Invert the Y-axis for correct texture orientation and scale down for
+    // the 3x3 texture atlas
+    vector uv = vector(offsetBaseUv[0], 1.0 - offsetBaseUv[1], 0.0) * ONE_THIRD;
+    return vector(uv[0], uv[1], mask);
+}
+
+shader parallax_cube_mapping (
+    string MainTexture = "" [[ string widget = "filename" ]],
+    float UVMargin = 0.005 [[ float min = 0.0, float max = 0.02 ]],
+    float MainDepth = 1.0 [[ float min = 0.0001, float max = 10.0 ]],
+
+    int Layer0_Enable = 1 [[ string widget = "checkBox" ]],
+    float Layer0_Depth = 0.0 [[ float min = -1.0, float max = 1.0 ]],
+    float Layer0_OffsetX = 0.0 [[ float min = -1.0, float max = 1.0 ]],
+    float Layer0_OffsetY = 0.0 [[ float min = -1.0, float max = 1.0 ]],
+    int Layer0_BlendMode = 0 [[ string widget = "mapper", string options = BLEND_MODE_LIST ]],
+    float Layer0_Opacity = 1.0 [[ float min = 0.0, float max = 1.0 ]],
+
+    int Layer1_Enable = 1 [[ string widget = "checkBox" ]],
+    float Layer1_Depth = 0.25 [[ float min = -1.0, float max = 1.0 ]],
+    float Layer1_OffsetX = 0.0 [[ float min = -1.0, float max = 1.0 ]],
+    float Layer1_OffsetY = 0.0 [[ float min = -1.0, float max = 1.0 ]],
+    int Layer1_BlendMode = 0 [[ string widget = "mapper", string options = BLEND_MODE_LIST ]],
+    float Layer1_Opacity = 1.0 [[ float min = 0.0, float max = 1.0 ]],
+
+    int Layer2_Enable = 1 [[ string widget = "checkBox" ]],
+    float Layer2_Depth = 0.5 [[ float min = -1.0, float max = 1.0 ]],
+    float Layer2_OffsetX = 0.0 [[ float min = -1.0, float max = 1.0 ]],
+    float Layer2_OffsetY = 0.0 [[ float min = -1.0, float max = 1.0 ]],
+    int Layer2_BlendMode = 0 [[ string widget = "mapper", string options = BLEND_MODE_LIST ]],
+    float Layer2_Opacity = 1.0 [[ float min = 0.0, float max = 1.0 ]],
+
+    int Layer3_Enable = 1 [[ string widget = "checkBox" ]],
+    float Layer3_Depth = 0.75 [[ float min = -1.0, float max = 1.0 ]],
+    float Layer3_OffsetX = 0.0 [[ float min = -1.0, float max = 1.0 ]],
+    float Layer3_OffsetY = 0.0 [[ float min = -1.0, float max = 1.0 ]],
+    int Layer3_BlendMode = 0 [[ string widget = "mapper", string options = BLEND_MODE_LIST ]],
+    float Layer3_Opacity = 1.0 [[ float min = 0.0, float max = 1.0 ]],
+
+    output color outColor = 0
+) {
+    vector rayDir = calcTangentViewDir();
+    int res[2];
+    gettextureinfo(MainTexture, "resolution", res);
+    float aspect = float(res[0]) / float(res[1]);
+    rayDir.y *= aspect;
+
+    vector startUV = vector(u, v, 0.0);
+    vector mainUv = calcCubeUV(startUV, rayDir, -MainDepth, UVMargin);
+    float mainAlpha = 1.0;
+    color finalRgb = texture(
+        MainTexture,
+        mainUv[0],
+        mainUv[1],
+        "alpha",
+        mainAlpha
+    );
+
+    int enables[4] = {
+        Layer0_Enable,
+        Layer1_Enable,
+        Layer2_Enable,
+        Layer3_Enable
+    };
+    float depths[4] = {
+        MainDepth * Layer0_Depth,
+        MainDepth * Layer1_Depth,
+        MainDepth * Layer2_Depth,
+        MainDepth * Layer3_Depth
+    };
+    float opacities[4] = {
+        Layer0_Opacity,
+        Layer1_Opacity,
+        Layer2_Opacity,
+        Layer3_Opacity
+    };
+    int modes[4] = {
+        Layer0_BlendMode,
+        Layer1_BlendMode,
+        Layer2_BlendMode,
+        Layer3_BlendMode
+    };
+    vector offsets[4] = {
+        vector(Layer0_OffsetX, Layer0_OffsetY, 0.0),
+        vector(Layer1_OffsetX, Layer1_OffsetY, 0.0),
+        vector(Layer2_OffsetX, Layer2_OffsetY, 0.0),
+        vector(Layer3_OffsetX, Layer3_OffsetY, 0.0)
+    };
+    vector uvTiles[4] = {
+        vector(0.0, 0.0, 0.0),
+        vector(TWO_THIRDS, 0.0, 0.0),
+        vector(0.0, TWO_THIRDS, 0.0),
+        vector(TWO_THIRDS, TWO_THIRDS, 0.0)
+    };
+
+    // Sorting Network
+    int indices[4] = { 0, 1, 2, 3 };
+    int tmp;
+    #define SORT(i, j) if(depths[indices[i]] < depths[indices[j]]) { tmp = indices[i]; indices[i] = indices[j]; indices[j] = tmp; }
+    SORT(0, 1); // tier 1
+    SORT(2, 3);
+    SORT(0, 2); // tier 2
+    SORT(1, 3);
+    SORT(1, 2); // tier 3
+    #undef SORT
+
+    for (int j = 0; j < 4; ++j) {
+        int i = indices[j];
+        if (enables[i] == 0) {
+            continue;
+        }
+
+        vector layerUv = calcPlaneUV(
+            startUV,
+            rayDir,
+            depths[i],
+            -offsets[i],
+            UVMargin
+        );
+        if (layerUv[2] == 0.0) {
+            continue;
+        }
+
+        vector finalLayerUv = layerUv + uvTiles[i];
+        float layerAlpha = 1.0;
+        color layerColor = texture(
+            MainTexture,
+            finalLayerUv[0],
+            finalLayerUv[1],
+            "alpha",
+            layerAlpha,
+            "wrap",
+            "clamp"
+        );
+        float combinedAlpha = layerAlpha * opacities[i];
+        finalRgb = applyBlendMode(
+            modes[i],
+            finalRgb,
+            layerColor,
+            combinedAlpha
+        );
+    }
+
+    outColor = finalRgb;
+}

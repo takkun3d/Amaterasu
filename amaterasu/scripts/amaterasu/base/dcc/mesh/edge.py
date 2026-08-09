@@ -20,6 +20,7 @@
 """Provides edge-related utilities for Maya meshes."""
 
 from __future__ import annotations
+import math
 from maya import cmds
 from amaterasu.base.dcc.mesh import component
 
@@ -116,3 +117,39 @@ def get_nth_edges(edges: list[str], nth: int = 1, mode: int = 1) -> list[str]:
                     result_edges.append(f"{obj}.e[{edge_ring_ids[i]}]")
 
     return list(set(result_edges))
+
+
+def edge_length_2d(edge: str) -> float:
+    """Calculates the 2D length of a given edge in UV space.
+
+    Args:
+        edge: The name of the edge component to measure (e.g., 'pCube1.e[0]').
+
+    Returns:
+        The Euclidean distance of the edge in 2D UV space.
+    """
+    uvs: list[str] = component.to_uv(edge)
+    position: list[float] = cmds.polyEditUV(uvs, query=True)  # type: ignore
+    return math.sqrt(
+        math.pow(position[2] - position[0], 2)
+        + math.pow(position[3] - position[1], 2)
+    )
+
+
+def edge_length_3d(edge: str) -> float:
+    """Calculates the 3D world space length of a given edge.
+
+    Args:
+        edge: The name of the edge component to measure (e.g., 'pCube1.e[0]').
+
+    Returns:
+        The Euclidean distance of the edge in 3D world space.
+    """
+    vertices: list[str] = component.to_vertex(edge)
+    position: list[float] = cmds.xform(
+        *vertices, query=True, translation=True, worldSpace=True
+    )  # type: ignore
+    x: float = math.pow(position[3] - position[0], 2)
+    y: float = math.pow(position[4] - position[1], 2)
+    z: float = math.pow(position[5] - position[2], 2)
+    return math.sqrt(x + y + z)

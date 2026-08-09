@@ -71,3 +71,20 @@ def hide_history(nodes: list[str]) -> None:
             be hidden.
     """
     __show_and_hide(nodes, False)
+
+
+def delete_history(nodes: list[str]) -> None:
+    """Deletes construction history for the given nodes."""
+    for node in nodes:
+        cmds.delete(node, constructionHistory=True)
+
+
+def remove_intermediate_objects(nodes: list[str]) -> None:
+    """Removes intermediate objects from the given nodes."""
+    for node in nodes:
+        shapes: list[str] = (
+            cmds.listRelatives(node, shapes=True, path=True) or []
+        )
+        for shape in shapes:
+            if cmds.getAttr(f"{shape}.io"):
+                cmds.delete(shape)
