@@ -1,3 +1,5 @@
 *.mel linguist-language=MEL
 *.ma linguist-vendored
 *.mb linguist-vendored
+*.ogsfx linguist-language=GLSL
+*.osl linguist-language=OSL
