@@ -50,6 +50,7 @@ from amaterasu.base.dcc import mesh
 from amaterasu.base.dcc import instance
 from amaterasu.base.dcc import sets
 from amaterasu.base.dcc import asset
+from amaterasu.base.dcc import animation
 
 __all__: list[str] = [
     # paths
@@ -77,4 +78,5 @@ __all__: list[str] = [
     "instance",
     "sets",
     "asset",
+    "animation",
 ]
