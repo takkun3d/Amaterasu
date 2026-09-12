@@ -244,7 +244,7 @@ def make_letter(
     cmds.delete(crv)
 
 
-def create_speedmeter(obj: str) -> str | None:
+def create_speedmeter(obj: str) -> utils.DataResult[list[str]]:
     """Creates a speed meter rig for the specified object.
 
     This function builds a hierarchical rig containing digital number curves
@@ -256,8 +256,16 @@ def create_speedmeter(obj: str) -> str | None:
         obj (str): The name of the Maya node to attach the speed meter to.
 
     Returns:
-        str | None: The name of the main display curve group if successful, or None.
+        utils.DataResult[list[str]]: A DataResult containing a list of the
+            created display curve names.
     """
+    result: utils.DataResult[list[str]] = utils.DataResult([])
+    if not cmds.objectType(obj, isAType="transform") and not cmds.objectType(
+        obj, isAType="joint"
+    ):
+        result.add_failure(obj, "Selected node is not a transform or joint.")
+        return result
+
     base_name: str = obj.replace(":", "_")
     exp_name: str = f"speedmeter_{base_name}_expr"
     root_grp: str = f"speedmeter_{base_name}_null"
@@ -373,8 +381,9 @@ int $digit1 = (trunc($speed)) % 10;
     dcc.node.hide_history([root_grp, display_crv])
     dcc.attribute.lock([root_grp], True, True, True, False)
 
-    cmds.select(display_crv)
-    return display_crv
+    result.set_value([display_crv])
+    # result.add_info(obj, "Speed meter successfully created.")
+    return result
 
 
 def main() -> None:
@@ -388,14 +397,15 @@ def main() -> None:
         _logger.warning("Select node(s) to create speed meter(s).")
         return
 
-    results: list[str] = []
+    result: utils.DataResult[list[str]] = utils.DataResult([])
     for node in selection:
-        result: str | None = create_speedmeter(node)
-        if result:
-            results.append(result)
+        r: utils.DataResult[list[str]] = create_speedmeter(node)
+        result.merge(r)
 
-    if results:
-        _logger.info(
-            "Successfully created speed meters for %s nodes.", len(results)
-        )
-        cmds.select(*results)
+    if result.value():
+        cmds.select(*result.value())
+
+    result.log(
+        _logger,
+        f"Successfully created speed meters for {len(result.value())} nodes.",
+    )
