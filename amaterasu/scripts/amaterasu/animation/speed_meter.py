@@ -353,10 +353,24 @@ int $digit1 = (trunc($speed)) % 10;
         name=exp_name, string=exp_str, alwaysEvaluate=True
     )
 
-    dcc.node.hide_history([display_crv])
+    mult_node: str = cmds.createNode(
+        "multMatrix", name=f"{base_name}_multMatrix"
+    )
+    cmds.connectAttr(f"{obj}.worldMatrix[0]", f"{mult_node}.matrixIn[0]")
+    cmds.connectAttr(
+        f"{root_grp}.parentInverseMatrix[0]", f"{mult_node}.matrixIn[1]"
+    )
 
-    # TODO Matrix
-    cmds.pointConstraint(obj, root_grp, maintainOffset=False)
+    decomp_node: str = cmds.createNode(
+        "decomposeMatrix", name=f"{base_name}_decomposeMatrix"
+    )
+    cmds.connectAttr(f"{mult_node}.matrixSum", f"{decomp_node}.inputMatrix")
+    cmds.connectAttr(f"{decomp_node}.outputTranslate", f"{root_grp}.translate")
+    cmds.connectAttr(f"{decomp_node}.outputRotate", f"{root_grp}.rotate")
+    cmds.connectAttr(f"{decomp_node}.outputScale", f"{root_grp}.scale")
+    cmds.connectAttr(f"{decomp_node}.outputShear", f"{root_grp}.shear")
+
+    dcc.node.hide_history([root_grp, display_crv])
     dcc.attribute.lock([root_grp], True, True, True, False)
 
     cmds.select(display_crv)
