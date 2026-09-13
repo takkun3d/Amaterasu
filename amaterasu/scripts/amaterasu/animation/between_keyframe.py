@@ -1,198 +1,75 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Between Keyframe
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Modifies keyframe values between selected keyframes."""
+
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any
 import random
-
-try:
-    from PySide2.QtCore import Qt, Slot, QSize
-    from PySide2.QtWidgets import (
-        QWidget,
-        QVBoxLayout,
-        QHBoxLayout,
-        QSlider,
-        QButtonGroup,
-    )
-
-except ImportError:
-    if not TYPE_CHECKING:
-        from PySide6.QtCore import Qt, Slot, QSize
-        from PySide6.QtWidgets import (
-            QWidget,
-            QVBoxLayout,
-            QHBoxLayout,
-            QSlider,
-            QButtonGroup,
-        )
+from typing import Any
 from maya import cmds
-from ..lib import logger, parser, widgets
+from amaterasu.base.qt import QtCore, QtWidgets
+from amaterasu.base import dcc, maths, framework, utils, widgets
+
+__product__: str = "Between Keyframe"
+__version__: str = "1.21"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Between Keyframe'
-__version__: str = '1.20'
-__doc__ = 'Modify keyframe between selected keyframes.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+class Settings(framework.ToolSettings):
+    """Settings for the Between Keyframe tool.
 
+    Attributes:
+        window_geo (framework.Variant[str]): The saved window geometry.
+    """
 
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-class Settings(parser.ToolSettings):
-    '''Settings for tool.'''
-
-    window_geo: parser.Variant[str] = parser.Variant('')
-
-
-class Ease:
-    '''Ease Base Class.'''
-
-    @staticmethod
-    def ease_in(t: float, b: float, c: float, d: float) -> float:
-        '''Return ease in.'''
-        return 0.0
-
-    @staticmethod
-    def ease_out(t: float, b: float, c: float, d: float) -> float:
-        '''Return ease out.'''
-        return 0.0
-
-    @staticmethod
-    def ease_in_out(t: float, b: float, c: float, d: float) -> float:
-        '''Return ease in out.'''
-        return 0.0
-
-
-class EaseQuadratic(Ease):
-    '''
-    Ease Quadratic.
-    Reference:
-    http://nakamura001.hatenablog.com/entry/20111117/1321539246
-
-    t = time
-    b = start value
-    c = difference value start to end.
-    d = tween total time.
-    '''
-
-    @staticmethod
-    def ease_in(t: float, b: float, c: float, d: float) -> float:
-        t /= d
-        return c * t * t + b
-
-    @staticmethod
-    def ease_out(t: float, b: float, c: float, d: float) -> float:
-        t /= d
-        return -c * t * (t - 2.0) + b
-
-    @staticmethod
-    def ease_in_out(t: float, b: float, c: float, d: float) -> float:
-        t /= d / 2.0
-        if t < 1:
-            return c / 2.0 * t * t + b
-        t = t - 1
-        return -c / 2.0 * (t * (t - 2) - 1) + b
-
-
-class EaseCubic(Ease):
-    '''
-    Ease EaseCubic.
-    Reference:
-    http://nakamura001.hatenablog.com/entry/20111117/1321539246
-
-    t = time
-    b = start value
-    c = difference value start to end.
-    d = tween total time.
-    '''
-
-    @staticmethod
-    def ease_in(t: float, b: float, c: float, d: float) -> float:
-        t /= d
-        return c * t * t * t + b
-
-    @staticmethod
-    def ease_out(t: float, b: float, c: float, d: float) -> float:
-        t /= d
-        t = t - 1
-        return c * (t * t * t + 1) + b
-
-    @staticmethod
-    def ease_in_out(t: float, b: float, c: float, d: float) -> float:
-        t /= d / 2.0
-        if t < 1:
-            return c / 2.0 * t * t * t + b
-        t = t - 2
-        return c / 2.0 * (t * t * t + 2) + b
-
-
-class EaseExponential(Ease):
-    '''
-    Ease Exponential.
-    Reference:
-    http://nakamura001.hatenablog.com/entry/20111117/1321539246
-
-    t = time
-    b = start value
-    c = difference value start to end.
-    d = tween total time.
-    '''
-
-    @staticmethod
-    def ease_in(t: float, b: float, c: float, d: float) -> float:
-        return c * 2 ** (10 * (t / d - 1)) + b
-
-    @staticmethod
-    def ease_out(t: float, b: float, c: float, d: float) -> float:
-        return float(c * (-(2.0 ** (-10.0 * t / d)) + 1.0) + b)
-
-    @staticmethod
-    def ease_in_out(t: float, b: float, c: float, d: float) -> float:
-        t /= d / 2.0
-        if t < 1:
-            return float(c / 2.0 * 2.0 ** (10.0 * (t - 1.0)) + b)
-
-        t = t - 1
-        return float(c / 2.0 * (-(2.0 ** (-10.0 * t)) + 2.0) + b)
+    window_geo: framework.Variant[str] = framework.Variant("")
 
 
 class AnimationCurveData:
-    '''Selected keyframe datas'''
+    """Stores data for a selected animation curve."""
 
     def __init__(self, curve: str) -> None:
-        '''Initialize'''
+        """Initializes the curve data based on the provided curve name.
+
+        Args:
+            curve (str): The name of the animation curve.
+        """
         self.curve_name: str = curve
         self.indexes: list[int] = cmds.keyframe(
             curve, query=True, selected=True, indexValue=True
-        )
+        )  # type: ignore
         self.times: list[float] = cmds.keyframe(
             curve, query=True, selected=True, timeChange=True
-        )
-        self.values: list[Any] = cmds.keyframe(
+        )  # type: ignore
+        self.values: list[float] = cmds.keyframe(
             curve, query=True, selected=True, valueChange=True
-        )
+        )  # type: ignore
 
         self.all_indexes: list[int] = cmds.keyframe(
             curve, query=True, indexValue=True
-        )
+        )  # type: ignore
         self.all_times: list[float] = cmds.keyframe(
             curve, query=True, timeChange=True
-        )
-        self.all_values: list[Any] = cmds.keyframe(
+        )  # type: ignore
+        self.all_values: list[float] = cmds.keyframe(
             curve, query=True, valueChange=True
-        )
+        )  # type: ignore
 
         self.start_index: int = self.indexes[0] - 1
         if self.start_index < self.all_indexes[0]:
@@ -204,34 +81,34 @@ class AnimationCurveData:
 
         self.start_time: float = self.all_times[self.start_index]
         self.end_time: float = self.all_times[self.end_index]
-        self.start_value: Any = self.all_values[self.start_index]
-        self.end_value: Any = self.all_values[self.end_index]
+        self.start_value: float = self.all_values[self.start_index]
+        self.end_value: float = self.all_values[self.end_index]
 
 
 class Between:
-    '''Between Base Class'''
+    """Base class for evaluating and modifying keyframes between extremes."""
 
     def __init__(self) -> None:
-        '''Initialize'''
-        self.__current_show_buffer_curves: str = 'off'
+        """Initializes the base between logic."""
+        self.__current_show_buffer_curves: str = "off"
         self.__data: list[AnimationCurveData] = []
-        self.__interpolation: Ease = Ease()
+        self.__interpolation: maths.Ease = maths.Ease()
 
     def drag_start(self) -> None:
-        '''Drag Start Event'''
+        """Executes operations when the drag event starts."""
         anim_curves: list[str] = cmds.keyframe(
             query=True, selected=True, name=True
-        )
+        )  # type: ignore
         if not anim_curves:
             return
 
         cmds.undoInfo(openChunk=True)
-        cmds.bufferCurve(animation='keys', overwrite=True)
+        cmds.bufferCurve(animation="keys", overwrite=True)
         self.__current_show_buffer_curves = cmds.animCurveEditor(
-            'graphEditor1GraphEd', query=True, showBufferCurves=True
-        )
+            "graphEditor1GraphEd", query=True, showBufferCurves=True
+        )  # type: ignore
         cmds.animCurveEditor(
-            'graphEditor1GraphEd', edit=True, showBufferCurves='on'
+            "graphEditor1GraphEd", edit=True, showBufferCurves="on"
         )
 
         for anim_curve in anim_curves:
@@ -239,66 +116,94 @@ class Between:
             self.__data.append(data)
 
     def drag_move(self, slider_value: float) -> None:
-        '''Drag move event.'''
+        """Executes operations during the drag move event.
+
+        Args:
+            slider_value (float): The current value from the UI slider.
+        """
 
     def drag_end(self) -> None:
-        '''Drag end event.'''
+        """Executes operations when the drag event ends."""
         if not self.__data:
             return
 
         self.__data = []
-        cmds.bufferCurve(animation='keys', overwrite=True)
+        cmds.bufferCurve(animation="keys", overwrite=True)
         cmds.animCurveEditor(
-            'graphEditor1GraphEd',
+            "graphEditor1GraphEd",
             edit=True,
             showBufferCurves=self.__current_show_buffer_curves,
         )
         cmds.undoInfo(closeChunk=True)
 
     def data(self) -> list[AnimationCurveData]:
-        '''Return AnimationCurveData list.'''
+        """Retrieves the list of animation curve data.
+
+        Returns:
+            list[AnimationCurveData]: A list containing curve data.
+        """
         return self.__data
 
     def set_data(self, data: list[AnimationCurveData]) -> None:
-        '''Set AnimationCurveData list.'''
+        """Sets the animation curve data list.
+
+        Args:
+            data (list[AnimationCurveData]): A list of animation curve data.
+        """
         self.__data = data
 
-    def interpolation(self) -> Ease:
-        '''Return interpolation'''
+    def interpolation(self) -> maths.Ease:
+        """Retrieves the active ease interpolation instance.
+
+        Returns:
+            maths.Ease: The interpolation logic instance.
+        """
         return self.__interpolation
 
-    def set_interpolation(self, interpolation: Ease) -> None:
-        '''Set interpolation.'''
+    def set_interpolation(self, interpolation: maths.Ease) -> None:
+        """Sets the ease interpolation instance.
+
+        Args:
+            interpolation (maths.Ease): An instance of an ease interpolation class.
+        """
         self.__interpolation = interpolation
 
 
 class BetweenToDefault(Between):
-    '''Between to default value.'''
+    """Evaluates keyframes towards their default value."""
 
     def drag_move(self, slider_value: float) -> None:
-        '''Drag move event.[override]'''
+        """Executes drag move operations for default evaluation.
+
+        Args:
+            slider_value (float): The current value from the UI slider.
+        """
         for data in self.data():
             for index, value in zip(data.indexes, data.values):
                 value = value + ((0.0 - value) * (slider_value / 100.0))
                 cmds.keyframe(
                     data.curve_name,
                     edit=True,
-                    index=(index, index),
+                    index=(index, index),  # type: ignore
                     valueChange=value,
                 )
 
 
 class BetweenToLinear(Between):
-    '''Between to linear.'''
+    """Evaluates keyframes towards a linear transition."""
 
     def drag_move(self, slider_value: float) -> None:
-        '''Drag move event.[override]'''
+        """Executes drag move operations for linear evaluation.
+
+        Args:
+            slider_value (float): The current value from the UI slider.
+        """
         for data in self.data():
             for index, time, value in zip(
                 data.indexes, data.times, data.values
             ):
-                factor = slider_value / 100.0 * 2.0
-                lerpValue = lerp(
+                factor: float = slider_value / 100.0 * 2.0
+                remap_value: float = maths.remap(
                     data.start_time,
                     data.start_value,
                     data.end_time,
@@ -306,51 +211,60 @@ class BetweenToLinear(Between):
                     time,
                 )
 
-                v: float = between(value, lerpValue, factor)
-                if value >= lerpValue:
-                    v = max(v, lerpValue)
+                v: float = maths.lerp(value, remap_value, factor)
+                if value >= remap_value:
+                    v = max(v, remap_value)
                 else:
-                    v = min(v, lerpValue)
+                    v = min(v, remap_value)
 
                 cmds.keyframe(
                     data.curve_name,
                     edit=True,
-                    index=(index, index),
+                    index=(index, index),  # type: ignore
                     valueChange=v,
                 )
 
 
 class GaussNoise(Between):
-    '''Gauss Noise'''
+    """Applies Gaussian noise to the selected keyframes."""
 
     def drag_move(self, slider_value: float) -> None:
-        '''Drag move event.[override]'''
+        """Executes drag move operations for noise evaluation.
+
+        Args:
+            slider_value (float): The current value from the UI slider.
+        """
         factor: float = slider_value / 100.0
         for data in self.data():
-            mu = 0.0
-            sigma = abs(data.start_value - data.end_value)
+            mu: float = 0.0
+            sigma: float = abs(data.start_value - data.end_value)
             if sigma == 0:
                 sigma = 1.0
+
             sigma = sigma * factor
 
             for index, time, value in zip(
                 data.indexes, data.times, data.values
             ):
-                random.seed(f'{data.curve_name}{index}{time}')
+                random.seed(f"{data.curve_name}{index}{time}")
                 value = value + random.gauss(mu, sigma)
                 cmds.keyframe(
                     data.curve_name,
                     edit=True,
-                    index=(index, index),
+                    index=(index, index),  # type: ignore
                     valueChange=value,
                 )
 
 
 class Smooth(Between):
-    '''Smooth'''
+    """Smooths the curve values over time."""
 
     def drag_move(self, slider_value: float) -> None:
-        '''Drag move event.[override]'''
+        """Executes drag move operations for curve smoothing.
+
+        Args:
+            slider_value (float): The current value from the UI slider.
+        """
         factor: float = slider_value / 100.0
         for data in self.data():
             for index, value in zip(data.indexes, data.values):
@@ -362,24 +276,28 @@ class Smooth(Between):
                 pos_index: int = index + 1
                 if pos_index > data.all_indexes[-1]:
                     continue
-                pos_value = data.all_values[pos_index]
+                pos_value: Any = data.all_values[pos_index]
 
-                smoothValue: float = (pre_value + value + pos_value) / 3.0
-                value = between(value, smoothValue, factor)
+                smooth_value: float = (pre_value + value + pos_value) / 3.0
+                value = maths.lerp(value, smooth_value, factor)
                 cmds.keyframe(
                     data.curve_name,
                     edit=True,
-                    index=(index, index),
+                    index=(index, index),  # type: ignore
                     valueChange=value,
                 )
 
 
 class BetweenEase(Between):
-    '''Between ease.'''
+    """Applies an easing interpolation to the selected keyframes."""
 
     def drag_move(self, slider_value: float) -> None:
-        '''Drag move event.[override]'''
-        interpolation = self.interpolation()
+        """Executes drag move operations with easing interpolation.
+
+        Args:
+            slider_value (float): The current value from the UI slider.
+        """
+        interpolation: maths.Ease = self.interpolation()
         factor: float = abs(slider_value) / 100.0 * 2.0
         for data in self.data():
             step: float = data.end_value - data.start_value
@@ -408,16 +326,16 @@ class BetweenEase(Between):
                 cmds.keyframe(
                     data.curve_name,
                     edit=True,
-                    index=(index, index),
+                    index=(index, index),  # type: ignore
                     valueChange=value,
                 )
 
 
 class CycleEase(BetweenEase):
-    '''Cycle Ease'''
+    """Applies a cycling easing interpolation."""
 
     def drag_start(self) -> None:
-        '''Drag start event.[override]'''
+        """Overrides drag start event to loop start and end values."""
         super().drag_start()
         new_data: list[AnimationCurveData] = []
         for data in self.data():
@@ -429,11 +347,15 @@ class CycleEase(BetweenEase):
 
 
 class ReplaceEase(Between):
-    '''Replace Ease'''
+    """Replaces current values smoothly using ease interpolations."""
 
     def drag_move(self, slider_value: float) -> None:
-        '''Drag move event.[override]'''
-        interpolation = self.interpolation()
+        """Executes drag move operations for value replacement.
+
+        Args:
+            slider_value (float): The current value from the UI slider.
+        """
+        interpolation: maths.Ease = self.interpolation()
         factor: float = abs(slider_value) / 100.0 * 5.0
         for data in self.data():
             for index, time, value in zip(
@@ -442,7 +364,7 @@ class ReplaceEase(Between):
                 time_factor: float = (time - data.start_time) / (
                     data.end_time - data.start_time
                 )
-                lerp_value: float = lerp(
+                remap_value: float = maths.remap(
                     data.start_time,
                     data.start_value,
                     data.end_time,
@@ -457,7 +379,6 @@ class ReplaceEase(Between):
                         (data.end_value - data.start_value),
                         1,
                     )
-
                 else:
                     time_factor = interpolation.ease_out(
                         time_factor,
@@ -466,23 +387,28 @@ class ReplaceEase(Between):
                         1,
                     )
 
-                value = lerp_value + factor * (lerp_value - time_factor)
-                value = clamp(value, data.start_value, data.end_value)
+                value = remap_value + factor * (remap_value - time_factor)
+                value = maths.clamp(value, data.start_value, data.end_value)
                 cmds.keyframe(
                     data.curve_name,
                     edit=True,
-                    index=(index, index),
+                    index=(index, index),  # type: ignore
                     valueChange=value,
                 )
 
 
-class BetweenSlider(QSlider):
-    '''Brween Slider widget.'''
+class BetweenSlider(QtWidgets.QSlider):
+    """Slider widget to drive the between logic interactively."""
 
-    def __init__(self, parent: QWidget | None = None) -> None:
-        '''Initialize widget.'''
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        """Initializes the slider.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+        """
         super().__init__(parent)
-        self.setOrientation(Qt.Horizontal)
+        self.setOrientation(QtCore.Qt.Orientation.Horizontal)
         self.setRange(-100, 100)
         self.setValue(0)
         self.sliderPressed.connect(self.drag_start)
@@ -491,64 +417,76 @@ class BetweenSlider(QSlider):
         self.__between: Between = Between()
 
     def between(self) -> Between:
-        '''Return between object.'''
+        """Retrieves the assigned between logic instance.
+
+        Returns:
+            Between: The logic instance currently assigned.
+        """
         return self.__between
 
     def set_between(self, between_value: Between) -> None:
-        '''Set between object.'''
+        """Assigns the between logic instance.
+
+        Args:
+            between_value (Between): The logic instance to assign.
+        """
         self.__between = between_value
 
-    def set_interpolation(self, interpolation: Ease) -> None:
-        '''Set interpolation object.'''
+    def set_interpolation(self, interpolation: maths.Ease) -> None:
+        """Sets the interpolation logic for the internal between object.
+
+        Args:
+            interpolation (Ease): The interpolation instance.
+        """
         self.__between.set_interpolation(interpolation)
 
-    @Slot()
+    @QtCore.Slot()
     def drag_start(self) -> None:
-        '''Drag start event.'''
+        """Slot triggered when the slider is pressed."""
         self.__between.drag_start()
 
-    @Slot()
+    @QtCore.Slot()
     def drag_move(self) -> None:
-        '''Drag move event.'''
-        self.__between.drag_move(self.value())
+        """Slot triggered when the slider is moved."""
+        self.__between.drag_move(float(self.value()))
 
-    @Slot()
+    @QtCore.Slot()
     def drag_end(self) -> None:
-        '''Drag end event.'''
+        """Slot triggered when the slider is released."""
         self.__between.drag_end()
         self.setValue(0)
 
 
-class MainWindow(widgets.ToolWidget):
-    '''Tool main window'''
+class MainWindow(framework.ToolWindow[Settings]):
+    """Main window for the Between Keyframe tool."""
 
     method_icons: list[str] = [
-        'a_between_ease.png',
-        'a_between_replace.png',
-        'a_between_linear.png',
-        'a_between_flat.png',
-        'a_between_noise.png',
-        'a_between_smooth.png',
-        'a_between_cycle.png',
+        "a_between_ease.png",
+        "a_between_replace.png",
+        "a_between_linear.png",
+        "a_between_flat.png",
+        "a_between_noise.png",
+        "a_between_smooth.png",
+        "a_between_cycle.png",
     ]
     method_tooltips: list[str] = [
-        'Between Offset to Easing Curve.',
-        'Between to Easing Curvce',
-        'Between to Linear',
-        'Between to Default',
-        'Add Gauss Noise',
-        'Smooth Curve',
-        'Between to Cycle Curve',
+        "Between Offset to Easing Curve.",
+        "Between to Easing Curve.",
+        "Between to Linear.",
+        "Between to Default.",
+        "Add Gauss Noise.",
+        "Smooth Curve.",
+        "Between to Cycle Curve.",
     ]
     interpolation_icons: list[str] = [
-        'a_quadratic.png',
-        'a_cubic.png',
-        'a_exponential.png',
+        "a_quadratic.png",
+        "a_cubic.png",
+        "a_exponential.png",
     ]
     interpolation_tooltips: list[str] = [
-        'Quadratic',
-        'Cubic',
-        'Exponential',
+        "Quadratic",
+        "Cubic",
+        "Exponential",
     ]
     betweens: list[Between] = [
         BetweenEase(),
@@ -559,150 +497,126 @@ class MainWindow(widgets.ToolWidget):
         Smooth(),
         CycleEase(),
     ]
-    interpolations: list[Ease] = [
-        EaseQuadratic(),
-        EaseCubic(),
-        EaseExponential(),
+    interpolations: list[maths.Ease] = [
+        maths.EaseQuadratic(),
+        maths.EaseCubic(),
+        maths.EaseExponential(),
     ]
 
     def __init__(
         self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-        unique_id: str = '',
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Window,
+        unique_id: str = "",
     ) -> None:
-        '''Initialize widget.'''
+        """Initializes the main window.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The Qt window flags.
+                Defaults to Window.
+            unique_id (str, optional): A unique identifier for restoring
+                window states. Defaults to "".
+        """
         super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
-        self.resize(400, 200)
+        self.resize(100, 10)
+        self.__method: QtWidgets.QButtonGroup
+        self.__interpolation: QtWidgets.QButtonGroup
+        self.__slider: BetweenSlider
 
-        option_widget: QWidget = self.option_widget()
-        main_layout: QVBoxLayout = QVBoxLayout(option_widget)
+    def create_ui(self, parent: QtWidgets.QWidget) -> None:
+        """Creates the tool-specific user interface elements.
+
+        Args:
+            parent (QtWidgets.QWidget): The parent widget for UI containment.
+        """
+        main_layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(parent)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
-        button_layout: QHBoxLayout = QHBoxLayout(self)
+        button_layout: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout()
         button_layout.setContentsMargins(0, 0, 0, 0)
         button_layout.setSpacing(2)
         main_layout.addLayout(button_layout)
 
-        self.__method_grp: QButtonGroup = QButtonGroup(self)
-        self.__method_grp.idClicked[int].connect(self.change_method_callback)
+        self.__method = QtWidgets.QButtonGroup(self)
+        self.__method.idClicked.connect(self.change_method)
 
-        i: int = 0
-        for icon, tooltip in zip(self.method_icons, self.method_tooltips):
+        for i, (icon, tooltip) in enumerate(
+            zip(self.method_icons, self.method_tooltips)
+        ):
             button: widgets.IconButton = widgets.IconButton(self)
-            button.set_icon(icon)
+            button.set_icon(dcc.get_icon_path(icon))
             button.setToolTip(tooltip)
-            button.setIconSize(QSize(24, 24))
+            button.setIconSize(QtCore.QSize(24, 24))
             button.setCheckable(True)
             button.setChecked(i == 0)
             button_layout.addWidget(button)
-            self.__method_grp.addButton(button, i)
-            i += 1
+            self.__method.addButton(button, i)
 
         button_layout.addWidget(widgets.VerticalLine(self))
 
-        self.__interpolation_grp: QButtonGroup = QButtonGroup(self)
-        self.__interpolation_grp.idClicked[int].connect(
-            self.change_interpolation_callback
-        )
+        self.__interpolation = QtWidgets.QButtonGroup(self)
+        self.__interpolation.idClicked.connect(self.change_interpolation)
 
-        i = 0
-        for icon, tooltip in zip(
-            self.interpolation_icons, self.interpolation_tooltips
+        for i, (icon, tooltip) in enumerate(
+            zip(self.interpolation_icons, self.interpolation_tooltips)
         ):
             button = widgets.IconButton(self)
-            button.set_icon(icon)
+            button.set_icon(dcc.get_icon_path(icon))
             button.setToolTip(tooltip)
-            button.setIconSize(QSize(24, 24))
+            button.setIconSize(QtCore.QSize(24, 24))
             button.setCheckable(True)
             button.setChecked(i == 0)
             button_layout.addWidget(button)
-            self.__interpolation_grp.addButton(button, i)
-            i += 1
+            self.__interpolation.addButton(button, i)
 
         button_layout.addStretch(True)
 
-        self.__slider: BetweenSlider = BetweenSlider(self)
+        self.__slider = BetweenSlider(self)
         main_layout.addWidget(self.__slider)
 
-        self.change_method_callback(0)
-        self.change_interpolation_callback(0)
-
-    # override
-    def load_settings(self) -> None:
-        '''Load ui settings from file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
-
-    # override
-    def save_settings(self) -> None:
-        '''Save ui settings to file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
-        settings.write()
-
-    # override
-    def reset_settings(self) -> None:
-        '''Reset ui settings.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
-
-    # override
-    def about(self) -> None:
-        '''Show a about dialog.[override]'''
-        widgets.AboutDialog.info(
-            self, __product__, __version__, __copyright__, __doc__
+        settings: Settings = self.tool_settings()
+        settings.window_geo.bind(
+            setter=self.restoreGeometry,
+            getter=self.saveGeometry,
+            encoder=utils.qt_to_ascii,
+            decoder=utils.ascii_to_qt,
         )
 
-    @Slot(int)
-    def change_method_callback(self, index: int) -> None:
-        '''Change method callback.'''
+        self.change_method(0)
+        self.change_interpolation(0)
+
+    @QtCore.Slot(int)
+    def change_method(self, index: int) -> None:
+        """Slot to handle changing the active method.
+
+        Args:
+            index (int): The index of the selected method.
+        """
         self.__slider.set_between(self.betweens[index])
-        for button in self.__interpolation_grp.buttons():
+        for button in self.__interpolation.buttons():
             button.setEnabled(index in [0, 1, 6])
 
-        self.change_interpolation_callback(self.__interpolation_grp.checkedId())
+        self.change_interpolation(self.__interpolation.checkedId())
 
-    @Slot(int)
-    def change_interpolation_callback(self, index: int) -> None:
-        '''Change Interpolation_callback'''
+    @QtCore.Slot(int)
+    def change_interpolation(self, index: int) -> None:
+        """Slot to handle changing the interpolation logic.
+
+        Args:
+            index (int): The index of the selected interpolation method.
+        """
         self.__slider.set_interpolation(self.interpolations[index])
 
-    @widgets.undo
-    def apply(self) -> None:
-        '''Apply'''
-        self.save_settings()
-        main()
 
+def main(unique_id: str = "") -> None:
+    """Initializes and displays the main application window.
 
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
-def lerp(x0: float, y0: float, x1: float, y1: float, x: float) -> float:
-    '''Return leap value of x-pointfrom two point.'''
-    return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
-
-
-def between(x: float, y: float, f: float) -> float:
-    '''
-    Return between value of f-point from x to y.
-    f = 0 to 1
-    '''
-    return (x * (1.0 - f)) + (y * f)
-
-
-def clamp(value: float, start_value: float, end_value: float) -> float:
-    '''Return clamp value from start to end.'''
-    min_value: float = min(start_value, end_value)
-    max_value: float = max(start_value, end_value)
-    return max(min(value, max_value), min_value)
-
-
-def main(unique_id: str = '') -> None:
-    '''Show window.'''
+    Args:
+        unique_id (str, optional): A unique identifier for restoring
+            window states. Defaults to "".
+    """
     window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()
