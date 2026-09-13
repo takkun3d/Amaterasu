@@ -45,6 +45,7 @@ from amaterasu.base.widgets.toast import ToastWidget, ToastSignalEmitter
 from amaterasu.base.widgets.tree_widget import TreeWidget
 from amaterasu.base.widgets.vertical_line import VerticalLine
 from amaterasu.base.widgets.image_drop_widget import ImageDropImage
+from amaterasu.base.widgets.drag_slider import DragSlider
 
 __all__: list[str] = [
     "ActionableCheckBox",
@@ -69,4 +70,5 @@ __all__: list[str] = [
     "TreeWidget",
     "VerticalLine",
     "ImageDropImage",
+    "DragSlider",
 ]
