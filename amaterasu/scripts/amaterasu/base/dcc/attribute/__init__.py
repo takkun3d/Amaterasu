@@ -39,7 +39,11 @@ from amaterasu.base.dcc.attribute.user_defined import (
     add_separator,
     delete_user_defined,
 )
-from amaterasu.base.dcc.attribute.query import get_default_value, get_range
+from amaterasu.base.dcc.attribute.query import (
+    is_default_value,
+    get_default_value,
+    get_range,
+)
 from amaterasu.base.dcc.attribute.lock import (
     lock,
     unlock,
@@ -67,6 +71,7 @@ __all__: list[str] = [
     "add_separator",
     "delete_user_defined",
     # query
+    "is_default_value",
     "get_default_value",
     "get_range",
     # lock
