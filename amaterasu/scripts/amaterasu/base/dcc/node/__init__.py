@@ -49,6 +49,7 @@ from amaterasu.base.dcc.node.outliner import (
     clear_outliner_color,
     sort,
 )
+from amaterasu.base.dcc.node.hierarchy import get_children
 
 __all__: list[str] = [
     # display
@@ -71,4 +72,6 @@ __all__: list[str] = [
     "set_outliner_color",
     "clear_outliner_color",
     "sort",
+    # hierarchy
+    "get_children",
 ]
