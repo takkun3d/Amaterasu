@@ -19,10 +19,15 @@
 # SOFTWARE.
 
 from __future__ import annotations
-from amaterasu.base.dcc.animation.curve import get_anim_curves, get_anim_curve
+from amaterasu.base.dcc.animation.curve import (
+    ANIM_CURVES_TYPE,
+    get_anim_curves,
+    get_anim_curve,
+)
 
 __all__: list[str] = [
     # curve
+    "ANIM_CURVES_TYPE",
     "get_anim_curves",
     "get_anim_curve",
 ]

@@ -26,7 +26,7 @@ and keyframes within Maya.
 from __future__ import annotations
 from maya import cmds
 
-ANIM_CURVES: list[str] = [
+ANIM_CURVES_TYPE: list[str] = [
     "animCurveTL",
     "animCurveTA",
     "animCurveTU",
@@ -52,7 +52,7 @@ def get_anim_curves(node: str) -> list[str]:
         return []
 
     for connection in connections:
-        if cmds.nodeType(connection) in ANIM_CURVES:
+        if cmds.nodeType(connection) in ANIM_CURVES_TYPE:
             result.append(connection)
 
     return result
@@ -76,7 +76,7 @@ def get_anim_curve(node: str, attr: str) -> str:
     if not connections:
         return ""
 
-    if cmds.nodeType(connections[0]) in ANIM_CURVES:
+    if cmds.nodeType(connections[0]) in ANIM_CURVES_TYPE:
         return connections[0]
 
     return ""
