@@ -225,7 +225,10 @@ def apply(
             values: list[Any] = cmds.keyframe(
                 curve, query=True, valueChange=True
             )  # type: ignore
-            tangents: list[float] = cmds.keyTangent(
+            in_tangents: list[float] = cmds.keyTangent(
+                curve, query=True, inAngle=True
+            )  # type: ignore
+            out_tangents: list[float] = cmds.keyTangent(
                 curve, query=True, outAngle=True
             )  # type: ignore
 
@@ -241,7 +244,11 @@ def apply(
             )
             if tangent:
                 cmds.keyTangent(
-                    curve, edit=True, index=index, outAngle=tangents[src_seek]  # type: ignore
+                    curve,
+                    edit=True,
+                    index=index,  # type: ignore
+                    inAngle=in_tangents[src_seek],
+                    outAngle=out_tangents[src_seek],
                 )
 
         cmds.setAttr(f"{curve}.preInfinity", pre_infinity)
