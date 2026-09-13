@@ -1,181 +1,178 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Cycle Keyframe
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Changes the animation of the selected nodes or curves to a cycle.
+
+This module provides functionality to apply cycle and infinity settings
+to animation curves associated with the specified nodes or curves.
+"""
+
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any
-
-try:
-    from PySide2.QtCore import Qt
-    from PySide2.QtWidgets import QWidget, QCheckBox, QComboBox
-
-except ImportError:
-    if not TYPE_CHECKING:
-        from PySide6.QtCore import Qt
-        from PySide6.QtWidgets import QWidget, QCheckBox, QComboBox
+from typing import Any
 from maya import cmds
-from ..lib import logger, parser, utility, widgets
+from amaterasu.base.qt import QtCore, QtWidgets
+from amaterasu.base import dcc, framework, utils, widgets
+
+__product__: str = "Cycle Keyframe"
+__version__: str = "1.21"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Cycle Keyframe'
-__version__: str = '1.20'
-__doc__ = 'Change an animation of selected node to a cycle.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+class Settings(framework.ToolSettings):
+    """Settings for the Cycle Keyframe tool.
+
+    Attributes:
+        window_geo (framework.Variant[str]): The saved window geometry.
+        method (framework.Variant[int]): Cycle generation method.
+            0 for None, 1 for Start -> End, 2 for End -> Start.
+        target (framework.Variant[int]): Target selection mode.
+            0 for Node, 1 for Curve.
+        tangent (framework.Variant[bool]): Whether to copy the tangent.
+        display_infinities (framework.Variant[bool]): Infinity display mode.
+        pre_infinity (framework.Variant[int]): Pre-infinity setting index.
+        post_infinity (framework.Variant[int]): Post-infinity setting index.
+    """
+
+    window_geo: framework.Variant[str] = framework.Variant("")
+    method: framework.Variant[int] = framework.Variant(0)
+    target: framework.Variant[int] = framework.Variant(0)
+    tangent: framework.Variant[bool] = framework.Variant(True)
+    display_infinities: framework.Variant[bool] = framework.Variant(True)
+    pre_infinity: framework.Variant[int] = framework.Variant(2)
+    post_infinity: framework.Variant[int] = framework.Variant(2)
 
 
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-class Settings(parser.ToolSettings):
-    '''Settings for tool.'''
-
-    window_geo: parser.Variant[str] = parser.Variant('')
-    method: parser.Variant[int] = parser.Variant(0)
-    target: parser.Variant[int] = parser.Variant(0)
-    tangent: parser.Variant[int] = parser.Variant(1)
-    display_infinities: parser.Variant[bool] = parser.Variant(True)
-    pre_infinity: parser.Variant[int] = parser.Variant(2)
-    post_infinity: parser.Variant[int] = parser.Variant(2)
-
-
-class MainWindow(widgets.StandardToolWidget):
-    '''Tool main window'''
+class MainWindow(framework.StandardToolWindow[Settings]):
+    """Main window for the Cycle Keyframe tool."""
 
     def __init__(
         self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-        unique_id: str = '',
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Window,
+        unique_id: str = "",
     ) -> None:
-        '''Initialize widget.'''
+        """Initializes the window.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The Qt window flags.
+                Defaults to Window.
+            unique_id (str, optional): A unique ID for restoring window
+                states. Defaults to "".
+        """
         super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
         self.resize(400, 200)
 
-        option_widget: QWidget = self.option_widget()
-        main_layout: widgets.FormLayout = widgets.FormLayout(option_widget)
+    def create_ui(self, parent: QtWidgets.QWidget) -> None:
+        """Creates the tool-specific user interface.
+
+        Args:
+            parent (QtWidgets.QWidget): The parent widget to contain the UI.
+        """
+        main_layout: widgets.FormLayout = widgets.FormLayout(parent)
 
         main_layout.addRow(
-            widgets.FrameWidget('Cycle Options', False, False, self)
+            widgets.FrameWidget("Cycle Options", False, False, self)
         )
 
-        self.__target: widgets.RadioButtons = widgets.RadioButtons(self)
-        self.__target.set_labels(('Selected Node', 'Selected Curve'))
-        main_layout.addRow(widgets.FormLabel('Target'), self.__target)
+        target: QtWidgets.QComboBox = QtWidgets.QComboBox(self)
+        target.addItems(["Selected Node", "Selected Curve"])
+        main_layout.addRow(widgets.FormLabel("Target"), target)
 
-        self.__method: widgets.RadioButtons = widgets.RadioButtons(self)
-        self.__method.set_labels(('None', 'Start -> End', 'End -> Start'))
-        self.__method.button_group().buttonClicked.connect(
-            self.update_ui_enabled
-        )
-        main_layout.addRow(widgets.FormLabel('Method'), self.__method)
+        method: QtWidgets.QComboBox = QtWidgets.QComboBox(self)
+        method.addItems(["None", "Start -> End", "End -> Start"])
+        main_layout.addRow(widgets.FormLabel("Method"), method)
 
-        self.__tangent: QCheckBox = QCheckBox('Copy Tangent', self)
-        main_layout.addRow('', self.__tangent)
+        tangent: QtWidgets.QCheckBox = QtWidgets.QCheckBox("Copy Tangent", self)
+        main_layout.addRow("", tangent)
 
         main_layout.addRow(
-            widgets.FrameWidget('Infinities Options', False, False, self)
+            widgets.FrameWidget("Infinities Options", False, False, self)
         )
 
-        self.__display_infinities: QCheckBox = QCheckBox(
-            'Display Infinities', self
+        display_infinities: QtWidgets.QCheckBox = QtWidgets.QCheckBox(
+            "Display Infinities", self
         )
-        main_layout.addRow('', self.__display_infinities)
+        main_layout.addRow("", display_infinities)
 
-        self.__pre_infinity: QComboBox = QComboBox(self)
-        self.__pre_infinity.addItem('Constant')
-        self.__pre_infinity.addItem('Linear')
-        self.__pre_infinity.addItem('Cycle')
-        self.__pre_infinity.addItem('Cycle with Offset')
-        self.__pre_infinity.addItem('Oscillate')
-        main_layout.addRow(
-            widgets.FormLabel('Pre Infinity'), self.__pre_infinity
+        infinities: list[str] = [
+            "Constant",
+            "Linear",
+            "Cycle",
+            "Cycle with Offset",
+            "Oscillate",
+        ]
+
+        pre_infinity: QtWidgets.QComboBox = QtWidgets.QComboBox(self)
+        pre_infinity.addItems(infinities)
+        main_layout.addRow(widgets.FormLabel("Pre Infinity"), pre_infinity)
+
+        post_infinity: QtWidgets.QComboBox = QtWidgets.QComboBox(self)
+        post_infinity.addItems(infinities)
+        main_layout.addRow(widgets.FormLabel("Post Infinity"), post_infinity)
+
+        settings: Settings = self.tool_settings()
+        settings.window_geo.bind(
+            setter=self.restoreGeometry,
+            getter=self.saveGeometry,
+            encoder=utils.qt_to_ascii,
+            decoder=utils.ascii_to_qt,
         )
-
-        self.__post_infinity: QComboBox = QComboBox(self)
-        self.__post_infinity.addItem('Constant')
-        self.__post_infinity.addItem('Linear')
-        self.__post_infinity.addItem('Cycle')
-        self.__post_infinity.addItem('Cycle with Offset')
-        self.__post_infinity.addItem('Oscillate')
-        main_layout.addRow(
-            widgets.FormLabel('Post Infinity'), self.__post_infinity
+        settings.target.bind(
+            setter=target.setCurrentIndex,
+            getter=target.currentIndex,
         )
-
-    # override
-    def load_settings(self) -> None:
-        '''Load ui settings from file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
-        self.__method.set_check_id(settings.method.value())
-        self.__target.set_check_id(settings.target.value())
-        self.__tangent.setChecked(settings.tangent.value())
-        self.__display_infinities.setChecked(
-            settings.display_infinities.value()
+        settings.method.bind(
+            setter=method.setCurrentIndex,
+            getter=method.currentIndex,
         )
-        self.__pre_infinity.setCurrentIndex(settings.pre_infinity.value())
-        self.__post_infinity.setCurrentIndex(settings.post_infinity.value())
-        self.update_ui_enabled()
-
-    # override
-    def save_settings(self) -> None:
-        '''Save ui settings to file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
-        settings.method.set_value(self.__method.check_id())
-        settings.target.set_value(self.__target.check_id())
-        settings.tangent.set_value(self.__tangent.isChecked())
-        settings.display_infinities.set_value(
-            self.__display_infinities.isChecked()
+        settings.tangent.bind(
+            setter=tangent.setChecked,
+            getter=tangent.isChecked,
         )
-        settings.pre_infinity.set_value(self.__pre_infinity.currentIndex())
-        settings.post_infinity.set_value(self.__post_infinity.currentIndex())
-        settings.write()
-
-    # override
-    def reset_settings(self) -> None:
-        '''Reset ui settings.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
-
-    # override
-    def about(self) -> None:
-        '''Show a about dialog.[override]'''
-        widgets.AboutDialog.info(
-            self, __product__, __version__, __copyright__, __doc__
+        settings.display_infinities.bind(
+            setter=display_infinities.setChecked,
+            getter=display_infinities.isChecked,
+        )
+        settings.pre_infinity.bind(
+            setter=pre_infinity.setCurrentIndex,
+            getter=pre_infinity.currentIndex,
+        )
+        settings.post_infinity.bind(
+            setter=post_infinity.setCurrentIndex,
+            getter=post_infinity.currentIndex,
         )
 
-    def update_ui_enabled(self) -> None:
-        '''Update ui enabled'''
-        if self.__method.check_id() == 0:
-            self.__tangent.setEnabled(False)
-        else:
-            self.__tangent.setEnabled(True)
+        method.currentIndexChanged.connect(
+            lambda idx: tangent.setEnabled(idx != 0)
+        )
+        tangent.setEnabled(method.currentIndex() != 0)
 
-    @widgets.undo
+    @dcc.undo
     def apply(self) -> None:
-        '''Apply'''
+        """Executes the tool logic and saves current settings."""
         self.save_settings()
-        main()
+        main(self.tool_settings())
 
 
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
 def apply(
     nodes: list[str],
     method: int = 0,
@@ -184,12 +181,29 @@ def apply(
     pre_infinity: int = 2,
     post_infinity: int = 2,
 ) -> bool:
-    '''Change an animation to a cycle.'''
+    """Applies cycle settings to the animation curves of given nodes.
+
+    Args:
+        nodes (list[str]): A list of Maya node or curve names to process.
+        method (int, optional): The cycle generation method. 0 for None,
+            1 for Start -> End, 2 for End -> Start. Defaults to 0.
+        tangent (bool, optional): Whether to copy the tangent. Defaults to True.
+        display_infinities (bool, optional): Whether to display infinities
+            in the Graph Editor. Defaults to True.
+        pre_infinity (int, optional): The pre-infinity mode index.
+            Defaults to 2.
+        post_infinity (int, optional): The post-infinity mode index.
+            Defaults to 2.
+
+    Returns:
+        bool: True if the operation was successful.
+    """
     cmds.animCurveEditor(
-        'graphEditor1GraphEd',
+        "graphEditor1GraphEd",
         edit=True,
-        displayInfinities='on' if display_infinities else 'off',
+        displayInfinities="on" if display_infinities else "off",
     )
+
     if pre_infinity >= 2:
         pre_infinity += 1
 
@@ -198,59 +212,78 @@ def apply(
 
     connected_curves: list[str] = []
     for node in nodes:
-        if cmds.objectType(node) not in utility.ANIM_CURVE_TYPES:
-            connected_curves.extend(utility.get_anim_curves(node))
-        else:
+        if cmds.objectType(node) in dcc.animation.ANIM_CURVES_TYPE:
             connected_curves.append(node)
+        else:
+            connected_curves.extend(dcc.animation.get_anim_curves(node))
 
     for curve in connected_curves:
         if method != 0:
             indexes: list[int] = cmds.keyframe(
                 curve, query=True, indexValue=True
-            )
+            )  # type: ignore
             values: list[Any] = cmds.keyframe(
                 curve, query=True, valueChange=True
-            )
+            )  # type: ignore
             tangents: list[float] = cmds.keyTangent(
                 curve, query=True, outAngle=True
-            )
+            )  # type: ignore
+
+            if not indexes:
+                continue
+
             src_seek: int = 0 if method == 1 else -1
             dst_seek: int = -1 if method == 1 else 0
             index: tuple[int, int] = (indexes[dst_seek], indexes[dst_seek])
 
             cmds.keyframe(
-                curve, edit=True, index=index, valueChange=values[src_seek]
+                curve, edit=True, index=index, valueChange=values[src_seek]  # type: ignore
             )
             if tangent:
                 cmds.keyTangent(
-                    curve, edit=True, index=index, outAngle=tangents[src_seek]
+                    curve, edit=True, index=index, outAngle=tangents[src_seek]  # type: ignore
                 )
 
-        cmds.setAttr(f'{curve}.preInfinity', pre_infinity)
-        cmds.setAttr(f'{curve}.postInfinity', post_infinity)
+        cmds.setAttr(f"{curve}.preInfinity", pre_infinity)
+        cmds.setAttr(f"{curve}.postInfinity", post_infinity)
 
     return True
 
 
-def option(unique_id: str = '') -> None:
-    '''Show window.'''
+def option(unique_id: str = "") -> None:
+    """Shows the tool's main window.
+
+    Args:
+        unique_id (str, optional): A unique identifier for the window
+            instance. Defaults to "".
+    """
     window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()
 
 
-def main() -> None:
-    '''Apply according to the setting.'''
+def main(settings: Settings | None = None) -> None:
+    """Executes the cycle application based on the current UI settings.
+
+    Args:
+        settings (Settings | None, optional): The tool settings instance.
+            If None, it initializes settings from the module name.
+            Defaults to None.
+    """
+    if settings is None:
+        settings = Settings.instance(__name__, True)
+        settings.read()
+
     selection: list[str] = []
-    settings: Settings = Settings.instance(__name__, True)
     if settings.target.value() == 0:
-        selection = cmds.ls(selection=True)
+        selection = cmds.ls(selection=True, long=True)
         if not selection:
-            _logger.error('Select node to cycle key.')
+            _logger.error("Select node(s) to apply a cycle.")
             return
+
     else:
-        selection = cmds.keyframe(query=True, selected=True, name=True)
+        selection = cmds.keyframe(query=True, selected=True, name=True)  # type: ignore
         if not selection:
-            _logger.error('Select curve to cycle key.')
+            _logger.error("Select curve(s) to apply a cycle.")
             return
 
     result: bool = apply(
@@ -262,4 +295,4 @@ def main() -> None:
         settings.post_infinity.value(),
     )
     if result:
-        _logger.info('Done.')
+        _logger.info("Done.")
