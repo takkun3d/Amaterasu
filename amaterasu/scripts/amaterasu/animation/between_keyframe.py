@@ -397,66 +397,6 @@ class ReplaceEase(Between):
                 )
 
 
-class BetweenSlider(QtWidgets.QSlider):
-    """Slider widget to drive the between logic interactively."""
-
-    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
-        """Initializes the slider.
-
-        Args:
-            parent (QtWidgets.QWidget | None, optional): The parent widget.
-                Defaults to None.
-        """
-        super().__init__(parent)
-        self.setOrientation(QtCore.Qt.Orientation.Horizontal)
-        self.setRange(-100, 100)
-        self.setValue(0)
-        self.sliderPressed.connect(self.drag_start)
-        self.sliderMoved.connect(self.drag_move)
-        self.sliderReleased.connect(self.drag_end)
-        self.__between: Between = Between()
-
-    def between(self) -> Between:
-        """Retrieves the assigned between logic instance.
-
-        Returns:
-            Between: The logic instance currently assigned.
-        """
-        return self.__between
-
-    def set_between(self, between_value: Between) -> None:
-        """Assigns the between logic instance.
-
-        Args:
-            between_value (Between): The logic instance to assign.
-        """
-        self.__between = between_value
-
-    def set_interpolation(self, interpolation: maths.Ease) -> None:
-        """Sets the interpolation logic for the internal between object.
-
-        Args:
-            interpolation (Ease): The interpolation instance.
-        """
-        self.__between.set_interpolation(interpolation)
-
-    @QtCore.Slot()
-    def drag_start(self) -> None:
-        """Slot triggered when the slider is pressed."""
-        self.__between.drag_start()
-
-    @QtCore.Slot()
-    def drag_move(self) -> None:
-        """Slot triggered when the slider is moved."""
-        self.__between.drag_move(float(self.value()))
-
-    @QtCore.Slot()
-    def drag_end(self) -> None:
-        """Slot triggered when the slider is released."""
-        self.__between.drag_end()
-        self.setValue(0)
-
-
 class MainWindow(framework.ToolWindow[Settings]):
     """Main window for the Between Keyframe tool."""
 
@@ -524,7 +464,8 @@ class MainWindow(framework.ToolWindow[Settings]):
         self.resize(100, 10)
         self.__method: QtWidgets.QButtonGroup
         self.__interpolation: QtWidgets.QButtonGroup
-        self.__slider: BetweenSlider
+        self.__slider: widgets.DragSlider
+        self.__active_between: Between = self.betweens[0]
 
     def create_ui(self, parent: QtWidgets.QWidget) -> None:
         """Creates the tool-specific user interface elements.
@@ -574,7 +515,10 @@ class MainWindow(framework.ToolWindow[Settings]):
 
         button_layout.addStretch(True)
 
-        self.__slider = BetweenSlider(self)
+        self.__slider = widgets.DragSlider(self)
+        self.__slider.drag_start.connect(self.drag_start)
+        self.__slider.drag_move.connect(self.drag_move)
+        self.__slider.drag_end.connect(self.drag_end)
         main_layout.addWidget(self.__slider)
 
         settings: Settings = self.tool_settings()
@@ -595,7 +539,7 @@ class MainWindow(framework.ToolWindow[Settings]):
         Args:
             index (int): The index of the selected method.
         """
-        self.__slider.set_between(self.betweens[index])
+        self.__active_between = self.betweens[index]
         for button in self.__interpolation.buttons():
             button.setEnabled(index in [0, 1, 6])
 
@@ -608,7 +552,26 @@ class MainWindow(framework.ToolWindow[Settings]):
         Args:
             index (int): The index of the selected interpolation method.
         """
-        self.__slider.set_interpolation(self.interpolations[index])
+        self.__active_between.set_interpolation(self.interpolations[index])
+
+    @QtCore.Slot()
+    def drag_start(self) -> None:
+        """Slot triggered when the slider drag starts."""
+        self.__active_between.drag_start()
+
+    @QtCore.Slot(int)
+    def drag_move(self, value: int) -> None:
+        """Slot triggered when the slider is moved.
+
+        Args:
+            value (int): The current value of the slider.
+        """
+        self.__active_between.drag_move(float(value))
+
+    @QtCore.Slot()
+    def drag_end(self) -> None:
+        """Slot triggered when the slider drag ends."""
+        self.__active_between.drag_end()
 
 
 def main(unique_id: str = "") -> None:
