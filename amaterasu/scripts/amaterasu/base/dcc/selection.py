@@ -23,13 +23,7 @@ from __future__ import annotations
 from itertools import product
 from maya import cmds, mel
 from amaterasu.base import utils
-
-ANIMATION_CURVES: list[str] = [
-    "animCurveTA",
-    "animCurveTL",
-    "animCurveTT",
-    "animCurveTU",
-]
+from amaterasu.base.dcc import animation
 
 
 def filter_animated(nodes: list[str] | None = None) -> utils.Result:
@@ -47,7 +41,7 @@ def filter_animated(nodes: list[str] | None = None) -> utils.Result:
     """
     result: utils.Result = utils.Result()
 
-    anim_curves: list[str] = cmds.ls(type=ANIMATION_CURVES)
+    anim_curves: list[str] = cmds.ls(type=animation.ANIM_CURVES_TYPE)
 
     animated_set: set[str] = set()
     for curve in anim_curves:
@@ -69,7 +63,9 @@ def filter_animated(nodes: list[str] | None = None) -> utils.Result:
     return result
 
 
-def get_selected_channel_box_plugs() -> list[str]:
+def get_selected_channel_box_plugs(
+    is_attribute_only: bool = False,
+) -> list[str]:
     """Gets a list of selected plugs (node.attribute) from the Channel Box.
 
     Returns:
@@ -93,7 +89,15 @@ def get_selected_channel_box_plugs() -> list[str]:
         Returns:
             list[str]: A list of combined plug strings (e.g., ['node.attr']).
         """
-        return [f"{n}.{a}" for n, a in product(nodes or [], attrs or [])]
+        _plugs: list[str] = []
+        for node, attr in product(nodes or [], attrs or []):
+            long_attr: str = cmds.attributeName(f"{node}.{attr}", long=True)
+            if is_attribute_only:
+                _plugs.append(long_attr)
+            else:
+                _plugs.append(f"{node}.{long_attr}")
+
+        return _plugs
 
     plugs: list[str] = []
     plugs.extend(
