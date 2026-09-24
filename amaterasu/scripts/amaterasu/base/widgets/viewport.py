@@ -25,7 +25,7 @@ from maya import OpenMaya, OpenMayaUI, cmds, mel
 from amaterasu.base.qt import QtCore, QtWidgets
 
 
-class Viewport(QtWidgets.QWidget):
+class ViewportCapture(QtWidgets.QWidget):
     """Widget for rendering and capturing the Maya viewport or shader ball.
 
     This widget embeds a Maya model editor into a Qt layout to provide

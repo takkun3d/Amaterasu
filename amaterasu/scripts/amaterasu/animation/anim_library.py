@@ -1222,7 +1222,7 @@ class SavePoseOption(QtWidgets.QDialog):
         label: QtWidgets.QLabel = QtWidgets.QLabel("Thumbnail :", self)
         viewport_layout.addWidget(label)
 
-        self.__viewport: widgets.Viewport = widgets.Viewport(self)
+        self.__viewport: widgets.ViewportCapture = widgets.ViewportCapture(self)
         self.__viewport.set_image_size(256, 256)
         viewport_layout.addWidget(self.__viewport)
         viewport_layout.addStretch(True)
@@ -1361,7 +1361,7 @@ class SaveAnimationOption(QtWidgets.QDialog):
         label: QtWidgets.QLabel = QtWidgets.QLabel("Thumbnail :", self)
         viewport_layout.addWidget(label)
 
-        self.__viewport: widgets.Viewport = widgets.Viewport(self)
+        self.__viewport: widgets.ViewportCapture = widgets.ViewportCapture(self)
         self.__viewport.set_image_size(256, 256)
         viewport_layout.addWidget(self.__viewport)
         viewport_layout.addStretch(True)
