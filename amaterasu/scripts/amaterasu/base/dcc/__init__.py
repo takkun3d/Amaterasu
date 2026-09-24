@@ -34,6 +34,7 @@ from amaterasu.base.dcc.ui import (
     find_layout,
     find_menu_item,
     show_attribute_editor,
+    add_widget_to_maya,
 )
 
 from amaterasu.base.dcc import project
@@ -63,6 +64,7 @@ __all__: list[str] = [
     "find_layout",
     "find_menu_item",
     "show_attribute_editor",
+    "add_widget_to_maya",
     #
     "project",
     "scene",
