@@ -37,14 +37,22 @@ class DragSlider(QtWidgets.QSlider):
     drag_move: QtCore.Signal = QtCore.Signal(int)
     drag_end: QtCore.Signal = QtCore.Signal()
 
-    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+    def __init__(
+        self,
+        parent: QtWidgets.QWidget | None = None,
+        auto_reset: bool = True,
+    ) -> None:
         """Initializes the slider.
 
         Args:
             parent (QtWidgets.QWidget | None, optional): The parent widget.
                 Defaults to None.
+            auto_reset (bool, optional): If True, resets value to 0 on release.
+                Defaults to True.
         """
         super().__init__(parent)
+        self.__auto_reset: bool = auto_reset
+
         self.setRange(-100, 100)  # Bug?
         self.setValue(0)
         self.setOrientation(QtCore.Qt.Orientation.Horizontal)
@@ -66,7 +74,9 @@ class DragSlider(QtWidgets.QSlider):
 
     @QtCore.Slot()
     def drag_end_callback(self) -> None:
-        """Handles the slider released event and resets the value."""
-        self.setValue(0)
+        """Handles the slider released event and optionally resets the value."""
+        if self.__auto_reset:
+            self.setValue(0)
+
         self.drag_end.emit()
         cmds.undoInfo(closeChunk=True)
