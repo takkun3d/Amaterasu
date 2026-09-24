@@ -47,6 +47,8 @@ from amaterasu.base.widgets.vertical_line import VerticalLine
 from amaterasu.base.widgets.image_drop_widget import ImageDropImage
 from amaterasu.base.widgets.drag_slider import DragSlider
 from amaterasu.base.widgets.adaptive_stacked_widget import AdaptiveStackedWidget
+from amaterasu.base.widgets.file_browser import FileBrowserItem, FileBrowser
+from amaterasu.base.widgets.viewport import Viewport
 
 __all__: list[str] = [
     "ActionableCheckBox",
@@ -73,4 +75,7 @@ __all__: list[str] = [
     "ImageDropImage",
     "DragSlider",
     "AdaptiveStackedWidget",
+    "FileBrowserItem",
+    "FileBrowser",
+    "Viewport",
 ]
