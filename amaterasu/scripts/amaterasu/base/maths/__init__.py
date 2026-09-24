@@ -25,11 +25,17 @@ from amaterasu.base.maths.ease import (
     EaseExponential,
     EaseQuadratic,
 )
-
 from amaterasu.base.maths.interpolation import (
     remap,
     lerp,
     clamp,
+)
+from amaterasu.base.maths.vector import (
+    normalize,
+    cross_product,
+    intersect_lines,
+    average_intersection,
+    average_direction,
 )
 
 __all__: list[str] = [
@@ -42,4 +48,10 @@ __all__: list[str] = [
     "remap",
     "lerp",
     "clamp",
+    # vector
+    "normalize",
+    "cross_product",
+    "intersect_lines",
+    "average_intersection",
+    "average_direction",
 ]
