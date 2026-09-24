@@ -80,3 +80,18 @@ def get_anim_curve(node: str, attr: str) -> str:
         return connections[0]
 
     return ""
+
+
+def has_animation(node: str, attr: str = "") -> bool:
+    """Returns whether the specified node or attribute has animation keyframes.
+
+    Args:
+        node (str): The name of the target node.
+        attr (str, optional): The name of the specific attribute to check.
+            Defaults to "".
+
+    Returns:
+        bool: True if the node or attribute has keyframes, False otherwise.
+    """
+    plug: str = f"{node}.{attr}" if attr else node
+    return bool(cmds.keyframe(plug, query=True, keyframeCount=True))

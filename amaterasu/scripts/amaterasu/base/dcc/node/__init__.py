@@ -43,6 +43,9 @@ from amaterasu.base.dcc.node.name import (
     normalize_shape_name,
     normalize_shading_engine_name,
     remove_pasted_prefixes,
+    get_namespace,
+    get_namespaces,
+    get_namespace_group,
 )
 from amaterasu.base.dcc.node.outliner import (
     set_outliner_color,
@@ -68,6 +71,9 @@ __all__: list[str] = [
     "normalize_shape_name",
     "normalize_shading_engine_name",
     "remove_pasted_prefixes",
+    "get_namespace",
+    "get_namespaces",
+    "get_namespace_group",
     # outliner
     "set_outliner_color",
     "clear_outliner_color",

@@ -23,6 +23,7 @@ from amaterasu.base.dcc.animation.curve import (
     ANIM_CURVES_TYPE,
     get_anim_curves,
     get_anim_curve,
+    has_animation,
 )
 
 __all__: list[str] = [
@@ -30,4 +31,5 @@ __all__: list[str] = [
     "ANIM_CURVES_TYPE",
     "get_anim_curves",
     "get_anim_curve",
+    "has_animation",
 ]
