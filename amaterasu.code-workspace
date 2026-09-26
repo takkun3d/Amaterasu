@@ -11,7 +11,7 @@
             "**/.svn": true,
             "**/.hg": true,
             "**/.env": true,
-            "**/.venv": true,
+            "**/.venv*": true,
             "**/.mypy_cache": true,
             "**/.DS_Store": true,
             "**/Thumbs.db": true,
