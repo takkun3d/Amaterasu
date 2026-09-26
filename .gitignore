@@ -1,7 +1,8 @@
-.env/
-psd/
-publish/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 
+.venv/
 __pycache__/
 *.pyc
 .mypy_cache/
@@ -9,6 +10,7 @@ __pycache__/
 Thumbs.db
 .DS_Store
 
+.env/
+psd/
 tools/
 template/
-.vscode/

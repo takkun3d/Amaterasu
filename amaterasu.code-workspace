@@ -11,11 +11,14 @@
             "**/.svn": true,
             "**/.hg": true,
             "**/.env": true,
+            "**/.venv": true,
             "**/.mypy_cache": true,
             "**/.DS_Store": true,
             "**/Thumbs.db": true,
             "**/__pycache__": true,
-            "**/*.pyc": true
+            "**/*.pyc": true,
+            "**/psd": true,
+            "**/tools": true
         },
         "files.associations": {
             "*.ogsfx": "glsl",
@@ -36,7 +39,7 @@
             "editor.insertSpaces": true,
             "editor.tabSize": 4,
             "editor.formatOnSave": true,
-            "editor.defaultFormatter": "ms-python.black-formatter"
+            "editor.defaultFormatter": "charliermarsh.ruff"
         },
         "python.autoComplete.extraPaths": [
             "${workspaceFolder}/.vscode/stubs",
@@ -52,9 +55,9 @@
         "python.analysis.inlayHints.functionReturnTypes": true,
         "python.analysis.inlayHints.variableTypes": true,
         "python.analysis.inlayHints.pytestParameters": true,
-
+        "python.terminal.useEnvFile": true,
         "pylint.args": [
-            "--extension-pkg-whitelist=PySide2,PySide6,maya,pymel,mtoa,arnold",
+            "--extension-pkg-allow-list=PySide2,PySide6,maya,pymel,mtoa,arnold",
             "--ignored-modules=mtoa,arnold,maya",
             "--max-line-length=80"
         ]
