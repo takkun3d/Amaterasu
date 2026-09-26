@@ -43,32 +43,33 @@ Functions:
 """
 
 from __future__ import annotations
+
 from typing import TYPE_CHECKING, TypeVar, cast
 
 try:
-    from PySide6 import QtCore, QtGui, QtWidgets
-    from PySide6.QtCore import Signal, Slot, Property
     import shiboken6 as shiboken
+    from PySide6 import QtCore, QtGui, QtWidgets
+    from PySide6.QtCore import Property, Signal, Slot
 
     PYSIDE_VERSION = 6
 
 except ImportError:
     if not TYPE_CHECKING:
-        from PySide2 import QtCore, QtGui, QtWidgets
-        from PySide2.QtCore import Signal, Slot, Property
         import shiboken2 as shiboken
+        from PySide2 import QtCore, QtGui, QtWidgets
+        from PySide2.QtCore import Property, Signal, Slot
 
     PYSIDE_VERSION = 2
 
 __all__: list[str] = [
+    "PYSIDE_VERSION",
+    "Property",
     "QtCore",
     "QtGui",
     "QtWidgets",
     "Signal",
     "Slot",
-    "Property",
     "shiboken",
-    "PYSIDE_VERSION",
     "wrap_instance",
 ]
 
@@ -82,6 +83,9 @@ if not TYPE_CHECKING and PYSIDE_VERSION == 2:
     QtGui.QFileSystemModel = QtWidgets.QFileSystemModel
     QtCore.QRegularExpression = QtCore.QRegExp
     QtGui.QRegularExpressionValidator = QtGui.QRegExpValidator
+    QtCore.QSortFilterProxyModel.setFilterRegularExpression = (
+        QtCore.QSortFilterProxyModel.setFilterRegExp
+    )
 
     # Methods
     # for cls in (
@@ -113,9 +117,9 @@ else:
         QtWidgets.QDialog,
         QtWidgets.QMenu,
     ):
-        # cls.exec = cls.exec_
         if hasattr(cls, "exec") and not hasattr(cls, "exec_"):
-            setattr(cls, "exec_", getattr(cls, "exec"))
+            # cls.exec_ = cls.exec
+            setattr(cls, "exec_", cls.exec)  # noqa: B010
 
 
 def wrap_instance(ptr: int, base: type[T]) -> T | None:

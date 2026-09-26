@@ -211,14 +211,9 @@ class FileBrowser(QtWidgets.QWidget):
 
         self.__outline_proxy_model = QtCore.QSortFilterProxyModel()
         self.__outline_proxy_model.setSourceModel(self.__outline_model)
-
-        # PySide2 / PySide6 Compatibility for Regex Filtering
-        if hasattr(self.__outline_proxy_model, "setFilterRegularExpression"):
-            self.__outline_proxy_model.setFilterRegularExpression(
-                self.folder_tree_filter
-            )
-        else:
-            self.__outline_proxy_model.setFilterRegExp(self.folder_tree_filter)  # type: ignore
+        self.__outline_proxy_model.setFilterRegularExpression(
+            self.folder_tree_filter
+        )
 
         self.__outline_viewer: QtWidgets.QTreeView = QtWidgets.QTreeView(self)
         self.__outline_viewer.setHeaderHidden(True)
@@ -627,12 +622,7 @@ class FileBrowser(QtWidgets.QWidget):
             filter_text (str): The regex pattern or text filter.
         """
         self.__filter_text = filter_text
-
-        # PySide2 / PySide6 Compatibility for Regex Filtering
-        if hasattr(self.__file_proxy_model, "setFilterRegularExpression"):
-            self.__file_proxy_model.setFilterRegularExpression(filter_text)
-        else:
-            self.__file_proxy_model.setFilterRegExp(filter_text)  # type: ignore
+        self.__file_proxy_model.setFilterRegularExpression(filter_text)
 
     def icon_size(self) -> int:
         """Gets the current icon size rendering dimension.
