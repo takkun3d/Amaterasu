@@ -24,7 +24,7 @@ animation and pose data.
 """
 
 from __future__ import annotations
-from typing import Any
+from typing import Any, TypeVar
 import os
 import json
 import datetime
@@ -37,6 +37,8 @@ from amaterasu.base import dcc, framework, utils, widgets
 __product__: str = "Anim Library"
 __version__: str = "1.31"
 _logger: utils.Logger = utils.get_logger(__product__)
+
+T = TypeVar("T", bound="LibraryData")
 
 ROOT_DIR: str = os.path.join(env.USER_DATA_DIR, "anim_library")
 ICON_SIZE_RANGE: tuple[int, int] = (64, 256)
@@ -96,19 +98,221 @@ class Settings(framework.ToolSettings):
     end_frame: framework.Variant[int] = framework.Variant(120)
 
 
-class Pose:
-    """Manages pose data, metadata, and application logic.
+class LibraryData:
+    """Base class for managing library data, metadata, and file operations.
 
     Attributes:
-        version (float): The current version of the pose data format.
-        folder_extension (str): The folder extension for pose data.
+        version (float): The current version of the data format.
+        folder_extension (str): The folder extension for the data type.
         meta_file_name (str): The filename for the metadata JSON.
-        data_file_name (str): The filename for the pose data JSON.
+        data_file_name (str): The filename for the core data file.
     """
 
     version: float = 1.0
-    folder_extension: str = "pose"
+    folder_extension: str = ""
     meta_file_name: str = "meta.json"
+    data_file_name: str = ""
+
+    def __init__(
+        self,
+        base_path: str,
+        basename: str,
+        comment: str = "",
+        replace_namespace: str = "",
+    ) -> None:
+        """Initializes the base LibraryData instance.
+
+        Args:
+            base_path (str): The root directory path.
+            basename (str): The base name for the data.
+            comment (str, optional): Comment for the data. Defaults to "".
+            replace_namespace (str, optional): Namespace to replace.
+                Defaults to "".
+        """
+        self._title: str = basename
+        self._metadata: dict[str, Any] = {
+            "owner": getpass.getuser(),
+            "date": "",
+            "version": self.version,
+            "maya_version": cmds.about(apiVersion=True),
+            "comment": comment,
+        }
+        self._replace_namespace: str = replace_namespace
+
+        self._folder_name: str = f"{basename}.{self.folder_extension}"
+        self._root_path: str = os.path.join(base_path, self._folder_name)
+        self._thumbnail_file_name: str = os.path.join(
+            self._root_path,
+            widgets.FileBrowserItem.thumbnail_filename,
+        )
+        self._metadata_file_name: str = os.path.join(
+            self._root_path,
+            self.meta_file_name,
+        )
+        self._data_file_path: str = os.path.join(
+            self._root_path,
+            self.data_file_name,
+        )
+
+    @classmethod
+    def from_path(cls: type[T], path: str) -> T:
+        """Returns an instance initialized from the given path.
+
+        Args:
+            path (str): The file path.
+
+        Returns:
+            T: A new instance of the class (Pose or Animation).
+        """
+        basename, _ = os.path.splitext(path)
+        data_path: str = os.path.dirname(basename)
+        basename = os.path.basename(basename)
+        return cls(data_path, basename)
+
+    def read(self) -> None:
+        """Reads metadata from the local JSON file."""
+        self._metadata = self.read_json(self._metadata_file_name)
+
+    def title(self) -> str:
+        """Returns the title of the data.
+
+        Returns:
+            str: Data title.
+        """
+        return self._title
+
+    def owner(self) -> str:
+        """Returns the owner from the metadata.
+
+        Returns:
+            str: Owner name.
+        """
+        return str(self._metadata.get("owner", "Unknown"))
+
+    def data_version(self) -> float:
+        """Returns the data format version from the metadata.
+
+        Returns:
+            float: Version number.
+        """
+        return float(self._metadata.get("version", 0.0))
+
+    def maya_version(self) -> int:
+        """Returns the Maya API version used when saving.
+
+        Returns:
+            int: Maya version number.
+        """
+        return int(self._metadata.get("maya_version", 0))
+
+    def comment(self) -> str:
+        """Returns the saved comment.
+
+        Returns:
+            str: Comment string.
+        """
+        return str(self._metadata.get("comment", "Unknown"))
+
+    def nodes(self) -> list[str]:
+        """Returns the list of node names recorded.
+
+        Returns:
+            list[str]: Node names.
+        """
+        result: list[str] = self._metadata.get("nodes", [])
+        return result
+
+    def node_count(self) -> int:
+        """Returns the total number of recorded nodes.
+
+        Returns:
+            int: Node count.
+        """
+        return len(self._metadata.get("nodes", []))
+
+    def date(self) -> str:
+        """Returns the creation date string from the metadata.
+
+        Returns:
+            str: Formatted date string.
+        """
+        return str(self._metadata.get("date", "Unknown"))
+
+    def thumbnail(self) -> str:
+        """Returns the absolute file path to the thumbnail image.
+
+        Returns:
+            str: Thumbnail path.
+        """
+        return self._thumbnail_file_name
+
+    def set_thumbnail(self, path: str) -> None:
+        """Sets the absolute file path for the thumbnail image.
+
+        Args:
+            path (str): The thumbnail path.
+        """
+        self._thumbnail_file_name = path
+
+    def root_path(self) -> str:
+        """Returns the absolute root directory path containing the data.
+
+        Returns:
+            str: Root directory path.
+        """
+        return self._root_path
+
+    def exists(self) -> bool:
+        """Checks if the data root directory exists on disk.
+
+        Returns:
+            bool: True if it exists, False otherwise.
+        """
+        return os.path.exists(self._root_path)
+
+    def read_json(self, file_name: str) -> dict[str, Any]:
+        """Reads and parses a JSON file from disk.
+
+        Args:
+            file_name (str): Path to the JSON file.
+
+        Returns:
+            dict[str, Any]: Loaded dictionary data, or an empty dictionary
+                if reading fails.
+        """
+        try:
+            with open(file_name, "r", encoding="utf-8") as f:
+                datas: dict[str, Any] = json.load(f)
+            return datas
+
+        except IOError:
+            _logger.error("Failed to read: %s", file_name)
+            return {}
+
+    def write_json(self, file_name: str, data: Any) -> bool:
+        """Serializes and writes data to a JSON file.
+
+        Args:
+            file_name (str): Path to the JSON file.
+            data (Any): Data to serialize.
+
+        Returns:
+            bool: True if successful, False otherwise.
+        """
+        try:
+            with open(file_name, "w", encoding="utf-8") as fw:
+                json.dump(data, fw, sort_keys=True, indent=4)
+            return True
+
+        except IOError:
+            _logger.error("Failed to write: %s", file_name)
+            return False
+
+
+class Pose(LibraryData):
+    """Manages pose data, metadata, and application logic."""
+
+    folder_extension: str = "pose"
     data_file_name: str = "data.json"
 
     def __init__(
@@ -127,46 +331,8 @@ class Pose:
             replace_namespace (str, optional): Namespace to replace.
                 Defaults to "".
         """
-        self.__title: str = basename
-        self.__metadata: dict[str, Any] = {
-            "owner": getpass.getuser(),
-            "date": "",
-            "version": self.version,
-            "maya_version": cmds.about(apiVersion=True),
-            "comment": comment,
-        }
-        self.__replace_namespace: str = replace_namespace
-        self.__data: dict[str, dict[str, Any]] = {}
-
-        self.__folder_name: str = f"{basename}.{self.folder_extension}"
-        self.__root_path: str = os.path.join(base_path, self.__folder_name)
-        self.__thumbnail_file_name: str = os.path.join(
-            self.__root_path,
-            widgets.FileBrowserItem.thumbnail_filename,
-        )
-        self.__metadata_file_name: str = os.path.join(
-            self.__root_path,
-            self.meta_file_name,
-        )
-        self.__pose_file_name: str = os.path.join(
-            self.__root_path,
-            self.data_file_name,
-        )
-
-    @classmethod
-    def from_path(cls, path: str) -> Pose:
-        """Returns an instance from the given path.
-
-        Args:
-            path (str): The file path.
-
-        Returns:
-            Pose: A new Pose instance.
-        """
-        basename, _ = os.path.splitext(path)
-        data_path: str = os.path.dirname(basename)
-        basename: str = os.path.basename(basename)
-        return cls(data_path, basename)
+        super().__init__(base_path, basename, comment, replace_namespace)
+        self._data: dict[str, dict[str, Any]] = {}
 
     def apply(self, method: int = 0, keyframe: bool = False) -> bool:
         """Applies the pose.
@@ -179,7 +345,7 @@ class Pose:
         Returns:
             bool: True if applied successfully, False otherwise.
         """
-        self.__data = self.read_json(self.__pose_file_name)
+        self._data = self.read_json(self._data_file_path)
         if method == 0:
             return self.apply_from_selection(keyframe)
 
@@ -202,7 +368,7 @@ class Pose:
 
         for node in selection:
             dst_namespace: str = dcc.node.get_namespace(node)
-            for src_node, attrs in self.__data.items():
+            for src_node, attrs in self._data.items():
                 src_namespace: str = dcc.node.get_namespace(src_node)
 
                 search: str = ""
@@ -210,20 +376,16 @@ class Pose:
                 prefix: str = ""
                 suffix: str = ""
                 if not src_namespace and not dst_namespace:
-                    # Has not Namespace > Has not Namespace
                     pass
 
                 elif not src_namespace and dst_namespace:
-                    # Has not Namespace > Has Namespace
                     prefix = dst_namespace
 
                 elif src_namespace and not dst_namespace:
-                    # Has Namespace > Has not Namespace
                     search = src_namespace
                     replace = ""
 
                 elif src_namespace and dst_namespace:
-                    # Has Namespace > Has Namespace
                     search = src_namespace
                     replace = dst_namespace
 
@@ -261,13 +423,12 @@ class Pose:
         selection: list[str] = cmds.ls(selection=True)
         dst_namespaces: list[str] = dcc.node.get_namespaces(selection)
 
-        for node, attrs in self.__data.items():
+        for node, attrs in self._data.items():
             result: int = 1
             for attr, value in attrs.items():
                 src_namespace: str = dcc.node.get_namespace(node)
 
                 if not src_namespace and not dst_namespaces:
-                    # Has not Namespace > Has not Namespace
                     result = Pose.set_value(node, attr, value, keyframe)
                     if result == -1:
                         _logger.error(
@@ -281,7 +442,6 @@ class Pose:
                         )
 
                 elif not src_namespace and dst_namespaces:
-                    # Has not Namespace > Has Namespace
                     for dst_namespace in dst_namespaces:
                         result = Pose.set_value(
                             node, attr, value, keyframe, "", "", dst_namespace
@@ -322,7 +482,6 @@ class Pose:
                         )
 
                 elif src_namespace and dst_namespaces:
-                    # Has Namespace > Has Namespace
                     for dst_namespace in dst_namespaces:
                         result = Pose.set_value(
                             node,
@@ -395,10 +554,6 @@ class Pose:
 
         return 1
 
-    def read(self) -> None:
-        """Reads pose metadata from file."""
-        self.__metadata = self.read_json(self.__metadata_file_name)
-
     def write(self, nodes: list[str]) -> bool:
         """Writes pose data from specified objects.
 
@@ -412,122 +567,25 @@ class Pose:
             _logger.error("Specify the nodes to save the pose.")
             return False
 
-        if not os.path.exists(self.__root_path):
+        if not os.path.exists(self._root_path):
             try:
-                os.makedirs(self.__root_path)
+                os.makedirs(self._root_path)
             except IOError as e:
                 _logger.error("Failed to make folder. %s", e)
 
         result: bool = self.write_json(
-            self.__pose_file_name,
+            self._data_file_path,
             self.read_from_nodes(nodes),
         )
         if not result:
             return False
 
-        self.__metadata["date"] = datetime.datetime.now().strftime(DATE_FORMAT)
-        result = self.write_json(self.__metadata_file_name, self.__metadata)
+        self._metadata["date"] = datetime.datetime.now().strftime(DATE_FORMAT)
+        result = self.write_json(self._metadata_file_name, self._metadata)
         if not result:
             return False
 
         return True
-
-    def title(self) -> str:
-        """Returns the title of the pose.
-
-        Returns:
-            str: Pose title.
-        """
-        return self.__title
-
-    def owner(self) -> str:
-        """Returns the owner in metadata.
-
-        Returns:
-            str: Owner name.
-        """
-        return str(self.__metadata.get("owner", "Unknown"))
-
-    def data_version(self) -> float:
-        """Returns the version in metadata.
-
-        Returns:
-            float: Version number.
-        """
-        return float(self.__metadata.get("version", 0.0))
-
-    def maya_version(self) -> int:
-        """Returns the maya version in metadata.
-
-        Returns:
-            int: Maya version.
-        """
-        return int(self.__metadata.get("maya_version", 0))
-
-    def comment(self) -> str:
-        """Returns the comment in metadata.
-
-        Returns:
-            str: Pose comment.
-        """
-        return str(self.__metadata.get("comment", "Unknown"))
-
-    def nodes(self) -> list[str]:
-        """Returns the list of nodes.
-
-        Returns:
-            list[str]: Node names.
-        """
-        result: list[str] = self.__metadata.get("nodes", [])
-        return result
-
-    def node_count(self) -> int:
-        """Returns the object count of data.
-
-        Returns:
-            int: Number of nodes.
-        """
-        return len(self.__metadata.get("nodes", []))
-
-    def date(self) -> str:
-        """Returns the date in metadata.
-
-        Returns:
-            str: Creation date.
-        """
-        return str(self.__metadata.get("date", "Unknown"))
-
-    def thumbnail(self) -> str:
-        """Returns the thumbnail file name.
-
-        Returns:
-            str: Thumbnail path.
-        """
-        return self.__thumbnail_file_name
-
-    def set_thumbnail(self, path: str) -> None:
-        """Sets the thumbnail file path.
-
-        Args:
-            path (str): The thumbnail path.
-        """
-        self.__thumbnail_file_name = path
-
-    def root_path(self) -> str:
-        """Returns the root path.
-
-        Returns:
-            str: Root directory path.
-        """
-        return self.__root_path
-
-    def exists(self) -> bool:
-        """Returns True if the path exists, False otherwise.
-
-        Returns:
-            bool: Existence state.
-        """
-        return os.path.exists(self.__root_path)
 
     def read_from_nodes(self, nodes: list[str]) -> dict[str, dict[str, Any]]:
         """Returns pose data extracted from selection.
@@ -538,12 +596,12 @@ class Pose:
         Returns:
             dict[str, dict[str, Any]]: The extracted pose data.
         """
-        self.__metadata["namespace"] = dcc.node.get_namespace(nodes[0])
-        if self.__replace_namespace != "":
-            self.__metadata["namespace"] = self.__replace_namespace
+        self._metadata["namespace"] = dcc.node.get_namespace(nodes[0])
+        if self._replace_namespace != "":
+            self._metadata["namespace"] = self._replace_namespace
 
-        self.__data = {}
-        self.__metadata["nodes"] = []
+        self._data = {}
+        self._metadata["nodes"] = []
         for node in nodes:
             attributes: list[str] = (
                 cmds.listAttr(node, keyable=True, unlocked=True) or []
@@ -551,13 +609,13 @@ class Pose:
 
             namespace: str = dcc.node.get_namespace(node)
             save_node_name: str = node
-            if self.__replace_namespace != "":
+            if self._replace_namespace != "":
                 save_node_name = node.replace(
-                    namespace, self.__replace_namespace
+                    namespace, self._replace_namespace
                 )
 
-            self.__data[save_node_name] = {}
-            self.__metadata["nodes"].append(save_node_name)
+            self._data[save_node_name] = {}
+            self._metadata["nodes"].append(save_node_name)
             for attribute in attributes:
                 plug: str = f"{node}.{attribute}"
                 try:
@@ -569,118 +627,16 @@ class Pose:
                     continue
 
                 value: Any = cmds.getAttr(plug)
-                self.__data[save_node_name][attribute] = value
+                self._data[save_node_name][attribute] = value
 
-        return self.__data
-
-    def read_json(self, file_name: str) -> dict[str, Any]:
-        """Reads data from a json file.
-
-        Args:
-            file_name (str): Path to the json file.
-
-        Returns:
-            dict[str, Any]: Loaded dictionary data.
-        """
-        try:
-            with open(file_name, "r", encoding="utf-8") as f:
-                datas: dict[str, Any] = json.load(f)
-            return datas
-
-        except IOError:
-            _logger.error("Failed to read: %s", file_name)
-            return {}
-
-    def write_json(self, file_name: str, data: Any) -> bool:
-        """Writes data to a json file.
-
-        Args:
-            file_name (str): Path to the json file.
-            data (Any): Data to write.
-
-        Returns:
-            bool: True if successful, False otherwise.
-        """
-        try:
-            with open(file_name, "w", encoding="utf-8") as fw:
-                json.dump(data, fw, sort_keys=True, indent=4)
-            return True
-
-        except IOError:
-            _logger.error("Failed to write: %s", file_name)
-            return False
+        return self._data
 
 
-class Animation:
-    """Manages animation data via ATOM export and import.
+class Animation(LibraryData):
+    """Manages animation data via ATOM export and import."""
 
-    Attributes:
-        version (float): The current version of the animation data format.
-        folder_extension (str): The folder extension for animation data.
-        meta_file_name (str): The filename for the metadata JSON.
-        data_file_name (str): The filename for the animation ATOM data.
-    """
-
-    version: float = 1.0
     folder_extension: str = "anim"
-    meta_file_name: str = "meta.json"
     data_file_name: str = "data.atom"
-
-    def __init__(
-        self,
-        base_path: str,
-        basename: str,
-        comment: str = "",
-        replace_namespace: str = "",
-    ) -> None:
-        """Initializes the Animation instance.
-
-        Args:
-            base_path (str): The root directory path.
-            basename (str): The base name for the animation.
-            comment (str, optional): Comment for the animation. Defaults to "".
-            replace_namespace (str, optional): Namespace to replace.
-                Defaults to "".
-        """
-        self.__title: str = basename
-        self.__metadata: dict[str, Any] = {
-            "owner": getpass.getuser(),
-            "date": "",
-            "version": self.version,
-            "maya_version": cmds.about(apiVersion=True),
-            "comment": comment,
-        }
-        self.__replace_namespace: str = replace_namespace
-
-        self.__folder_name: str = f"{basename}.{self.folder_extension}"
-        self.__root_path: str = os.path.join(base_path, self.__folder_name)
-        self.__thumbnail_file_name: str = os.path.join(
-            self.__root_path,
-            widgets.FileBrowserItem.thumbnail_filename,
-        )
-        self.__metadata_file_name: str = os.path.join(
-            self.__root_path,
-            self.meta_file_name,
-        )
-        self.__anim_file_name: str = os.path.join(
-            self.__root_path,
-            self.data_file_name,
-        )
-
-    @classmethod
-    def from_path(cls, path: str) -> Animation:
-        """Returns an instance from the given path.
-
-        Args:
-            path (str): The file path.
-
-        Returns:
-            Animation: A new Animation instance.
-        """
-        basename, _ = os.path.splitext(path)
-        data_path: str = os.path.dirname(basename)
-        basename: str = os.path.basename(basename)
-        return cls(data_path, basename)
 
     def apply(
         self,
@@ -765,7 +721,7 @@ class Animation:
             selection
         )
         for dst_namespace, nodes in namespaces.items():
-            src_namespace: str = self.__metadata["namespace"]
+            src_namespace: str = self._metadata["namespace"]
             search: str = ""
             replace: str = ""
             prefix: str = ""
@@ -775,16 +731,14 @@ class Animation:
                 prefix = dst_namespace
 
             elif src_namespace and not dst_namespace:
-                # Has Namespace > Has not Namespace
                 search = src_namespace
 
             elif src_namespace and dst_namespace:
-                # Has Namespace > Has Namespace
                 search = src_namespace
                 replace = dst_namespace
 
             result: bool = Animation.import_atom(
-                self.__anim_file_name,
+                self._data_file_path,
                 nodes,
                 search,
                 replace,
@@ -828,7 +782,7 @@ class Animation:
             self.remove_animation(selection)
 
         for dst_namespace in namespaces:
-            src_namespace: str = self.__metadata["namespace"]
+            src_namespace: str = self._metadata["namespace"]
             search: str = ""
             replace: str = ""
             prefix: str = ""
@@ -838,17 +792,15 @@ class Animation:
                 prefix = dst_namespace
 
             elif src_namespace and not dst_namespace:
-                # Has Namespace > Has not Namespace
                 search = src_namespace
 
             elif src_namespace and dst_namespace:
-                # Has Namespace > Has Namespace
                 search = src_namespace
                 replace = dst_namespace
 
             result: bool = Animation.import_atom(
-                self.__anim_file_name,
-                self.__metadata["nodes"],
+                self._data_file_path,
+                self._metadata["nodes"],
                 search,
                 replace,
                 prefix,
@@ -887,7 +839,8 @@ class Animation:
             replace_anim (bool, optional): Replace animation. Defaults to False.
             start_frame (int | None, optional): Start frame. Defaults to None.
             end_frame (int | None, optional): End frame. Defaults to None.
-            filter_nodes (list[str] | None, optional): Nodes to filter. Defaults to None.
+            filter_nodes (list[str] | None, optional): Nodes to filter.
+                Defaults to None.
 
         Returns:
             bool: True if imported successfully, False otherwise.
@@ -936,10 +889,6 @@ class Animation:
         )
         return True
 
-    def read(self) -> None:
-        """Reads animation metadata from file."""
-        self.__metadata = self.read_json(self.__metadata_file_name)
-
     def write(
         self,
         nodes: list[str],
@@ -960,7 +909,7 @@ class Animation:
             _logger.error("Specify the nodes to save the animation.")
             return False
 
-        self.__metadata["nodes"] = []
+        self._metadata["nodes"] = []
         filtered_node: list[str] = []
         for node in nodes:
             if not dcc.animation.has_animation(node):
@@ -968,24 +917,24 @@ class Animation:
 
             namespace: str = dcc.node.get_namespace(node)
             node_name: str = node
-            if self.__replace_namespace != "":
-                node_name = node.replace(namespace, self.__replace_namespace)
+            if self._replace_namespace != "":
+                node_name = node.replace(namespace, self._replace_namespace)
 
-            self.__metadata["nodes"].append(node_name)
+            self._metadata["nodes"].append(node_name)
             filtered_node.append(node)
 
         if not filtered_node:
             _logger.error("Specify the nodes to save the animation.")
             return False
 
-        self.__metadata["namespace"] = dcc.node.get_namespace(
-            self.__metadata["nodes"][0]
+        self._metadata["namespace"] = dcc.node.get_namespace(
+            self._metadata["nodes"][0]
         )
         namespace = dcc.node.get_namespace(filtered_node[0])
 
-        if not os.path.exists(self.__root_path):
+        if not os.path.exists(self._root_path):
             try:
-                os.makedirs(self.__root_path)
+                os.makedirs(self._root_path)
             except IOError as e:
                 _logger.error("Failed to make folder. %s", e)
 
@@ -1008,12 +957,13 @@ class Animation:
             f"selected=selectedOnly;whichRange={which_range};"
             f"range={start_frame}:{end_frame};hierarchy=none;controlPoints=0;"
             f"useChannelBox=1;options=keys;"
-            f"copyKeyCmd=-animation objects {copy_key_cmd_time_range} -option keys -hierarchy none -controlPoints 0 "
+            f"copyKeyCmd=-animation objects {copy_key_cmd_time_range} "
+            f"-option keys -hierarchy none -controlPoints 0 "
         )
 
         try:
             cmds.file(
-                self.__anim_file_name,
+                self._data_file_path,
                 force=True,
                 options=options,
                 constructionHistory=True,
@@ -1021,17 +971,17 @@ class Animation:
                 exportSelected=True,
             )
 
-            if self.__replace_namespace != "":
-                with open(self.__anim_file_name, "r", encoding="utf-8") as f:
+            if self._replace_namespace != "":
+                with open(self._data_file_path, "r", encoding="utf-8") as f:
                     all_lines: list[str] = f.readlines()
 
                 for i, line in enumerate(all_lines):
                     all_lines[i] = line.replace(
-                        namespace, self.__replace_namespace
+                        namespace, self._replace_namespace
                     )
 
                 with open(
-                    self.__anim_file_name, "w", encoding="utf-8", newline="\n"
+                    self._data_file_path, "w", encoding="utf-8", newline="\n"
                 ) as fw:
                     fw.writelines(all_lines)
 
@@ -1039,148 +989,12 @@ class Animation:
             _logger.error("Failed to export animation data. %s", e)
             return False
 
-        self.__metadata["date"] = datetime.datetime.now().strftime(DATE_FORMAT)
-        result: bool = self.write_json(
-            self.__metadata_file_name, self.__metadata
-        )
+        self._metadata["date"] = datetime.datetime.now().strftime(DATE_FORMAT)
+        result: bool = self.write_json(self._metadata_file_name, self._metadata)
         if not result:
             return False
 
         return True
-
-    def title(self) -> str:
-        """Returns the title of the animation.
-
-        Returns:
-            str: Animation title.
-        """
-        return self.__title
-
-    def owner(self) -> str:
-        """Returns the owner in metadata.
-
-        Returns:
-            str: Owner name.
-        """
-        return str(self.__metadata.get("owner", "Unknown"))
-
-    def data_version(self) -> float:
-        """Returns the version in metadata.
-
-        Returns:
-            float: Version number.
-        """
-        return float(self.__metadata.get("version", 0.0))
-
-    def maya_version(self) -> int:
-        """Returns the maya version in metadata.
-
-        Returns:
-            int: Maya version.
-        """
-        return int(self.__metadata.get("maya_version", 0))
-
-    def comment(self) -> str:
-        """Returns the comment in metadata.
-
-        Returns:
-            str: Animation comment.
-        """
-        return str(self.__metadata.get("comment", "Unknown"))
-
-    def nodes(self) -> list[str]:
-        """Returns the list of nodes.
-
-        Returns:
-            list[str]: Node names.
-        """
-        result: list[str] = self.__metadata.get("nodes", [])
-        return result
-
-    def node_count(self) -> int:
-        """Returns the object count of data.
-
-        Returns:
-            int: Number of nodes.
-        """
-        return len(self.__metadata.get("nodes", []))
-
-    def date(self) -> str:
-        """Returns the date in metadata.
-
-        Returns:
-            str: Creation date.
-        """
-        return str(self.__metadata.get("date", "Unknown"))
-
-    def thumbnail(self) -> str:
-        """Returns the thumbnail file name.
-
-        Returns:
-            str: Thumbnail path.
-        """
-        return self.__thumbnail_file_name
-
-    def set_thumbnail(self, path: str) -> None:
-        """Sets the thumbnail file path.
-
-        Args:
-            path (str): The thumbnail path.
-        """
-        self.__thumbnail_file_name = path
-
-    def root_path(self) -> str:
-        """Returns the root path.
-
-        Returns:
-            str: Root directory path.
-        """
-        return self.__root_path
-
-    def exists(self) -> bool:
-        """Returns True if the path exists, False otherwise.
-
-        Returns:
-            bool: Existence state.
-        """
-        return os.path.exists(self.__root_path)
-
-    def read_json(self, file_name: str) -> dict[str, Any]:
-        """Reads data from a json file.
-
-        Args:
-            file_name (str): Path to the json file.
-
-        Returns:
-            dict[str, Any]: Loaded dictionary data.
-        """
-        try:
-            with open(file_name, "r", encoding="utf-8") as f:
-                datas: dict[str, Any] = json.load(f)
-            return datas
-
-        except IOError:
-            _logger.error("Failed to read: %s", file_name)
-            return {}
-
-    def write_json(self, file_name: str, data: Any) -> bool:
-        """Writes data to a json file.
-
-        Args:
-            file_name (str): Path to the json file.
-            data (Any): Data to write.
-
-        Returns:
-            bool: True if successful, False otherwise.
-        """
-        try:
-            with open(file_name, "w", encoding="utf-8") as fw:
-                json.dump(data, fw, sort_keys=True, indent=4)
-            return True
-
-        except IOError:
-            _logger.error("Failed to write: %s", file_name)
-            return False
 
 
 class SavePoseOption(QtWidgets.QDialog):
