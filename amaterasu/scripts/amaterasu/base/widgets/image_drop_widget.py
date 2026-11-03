@@ -29,7 +29,7 @@ ensuring maximum reusability and a clean MVC architecture.
 from amaterasu.base.qt import QtCore, QtGui, QtWidgets
 from amaterasu.base import dcc
 
-DROP_ICON: str = dcc.get_icon_path("a_download.png")
+DROP_ICON: str = "a_download.png"
 
 
 class ImageDropImage(QtWidgets.QLabel):
@@ -68,7 +68,9 @@ class ImageDropImage(QtWidgets.QLabel):
 
         self.__file_path: str = ""
 
-        pixmap: QtGui.QPixmap = QtGui.QPixmap(DROP_ICON)
+        pixmap: QtGui.QPixmap = QtGui.QPixmap(
+            dcc.get_icon_path("a_download.png")
+        )
         pixmap = pixmap.scaled(
             self.width(),
             self.height(),
