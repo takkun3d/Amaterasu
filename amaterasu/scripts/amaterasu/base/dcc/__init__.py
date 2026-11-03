@@ -26,59 +26,59 @@ path resolution and undo stack management.
 """
 
 from __future__ import annotations
-from amaterasu.base.dcc.paths import get_icon_path
+
+from amaterasu.base.dcc import (
+    animation,
+    asset,
+    attribute,
+    curve,
+    instance,
+    mesh,
+    node,
+    plugin,
+    project,
+    reference,
+    scene,
+    selection,
+    sets,
+    shape,
+    space,
+    viewport,
+)
 from amaterasu.base.dcc.decorators import undo
+from amaterasu.base.dcc.paths import get_icon_path
 from amaterasu.base.dcc.ui import (
-    get_maya_window,
+    add_widget_to_maya,
     find_control,
     find_layout,
     find_menu_item,
+    get_maya_window,
     show_attribute_editor,
-    add_widget_to_maya,
 )
 
-from amaterasu.base.dcc import project
-from amaterasu.base.dcc import scene
-from amaterasu.base.dcc import reference
-from amaterasu.base.dcc import plugin
-from amaterasu.base.dcc import node
-from amaterasu.base.dcc import shape
-from amaterasu.base.dcc import attribute
-from amaterasu.base.dcc import selection
-from amaterasu.base.dcc import viewport
-from amaterasu.base.dcc import space
-from amaterasu.base.dcc import mesh
-from amaterasu.base.dcc import instance
-from amaterasu.base.dcc import sets
-from amaterasu.base.dcc import asset
-from amaterasu.base.dcc import animation
-
 __all__: list[str] = [
-    # paths
-    "get_icon_path",
-    # decorators
-    "undo",
-    # ui
-    "get_maya_window",
+    "add_widget_to_maya",
+    "animation",
+    "asset",
+    "attribute",
+    "curve",
     "find_control",
     "find_layout",
     "find_menu_item",
-    "show_attribute_editor",
-    "add_widget_to_maya",
-    #
-    "project",
-    "scene",
-    "reference",
-    "plugin",
-    "node",
-    "shape",
-    "attribute",
-    "selection",
-    "viewport",
-    "space",
-    "mesh",
+    "get_icon_path",
+    "get_maya_window",
     "instance",
+    "mesh",
+    "node",
+    "plugin",
+    "project",
+    "reference",
+    "scene",
+    "selection",
     "sets",
-    "asset",
-    "animation",
+    "shape",
+    "show_attribute_editor",
+    "space",
+    "undo",
+    "viewport",
 ]

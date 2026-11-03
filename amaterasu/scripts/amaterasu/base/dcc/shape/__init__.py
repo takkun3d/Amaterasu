@@ -27,12 +27,19 @@ and decoupled from direct DCC API calls.
 """
 
 from __future__ import annotations
+
 from amaterasu.base.dcc.shape.combine import combine
+from amaterasu.base.dcc.shape.modifier import insert_transform_geometry
 from amaterasu.base.dcc.shape.replace import replace
 from amaterasu.base.dcc.shape.separate import separate
 
 __all__: list[str] = [
+    # combine
     "combine",
+    # modifier
+    "insert_transform_geometry",
+    # replace
     "replace",
+    # separate
     "separate",
 ]
