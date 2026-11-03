@@ -407,7 +407,7 @@ class FilmOffsetContext(BaseCameraDraggerContext):
         self.__horizontal_plug = find_target_plug(
             self.camera(),
             "horizontalFilmOffset",
-            "filmOffsetSlider_C_ctrl",
+            "filmOffset_C_ctrl",
             "translateX",
         )
         self.__start_offset_x = cmds.getAttr(self.__horizontal_plug)
@@ -415,7 +415,7 @@ class FilmOffsetContext(BaseCameraDraggerContext):
         self.__vertical_plug = find_target_plug(
             self.camera(),
             "verticalFilmOffset",
-            "filmOffsetSlider_C_ctrl",
+            "filmOffset_C_ctrl",
             "translateY",
         )
         self.__start_offset_y = cmds.getAttr(self.__vertical_plug)
@@ -1047,7 +1047,7 @@ class CameraInfoManager(QtWidgets.QWidget):
         plug = find_target_plug(
             self.camera(),
             "horizontalFilmOffset",
-            "filmOffsetSlider_C_ctrl",
+            "filmOffset_C_ctrl",
             "translateX",
         )
         cmds.attrFieldSliderGrp(self.__offset_x, edit=True, attribute=plug)
@@ -1055,7 +1055,7 @@ class CameraInfoManager(QtWidgets.QWidget):
         plug = find_target_plug(
             self.camera(),
             "verticalFilmOffset",
-            "filmOffsetSlider_C_ctrl",
+            "filmOffset_C_ctrl",
             "translateY",
         )
         cmds.attrFieldSliderGrp(self.__offset_y, edit=True, attribute=plug)
@@ -1267,16 +1267,17 @@ class CameraManager(QtWidgets.QWidget):
         msg_box.exec_()
 
         if msg_box.clickedButton() == amaterasu_camera_rig:
-            if cmds.objExists("render_cam"):
-                QtWidgets.QMessageBox.critical(
-                    self,
-                    "Duplicate Camera Rig",
-                    "An Amaterasu camera rig already exists in the scene.",
-                )
-                return
+            # if cmds.objExists("render_cam"):
+            #     QtWidgets.QMessageBox.critical(
+            #         self,
+            #         "Duplicate Camera Rig",
+            #         "An Amaterasu camera rig already exists in the scene.",
+            #     )
+            #     return
 
+            # camera = camera_rig.main()
+            # camera = cmds.ls(camera)[0]
             camera = camera_rig.main()
-            camera = cmds.ls(camera)[0]
 
         elif msg_box.clickedButton() == default_camera:
             created_camera: str = cmds.camera(
