@@ -25,13 +25,16 @@ to prevent circular imports and hardcoded paths.
 """
 
 from __future__ import annotations
+
 import os
 import pathlib
+
 from maya.api import OpenMaya
+
 from amaterasu.base import framework
 
 __product__: str = "Amaterasu"
-__version__: int = 20260809
+__version__: int = 20261108
 
 DEFAULT_LICENSE: str = """Copyright (c) 2014-2026 takkun (takkun3d).<br />
 <br />
@@ -67,9 +70,7 @@ GITHUB_API_LATEST_URL: str = (
     "https://api.github.com/repos/takkun3d/Amaterasu/releases/latest"
 )
 
-NOTION_URL: str = (
-    "https://telling-mink-b5d.notion.site/Amaterasu-15c88977f41f80a7af4adcfca26d304a"
-)
+NOTION_URL: str = "https://telling-mink-b5d.notion.site/Amaterasu-15c88977f41f80a7af4adcfca26d304a"
 
 
 X_URL: str = "https://x.com/takkun3d"
