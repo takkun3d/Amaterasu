@@ -1,268 +1,232 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Shift Lens
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Provides vertical lens shift for perspective correction."""
+
 from __future__ import annotations
-from typing import TYPE_CHECKING
 import math
 from functools import partial
-
-try:
-    from PySide2.QtCore import Qt, Signal, Slot
-    from PySide2.QtWidgets import QWidget, QGridLayout, QSlider, QPushButton
-
-except ImportError:
-    if not TYPE_CHECKING:
-        from PySide6.QtCore import Qt, Signal, Slot
-        from PySide6.QtWidgets import QWidget, QGridLayout, QSlider, QPushButton
 from maya import cmds
-from ..lib import logger, parser, widgets
+from amaterasu.base.qt import QtCore, QtWidgets
+from amaterasu.base import dcc, framework, utils, widgets
+
+__product__: str = "Shift Lens"
+__version__: str = "1.21"
+_logger: utils.Logger = utils.get_logger(__product__)
 
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Shift Lens'
-__version__: str = '1.20'
-__doc__ = 'Provides vertical lens shift for perspective correction.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+class Settings(framework.ToolSettings):
+    """Settings for the Shift Lens tool.
+
+    Attributes:
+        window_geo (framework.Variant[str]): The saved window geometry.
+    """
+
+    window_geo: framework.Variant[str] = framework.Variant("")
 
 
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-class Settings(parser.ToolSettings):
-    '''Settings for tool.'''
-
-    window_geo: parser.Variant[str] = parser.Variant('')
-
-
-class Slider(QSlider):
-    '''Brween Slider widget.'''
-
-    drag_start = Signal()
-    drag_move = Signal(int)
-    drag_end = Signal()
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        '''Initialize widget.'''
-        super().__init__(parent)
-        self.setOrientation(Qt.Horizontal)
-        self.setRange(-101, 101)  # Bug?
-        self.setValue(0)
-        self.sliderPressed.connect(self.__drag_start)
-        self.sliderMoved.connect(self.__drag_move)
-        self.sliderReleased.connect(self.__drag_end)
-
-    @Slot()
-    def __drag_start(self) -> None:
-        '''Drag start event.'''
-        self.drag_start.emit()
-
-    @Slot()
-    def __drag_move(self) -> None:
-        '''Drag move event.'''
-        self.drag_move.emit(self.value())
-
-    @Slot()
-    def __drag_end(self) -> None:
-        '''Drag end event.'''
-        self.setValue(0)
-        self.drag_end.emit()
-
-
-class MainWindow(widgets.ToolWidget):
-    '''Tool main window'''
+class MainWindow(framework.ToolWindow[Settings]):
+    """Main window for the Shift Lens tool."""
 
     def __init__(
         self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-        unique_id: str = '',
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Window,
+        unique_id: str = "",
     ) -> None:
-        '''Initialize widget.'''
+        """Initializes the main window.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The Qt window flags.
+                Defaults to Window.
+            unique_id (str, optional): A unique identifier for restoring
+                window states. Defaults to "".
+        """
         super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
-        self.resize(400, 200)
-        self.__current_rotate_x: float = 0.0
+        self.resize(400, 20)
+        self._initial_rotate_x: float = 0.0
 
-        option_widget: QWidget = self.option_widget()
-        main_layout: QGridLayout = QGridLayout(option_widget)
+        self.__camera_picker: widgets.NodePicker
+        self.__slider: widgets.DragSlider
+
+    def create_ui(self, parent: QtWidgets.QWidget) -> None:
+        """Creates the tool-specific user interface elements.
+
+        Args:
+            parent (QtWidgets.QWidget): The parent widget for UI containment.
+        """
+        main_layout = QtWidgets.QGridLayout(parent)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
-        picker_layout: widgets.FormLayout = widgets.FormLayout(self)
+        picker_layout: widgets.FormLayout = widgets.FormLayout()
+        self.__camera_picker = widgets.NodePicker(parent, multi_select=False)
+        picker_layout.addRow(widgets.FormLabel("Camera"), self.__camera_picker)
         main_layout.addLayout(picker_layout, 0, 0, 1, 7)
 
-        self.__camera: widgets.NodePicker = widgets.NodePicker(1, self)
-        picker_layout.addRow(widgets.FormLabel('Camera'), self.__camera)
+        main_layout.addWidget(widgets.HorizontalLine(parent), 1, 0, 1, 7)
 
-        line: widgets.HorizontalLine = widgets.HorizontalLine(self)
-        main_layout.addWidget(line, 1, 0, 1, 7)
+        self.__slider = widgets.DragSlider(parent)
+        self.__slider.drag_start.connect(self.drag_start)
+        self.__slider.drag_move.connect(self.drag_move)
+        self.__slider.drag_end.connect(self.drag_end)
+        main_layout.addWidget(self.__slider, 2, 0, 1, 7)
 
-        slider = Slider(self)
-        slider.drag_start.connect(self.drag_start)
-        slider.drag_move.connect(self.drag_move)
-        slider.drag_end.connect(self.drag_end)
-        main_layout.addWidget(slider, 2, 0, 1, 7)
+        main_layout.addWidget(widgets.HorizontalLine(parent), 3, 0, 1, 7)
 
-        line: widgets.HorizontalLine = widgets.HorizontalLine(self)
-        main_layout.addWidget(line, 3, 0, 1, 7)
+        offsets: list[tuple[str, float]] = [
+            ("<<<", 5),
+            ("<<", 1),
+            ("<", 0.1),
+            ("Auto", 0),
+            (">", -0.1),
+            (">>", -1),
+            (">>>", -5),
+        ]
+        for i, (label, val) in enumerate(offsets):
+            button: QtWidgets.QPushButton = QtWidgets.QPushButton(label, parent)
+            if label == "Auto":
+                button.clicked.connect(self.apply_auto)
+            else:
+                button.clicked.connect(partial(self.apply_offset, val))
 
-        button: QPushButton = QPushButton('<<<', self)
-        button.clicked.connect(partial(self.apply_offset, 5))
-        main_layout.addWidget(button, 4, 0)
+            main_layout.addWidget(button, 4, i)
 
-        button: QPushButton = QPushButton('<<', self)
-        button.clicked.connect(partial(self.apply_offset, 1))
-        main_layout.addWidget(button, 4, 1)
-
-        button: QPushButton = QPushButton('<', self)
-        button.clicked.connect(partial(self.apply_offset, 0.1))
-        main_layout.addWidget(button, 4, 2)
-
-        button: QPushButton = QPushButton('Auto', self)
-        button.clicked.connect(self.apply_auto)
-        main_layout.addWidget(button, 4, 3)
-
-        button: QPushButton = QPushButton('>', self)
-        button.clicked.connect(partial(self.apply_offset, -0.1))
-        main_layout.addWidget(button, 4, 4)
-
-        button: QPushButton = QPushButton('>>', self)
-        button.clicked.connect(partial(self.apply_offset, -1))
-        main_layout.addWidget(button, 4, 5)
-
-        button: QPushButton = QPushButton('>>>', self)
-        button.clicked.connect(partial(self.apply_offset, -5))
-        main_layout.addWidget(button, 4, 6)
-
-    # override
-    def load_settings(self) -> None:
-        '''Load ui settings from file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
-
-    # override
-    def save_settings(self) -> None:
-        '''Save ui settings to file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
-        settings.write()
-
-    # override
-    def reset_settings(self) -> None:
-        '''Reset ui settings.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
-
-    # override
-    def about(self) -> None:
-        '''Show a about dialog.[override]'''
-        widgets.AboutDialog.info(
-            self, __product__, __version__, __copyright__, __doc__
+        settings: Settings = self.tool_settings()
+        settings.window_geo.bind(
+            setter=self.restoreGeometry,
+            getter=self.saveGeometry,
+            encoder=utils.qt_to_ascii,
+            decoder=utils.ascii_to_qt,
         )
 
     def set_camera(self, camera: str) -> None:
-        '''Set camera to widget.'''
-        self.__camera.set_text(camera)
+        """Sets the target camera for the widget.
 
-    @Slot()
+        Args:
+            camera (str): The name of the camera node.
+        """
+        self.__camera_picker.set_text(camera)
+
+    @QtCore.Slot()
     def drag_start(self) -> None:
-        '''Start slider drag.'''
-        camera = self.__camera.text()
+        """Prepares the camera state for interactive lens shifting."""
+        camera: str = self.__camera_picker.text()
         if not camera:
-            _logger.error('Camera is required to apply Dolly Zoom.')
+            _logger.error("A camera must be specified to shift the lens.")
             return
 
         camera_shapes: list[str] = (
-            cmds.listRelatives(camera, type='camera') or []
+            cmds.listRelatives(camera, type="camera") or []
         )
         if not camera_shapes:
             return
 
-        rotate = cmds.xform(camera, query=True, rotation=True, worldSpace=True)
-        self.__current_rotate_x = rotate[0]
-        cmds.undoInfo(openChunk=True)
+        rotate: list[float] = cmds.xform(
+            camera, query=True, rotation=True, worldSpace=True
+        )  # type: ignore
+        self._initial_rotate_x = rotate[0]
 
-    @Slot()
+    @QtCore.Slot(int)
     def drag_move(self, value: int) -> None:
-        '''Move slider.'''
-        camera = self.__camera.text()
+        """Updates the lens shift interactively.
+
+        Args:
+            value (int): The current slider value.
+        """
+        camera: str = self.__camera_picker.text()
         if not camera:
             return
 
-        rotate_x: float = self.__current_rotate_x * (1.0 - (value / 100.0))
+        rotate_x: float = self._initial_rotate_x * (1.0 - (value / 100.0))
         apply(camera, rotate_x)
 
-    @Slot()
+    @QtCore.Slot()
     def drag_end(self) -> None:
-        '''End slider drag.'''
-        cmds.undoInfo(closeChunk=True)
+        """Finalizes the interactive lens shifting operation."""
 
-    @widgets.undo
+    @dcc.undo
     def apply_offset(self, offset_value: float) -> None:
-        '''Apply'''
-        self.save_settings()
-        camera = self.__camera.text()
+        """Applies a specific offset to the lens shift.
+
+        Args:
+            offset_value (float): The amount to offset the rotation X.
+        """
+        camera: str = self.__camera_picker.text()
         if not camera:
-            _logger.error('Camera is required to apply Dolly Zoom.')
+            _logger.error("A camera must be specified to shift the lens.")
             return
 
-        apply(camera, 0, offset_value)
+        apply(camera, 0.0, offset_value)
 
-    @widgets.undo
+    @dcc.undo
     def apply_auto(self) -> None:
-        '''Apply zero to rotate X'''
-        self.save_settings()
-        camera = self.__camera.text()
+        """Resets the lens shift rotation X to zero."""
+        camera: str = self.__camera_picker.text()
         if not camera:
-            _logger.error('Camera is required to apply Dolly Zoom.')
+            _logger.error("A camera must be specified to shift the lens.")
             return
 
-        apply(camera, 0)
+        apply(camera, 0.0)
 
 
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
 def apply(camera: str, rotate_x: float, offset: float | None = None) -> bool:
-    '''Dot it'''
-    camera_shapes: list[str] = cmds.listRelatives(camera, type='camera') or []
+    """Calculates and applies the vertical film offset for the camera.
+
+    Args:
+        camera (str): The name of the transform node for the camera.
+        rotate_x (float): The target X-axis rotation value in degrees.
+        offset (float | None, optional): An additional offset applied to
+            the current rotation. Defaults to None.
+
+    Returns:
+        bool: True if the operation succeeds, False otherwise.
+    """
+    camera_shapes: list[str] = cmds.listRelatives(camera, type="camera") or []
     if not camera_shapes:
         return False
 
     rotate: list[float] = cmds.xform(
         camera, query=True, rotation=True, worldSpace=True
+    )  # type: ignore
+    focal_length: float = cmds.getAttr(f"{camera_shapes[0]}.focalLength")
+    current_offset_v: float = cmds.getAttr(
+        f"{camera_shapes[0]}.verticalFilmOffset"
     )
-    focal_length: float = cmds.getAttr(f'{camera_shapes[0]}.focalLength')
-    current_offset_v = cmds.getAttr(f"{camera_shapes[0]}.verticalFilmOffset")
     if offset is not None:
         rotate_x = rotate[0] + offset
 
     # Check Aim Camera.(Maya defult)
-    aim_target: str = ''
+    aim_target: str = ""
     look_at_nodes: list[str] = (
         cmds.listConnections(
-            camera, type='lookAt', source=True, destination=False
+            camera, type="lookAt", source=True, destination=False
         )
         or []
     )
     if look_at_nodes:
         target_nodes: list[str] = (
             cmds.listConnections(
-                f'{look_at_nodes[0]}.target[0].targetParentMatrix',
-                type='transform',
+                f"{look_at_nodes[0]}.target[0].targetParentMatrix",
+                type="transform",
                 source=True,
                 destination=False,
             )
@@ -273,7 +237,7 @@ def apply(camera: str, rotate_x: float, offset: float | None = None) -> bool:
 
     # Calculate film offset x amout.
     # 25.4 is mm to inch
-    offset_amount = (focal_length / 25.4) * (
+    offset_amount: float = (focal_length / 25.4) * (
         math.tan(math.radians(rotate[0])) - math.tan(math.radians(rotate_x))
     )
 
@@ -288,10 +252,10 @@ def apply(camera: str, rotate_x: float, offset: float | None = None) -> bool:
         # Get World Positions
         camera_position: list[float] = cmds.xform(
             camera, query=True, worldSpace=True, translation=True
-        )
+        )  # type: ignore
         target_position: list[float] = cmds.xform(
             aim_target, query=True, worldSpace=True, translation=True
-        )
+        )  # type: ignore
 
         # Calculate Horizontal Distance (XZ plane only)
         dx: float = target_position[0] - camera_position[0]
@@ -299,12 +263,12 @@ def apply(camera: str, rotate_x: float, offset: float | None = None) -> bool:
         horizontal_distance: float = math.sqrt(dx * dx + dz * dz)
 
         # Calculate New Height Difference
-        height_difference = horizontal_distance * math.tan(
+        height_difference: float = horizontal_distance * math.tan(
             math.radians(rotate_x)
         )
 
         # Calculate translate Y
-        translate_y = camera_position[1] + height_difference
+        translate_y: float = camera_position[1] + height_difference
 
         # Apply
         cmds.xform(
@@ -314,15 +278,23 @@ def apply(camera: str, rotate_x: float, offset: float | None = None) -> bool:
         )
 
     cmds.setAttr(
-        f'{camera_shapes[0]}.verticalFilmOffset',
+        f"{camera_shapes[0]}.verticalFilmOffset",
         current_offset_v + offset_amount,
     )
     return True
 
 
-def main(unique_id: str = '', camera: str | None = None) -> None:
-    '''Show window.'''
-    window: MainWindow = MainWindow(unique_id=unique_id)
+def main(unique_id: str = "", camera: str | None = None) -> None:
+    """Initializes and displays the main application window.
+
+    Args:
+        unique_id (str, optional): A unique identifier for restoring
+            window states. Defaults to "".
+        camera (str | None, optional): The initial camera to set.
+            Defaults to None.
+    """
+    window = MainWindow(unique_id=unique_id)
     if camera is not None:
         window.set_camera(camera)
+
     window.show()

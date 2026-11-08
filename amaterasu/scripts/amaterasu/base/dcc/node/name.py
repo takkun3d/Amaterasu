@@ -133,3 +133,60 @@ def remove_pasted_prefixes(nodes: list[str] | None = None) -> utils.Result:
             result.add_failure(node, "Failed to remove prefix")
 
     return result
+
+
+def get_namespace(node: str) -> str:
+    """Extracts the namespace from a given node name.
+
+    Args:
+        node (str): The name of the node.
+
+    Returns:
+        str: The extracted namespace without the trailing colon, or an empty
+            string if no namespace exists.
+    """
+    namespace: str = ""
+    temp: list[str] = node.split(":")
+    if len(temp) != 1:
+        # namespace = ":".join(temp[:-1]) + ":"
+        namespace = ":".join(temp[:-1])
+
+    return namespace
+
+
+def get_namespaces(nodes: list[str]) -> list[str]:
+    """Extracts a unique list of namespaces from a list of nodes.
+
+    Args:
+        nodes (list[str]): A list of node names.
+
+    Returns:
+        list[str]: A list of unique namespaces. Returns an empty list if
+            no valid namespaces are found.
+    """
+    result: list[str] = list(set([get_namespace(n) for n in nodes]))
+    if result == [""]:
+        return []
+
+    return result
+
+
+def get_namespace_group(nodes: list[str]) -> dict[str, list[str]]:
+    """Groups a list of nodes by their respective namespaces.
+
+    Args:
+        nodes (list[str]): A list of node names to group.
+
+    Returns:
+        dict[str, list[str]]: A dictionary where keys are namespaces and
+            values are lists of nodes belonging to that namespace.
+    """
+    result: dict[str, list[str]] = {}
+    for node in nodes:
+        namespace: str = get_namespace(node)
+        if namespace not in result:
+            result[namespace] = []
+
+        result[namespace].append(node)
+
+    return result

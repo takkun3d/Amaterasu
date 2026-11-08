@@ -24,6 +24,31 @@ from typing import Any
 from maya import cmds
 
 
+def is_default_value(node: str, attr: str, value: Any | None = None) -> bool:
+    """Checks if the attribute's current value matches its default value.
+
+    Args:
+        node (str): The name of the node to check.
+        attr (str): The name of the attribute.
+        value (Any | None, optional): An explicit value to check. If None,
+            the current attribute value in Maya will be queried.
+
+    Returns:
+        bool: True if the evaluated value matches the default value,
+            False otherwise.
+    """
+    default: Any = get_default_value(node, attr)
+    current: Any = (
+        value if value is not None else cmds.getAttr(f"{node}.{attr}")
+    )
+
+    if isinstance(current, list) and len(current) == 1:
+        current = current[0]
+
+    result: bool = default == current
+    return result
+
+
 def get_default_value(node: str, attribute: str) -> Any | None:
     """Gets the default value of a specified attribute with accurate Python typing.
 

@@ -137,6 +137,7 @@
         {"label": "Create Camera Rig", "module": "amaterasu.animation.camera_rig"},
         {"label": "Create Motion Trail Curve[plug-ins]", "module": "amaterasu.animation.create_motion_trail_curve", "enable": false},
         {"label": "Create Motion Curve", "module": "amaterasu.animation.create_motion_curve", "option_func": "option()"},
+        {"label": "Speed Meter", "module": "amaterasu.animation.speed_meter"},
         {"divider": "Camera"},
         {"label": "Shift Lens", "module": "amaterasu.animation.shift_lens", "is_window_only": true},
         {"label": "Dolly Zoom", "module": "amaterasu.animation.dolly_zoom", "is_window_only": true},

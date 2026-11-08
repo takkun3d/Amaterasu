@@ -99,3 +99,15 @@ def show_attribute_editor(node_name: str) -> None:
     """
     cmds.select(node_name)
     mel.eval("ShowAttributeEditorOrChannelBox")
+
+
+def add_widget_to_maya(widget: QtWidgets.QWidget, parent_name: str) -> None:
+    """Binds an independently floating PySide element into Maya constraints.
+
+    Args:
+        widget (QtWidgets.QWidget): PySide component.
+        parent_name (str): Associated inner Maya layout ID.
+    """
+    ptr: int = int(OpenMayaUI.MQtUtil.findControl(widget.objectName()))
+    parent_ptr: int = int(OpenMayaUI.MQtUtil.findLayout(parent_name))
+    OpenMayaUI.MQtUtil.addWidgetToMayaLayout(ptr, parent_ptr)

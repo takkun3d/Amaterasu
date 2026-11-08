@@ -24,18 +24,15 @@ vanishing points and eye-level indicators, attached to a selected Maya camera.
 """
 
 from __future__ import annotations
+
 from maya import cmds
+
+from amaterasu.base import dcc, framework, utils, widgets
 from amaterasu.base.qt import QtCore, QtWidgets
-from amaterasu.base import utils, framework, dcc, widgets
 
 __product__: str = "Perspective Guide"
-__version__: str = "1.11"
+__version__: str = "1.12"
 _logger: utils.Logger = utils.get_logger(__product__)
-
-EL_COLOR: list[float] = [0.2, 0.7, 1.0]
-VP_COLOR: list[float] = [0.65, 0.2, 1.0]
-EL_WIDTH: float = 4.0
-VP_WIDTH: float = 2.0
 
 
 class Settings(framework.ToolSettings):
@@ -163,80 +160,6 @@ class MainWindow(framework.StandardToolWindow[Settings]):
         main(self.tool_settings())
 
 
-def create_vanishing_point(
-    base_name: str,
-    parent: str,
-    axis: int = 0,
-    radius: float = 9999,
-    division: int = 16,
-) -> str:
-    """Creates a vanishing point guide for a specific axis.
-
-    Args:
-        base_name (str): The base name for the generated curve nodes.
-        parent (str): The name of the parent group node.
-        axis (int, optional): The axis index (0 for X/Horizontal, 1 for Y/Vertical,
-            2 for Z/Depth). Defaults to 0.
-        radius (float, optional): The radius of the guide curves. Defaults to 9999.
-        division (int, optional): The number of line divisions to generate.
-            Defaults to 16.
-
-    Returns:
-        str: The name of the combined curve node representing the vanishing point.
-    """
-    step: float = 180.0 / division
-    axis_name: tuple[str, str, str] = ("Horizontal", "Vertical", "Depth")
-    curves: list[str] = []
-    for i in range(division):
-        angle: float = step * i
-        normal: tuple[tuple[float, float, float], ...] = (
-            (0.0, 0.0, 1.0),
-            (1.0, 0.0, 0.0),
-            (0.0, 1.0, 0.0),
-        )
-        rotate_mask: tuple[tuple[float, float, float], ...] = (
-            (1.0, 0.0, 0.0),
-            (0.0, 1.0, 0.0),
-            (0.0, 0.0, 1.0),
-        )
-        curve: str = cmds.circle(
-            name=f"{base_name}{axis_name[axis]}{i}_crv",
-            radius=radius,
-            normal=normal[axis],
-            sections=64,
-            degree=3,
-            constructionHistory=False,
-        )[
-            0
-        ]  # type: ignore
-        rotate: tuple[float, float, float] = (
-            angle * rotate_mask[axis][0],
-            angle * rotate_mask[axis][1],
-            angle * rotate_mask[axis][2],
-        )
-        cmds.setAttr(f"{curve}.rotate", *rotate, type="double3")
-        dcc.attribute.lock([curve], translate=True, rotate=True, scale=True)
-
-        curve = cmds.parent(curve, parent)[0]
-        dcc.attribute.unlock([curve], translate=True, rotate=True, scale=True)
-        cmds.makeIdentity(
-            curve, apply=True, translate=True, rotate=True, scale=True
-        )
-
-        if i == 0:
-            cmds.setAttr(f"{curve}.lineWidth", VP_WIDTH)
-
-        dcc.node.set_drawing_rgb_color(rgb=VP_COLOR, nodes=[curve])
-        curves.append(curve)
-
-    dcc.shape.combine(curves[0], curves[1:])
-    dcc.attribute.lock_and_hide([curves[0]], translate=True, scale=True)
-    dcc.node.hide_history(cmds.listRelatives(curves[0], shapes=True, path=True))
-
-    curves[0] = cmds.rename(curves[0], f"{base_name}{axis_name[axis]}_crv")
-    return curves[0]
-
-
 def apply(
     camera: str,
     radius: float = 9999,
@@ -245,6 +168,10 @@ def apply(
     is_vp_x: bool = True,
     is_vp_y: bool = True,
     is_vp_z: bool = True,
+    el_color: list[float] | None = None,
+    el_width: float = 4.0,
+    vp_color: list[float] | None = None,
+    vp_width: float = 2.0,
 ) -> utils.Result:
     """Applies the perspective guide to the specified camera.
 
@@ -253,8 +180,7 @@ def apply(
 
     Args:
         camera (str): The name of the camera to attach the guide to.
-        radius (float, optional): The radius of the guide curves.
-            Defaults to 9999.
+        radius (float, optional): The radius of the guide curves. Defaults to 9999.
         division (int, optional): The number of divisions for the vanishing points.
             Defaults to 16.
         is_eye_level (bool, optional): Whether to generate the eye-level guide.
@@ -265,10 +191,23 @@ def apply(
             Defaults to True.
         is_vp_z (bool, optional): Whether to generate the Z-axis vanishing point.
             Defaults to True.
+        el_color (list[float] | None, optional): RGB color array for the eye-level curve.
+            If None, defaults to [0.2, 0.7, 1.0].
+        el_width (float, optional): Line width for the eye-level curve. Defaults to 4.0.
+        vp_color (list[float] | None, optional): RGB color array for the vanishing points.
+            If None, defaults to [0.65, 0.2, 1.0].
+        vp_width (float, optional): Line width for the primary vanishing point curves.
+            Defaults to 2.0.
 
     Returns:
         utils.Result: An object containing the merged results of the operation.
     """
+    if el_color is None:
+        el_color = [0.2, 0.7, 1.0]
+
+    if vp_color is None:
+        vp_color = [0.65, 0.2, 1.0]
+
     result: utils.Result = utils.Result()
     base_name: str = camera.split("|")[-1]
     base_name = camera.split("_")[0]
@@ -298,11 +237,9 @@ def apply(
             sections=64,
             degree=3,
             constructionHistory=False,
-        )[
-            0
-        ]  # type: ignore
-        cmds.setAttr(f"{eye_level}.lineWidth", EL_WIDTH)
-        dcc.node.set_drawing_rgb_color(rgb=EL_COLOR, nodes=[eye_level])
+        )[0]  # type: ignore
+        cmds.setAttr(f"{eye_level}.lineWidth", el_width)
+        dcc.node.set_drawing_rgb_color(rgb=el_color, nodes=[eye_level])
 
         dcc.node.hide_history(
             cmds.listRelatives(eye_level, shapes=True, path=True)
@@ -314,13 +251,25 @@ def apply(
 
     # Vanishing Point
     if is_vp_x:
-        create_vanishing_point(base_name, group, 0, radius * 1.001, division)
+        vp_x: str = dcc.curve.create_spherical_grid(
+            base_name, group, 0, radius * 1.001, division, vp_color, vp_width
+        )
+        shapes: list[str] = cmds.listRelatives(vp_x, shapes=True, path=True)
+        dcc.node.hide_history([vp_x] + shapes)
 
     if is_vp_y:
-        create_vanishing_point(base_name, group, 1, radius * 1.002, division)
+        vp_y: str = dcc.curve.create_spherical_grid(
+            base_name, group, 1, radius * 1.002, division, vp_color, vp_width
+        )
+        shapes = cmds.listRelatives(vp_y, shapes=True, path=True)
+        dcc.node.hide_history([vp_y] + shapes)
 
     if is_vp_z:
-        create_vanishing_point(base_name, group, 2, radius * 1.003, division)
+        vp_z: str = dcc.curve.create_spherical_grid(
+            base_name, group, 2, radius * 1.003, division, vp_color, vp_width
+        )
+        shapes = cmds.listRelatives(vp_z, shapes=True, path=True)
+        dcc.node.hide_history([vp_z] + shapes)
 
     return result
 

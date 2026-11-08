@@ -27,7 +27,10 @@ and decoupled from direct DCC API calls.
 """
 
 from __future__ import annotations
-from amaterasu.base.dcc.attribute.connection import break_transform_connections
+from amaterasu.base.dcc.attribute.connection import (
+    break_transform_connections,
+    promote_attribute,
+)
 from amaterasu.base.dcc.attribute.user_defined import (
     add_integer,
     add_float,
@@ -39,12 +42,17 @@ from amaterasu.base.dcc.attribute.user_defined import (
     add_separator,
     delete_user_defined,
 )
-from amaterasu.base.dcc.attribute.query import get_default_value, get_range
+from amaterasu.base.dcc.attribute.query import (
+    is_default_value,
+    get_default_value,
+    get_range,
+)
 from amaterasu.base.dcc.attribute.lock import (
     lock,
     unlock,
     lock_and_hide,
     unlock_and_show,
+    lock_all_attributes,
 )
 from amaterasu.base.dcc.attribute.sort import reorder_user_attributes
 from amaterasu.base.dcc.attribute.transfer import (
@@ -56,6 +64,7 @@ from amaterasu.base.dcc.attribute.transfer import (
 __all__: list[str] = [
     # connection
     "break_transform_connections",
+    "promote_attribute",
     # user_defined
     "add_integer",
     "add_float",
@@ -67,6 +76,7 @@ __all__: list[str] = [
     "add_separator",
     "delete_user_defined",
     # query
+    "is_default_value",
     "get_default_value",
     "get_range",
     # lock
@@ -74,6 +84,7 @@ __all__: list[str] = [
     "unlock",
     "lock_and_hide",
     "unlock_and_show",
+    "lock_all_attributes",
     # sort
     "reorder_user_attributes",
     # transfer

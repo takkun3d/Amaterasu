@@ -29,6 +29,7 @@ conventions) to keep tool logic clean and decoupled from direct DCC API calls.
 from __future__ import annotations
 from amaterasu.base.dcc.node.display import set_xray, set_display_local_axis
 from amaterasu.base.dcc.node.drawing import (
+    INDEX_COLOR_NAMES,
     set_drawing_index_color,
     set_drawing_rgb_color,
     clear_drawing_color,
@@ -43,18 +44,23 @@ from amaterasu.base.dcc.node.name import (
     normalize_shape_name,
     normalize_shading_engine_name,
     remove_pasted_prefixes,
+    get_namespace,
+    get_namespaces,
+    get_namespace_group,
 )
 from amaterasu.base.dcc.node.outliner import (
     set_outliner_color,
     clear_outliner_color,
     sort,
 )
+from amaterasu.base.dcc.node.hierarchy import get_children
 
 __all__: list[str] = [
     # display
     "set_xray",
     "set_display_local_axis",
     # drawing
+    "INDEX_COLOR_NAMES",
     "set_drawing_index_color",
     "set_drawing_rgb_color",
     "clear_drawing_color",
@@ -67,8 +73,13 @@ __all__: list[str] = [
     "normalize_shape_name",
     "normalize_shading_engine_name",
     "remove_pasted_prefixes",
+    "get_namespace",
+    "get_namespaces",
+    "get_namespace_group",
     # outliner
     "set_outliner_color",
     "clear_outliner_color",
     "sort",
+    # hierarchy
+    "get_children",
 ]

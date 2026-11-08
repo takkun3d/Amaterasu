@@ -1,357 +1,290 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Copy Animation
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Copies animation from selected nodes to specific target nodes."""
+
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from maya import cmds
+from amaterasu.base.qt import QtCore, QtWidgets
+from amaterasu.base import dcc, framework, utils, widgets
 
-try:
-    from PySide2.QtCore import Qt, Slot
-    from PySide2.QtWidgets import (
-        QWidget,
-        QGridLayout,
-        QLineEdit,
-        QCheckBox,
-        QComboBox,
-    )
+__product__: str = "Copy Animation"
+__version__: str = "1.31"
+_logger: utils.Logger = utils.get_logger(__product__)
 
-except ImportError:
-    if not TYPE_CHECKING:
-        from PySide6.QtCore import Qt, Slot
-        from PySide6.QtWidgets import (
-            QWidget,
-            QGridLayout,
-            QLineEdit,
-            QCheckBox,
-            QComboBox,
-        )
-from maya import cmds, mel
-from ..lib import logger, parser, utility, widgets
+MIRROR_CHANNELS: tuple[str, str, str] = ("translate", "rotate", "scale")
+MIRROR_AXES: tuple[str, str, str] = ("X", "Y", "Z")
 
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Copy Animation'
-__version__: str = '1.30'
-__doc__ = 'Copy animation to specific nodes from selected nodes.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+class Settings(framework.ToolSettings):
+    """Settings for the Copy Animation tool.
 
-MIRROR_CHANNELS: tuple[str, str, str] = ('translate', 'rotate', 'scale')
-MIRROR_AXIS: tuple[str, str, str] = ('X', 'Y', 'Z')
+    Attributes:
+        window_geo (framework.Variant[str]): The saved geometry of the window.
+        hierarchy (framework.Variant[int]): 0 for Selected, 1 for Below.
+        method (framework.Variant[int]): 0 for X:X, 1 for 1:X, 2 for Replace.
+        reverse_tx (framework.Variant[bool]): Reverse translate X flag.
+        reverse_ty (framework.Variant[bool]): Reverse translate Y flag.
+        reverse_tz (framework.Variant[bool]): Reverse translate Z flag.
+        reverse_rx (framework.Variant[bool]): Reverse rotate X flag.
+        reverse_ry (framework.Variant[bool]): Reverse rotate Y flag.
+        reverse_rz (framework.Variant[bool]): Reverse rotate Z flag.
+        reverse_sx (framework.Variant[bool]): Reverse scale X flag.
+        reverse_sy (framework.Variant[bool]): Reverse scale Y flag.
+        reverse_sz (framework.Variant[bool]): Reverse scale Z flag.
+        search (framework.Variant[str]): String to search in node names.
+        replace (framework.Variant[str]): String to replace in node names.
+    """
 
-
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-class Settings(parser.ToolSettings):
-    '''Settings for tool.'''
-
-    window_geo: parser.Variant[str] = parser.Variant('')
-    hierarchy: parser.Variant[int] = parser.Variant(1)
-    method: parser.Variant[int] = parser.Variant(2)
-    reverse_tx: parser.Variant[bool] = parser.Variant(False)
-    reverse_ty: parser.Variant[bool] = parser.Variant(False)
-    reverse_tz: parser.Variant[bool] = parser.Variant(False)
-    reverse_rx: parser.Variant[bool] = parser.Variant(False)
-    reverse_ry: parser.Variant[bool] = parser.Variant(False)
-    reverse_rz: parser.Variant[bool] = parser.Variant(False)
-    reverse_sx: parser.Variant[bool] = parser.Variant(False)
-    reverse_sy: parser.Variant[bool] = parser.Variant(False)
-    reverse_sz: parser.Variant[bool] = parser.Variant(False)
-    search: parser.Variant[str] = parser.Variant('_L_')
-    replace: parser.Variant[str] = parser.Variant('_R_')
+    window_geo: framework.Variant[str] = framework.Variant("")
+    hierarchy: framework.Variant[int] = framework.Variant(1)
+    method: framework.Variant[int] = framework.Variant(2)
+    reverse_tx: framework.Variant[bool] = framework.Variant(False)
+    reverse_ty: framework.Variant[bool] = framework.Variant(False)
+    reverse_tz: framework.Variant[bool] = framework.Variant(False)
+    reverse_rx: framework.Variant[bool] = framework.Variant(False)
+    reverse_ry: framework.Variant[bool] = framework.Variant(False)
+    reverse_rz: framework.Variant[bool] = framework.Variant(False)
+    reverse_sx: framework.Variant[bool] = framework.Variant(False)
+    reverse_sy: framework.Variant[bool] = framework.Variant(False)
+    reverse_sz: framework.Variant[bool] = framework.Variant(False)
+    search: framework.Variant[str] = framework.Variant("_L_")
+    replace: framework.Variant[str] = framework.Variant("_R_")
 
 
-class MainWindow(widgets.StandardToolWidget):
-    '''Tool main window'''
+class MainWindow(framework.StandardToolWindow[Settings]):
+    """Main window for the Copy Animation tool."""
 
     def __init__(
         self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-        unique_id: str = '',
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Window,
+        unique_id: str = "",
     ) -> None:
-        '''Initialize widget.'''
+        """Initializes the window.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The Qt window flags.
+                Defaults to Window.
+            unique_id (str, optional): A unique ID for restoring window
+                states. Defaults to "".
+        """
         super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
         self.resize(400, 200)
+        self.__tx: QtWidgets.QCheckBox
+        self.__ty: QtWidgets.QCheckBox
+        self.__tz: QtWidgets.QCheckBox
+        self.__rx: QtWidgets.QCheckBox
+        self.__ry: QtWidgets.QCheckBox
+        self.__rz: QtWidgets.QCheckBox
+        self.__sx: QtWidgets.QCheckBox
+        self.__sy: QtWidgets.QCheckBox
+        self.__sz: QtWidgets.QCheckBox
 
-        option_widget: QWidget = self.option_widget()
-        self.__main_layout: widgets.FormLayout = widgets.FormLayout(
-            option_widget
+    def create_ui(self, parent: QtWidgets.QWidget) -> None:
+        """Creates the tool-specific user interface.
+
+        Args:
+            parent (QtWidgets.QWidget): The parent widget to contain the UI.
+        """
+        main_layout: widgets.FormLayout = widgets.FormLayout(parent)
+
+        # Copy Options
+        main_layout.addRow(
+            widgets.FrameWidget("Copy Options", False, False, parent)
         )
+        hierarchy: QtWidgets.QComboBox = QtWidgets.QComboBox(self)
+        hierarchy.addItems(["Selected", "Below"])
+        main_layout.addRow(widgets.FormLabel("Hierarchy"), hierarchy)
 
-        self.__main_layout.addRow(
-            widgets.FrameWidget('Copy Options', False, False, self)
+        # Paste Options
+        main_layout.addRow(
+            widgets.FrameWidget("Paste Options", False, False, parent)
         )
+        method: QtWidgets.QComboBox = QtWidgets.QComboBox(self)
+        method.addItems(["X:X", "1:X", "Search & Replace"])
+        main_layout.addRow(widgets.FormLabel("Method"), method)
 
-        self.__hierarchy: widgets.RadioButtons = widgets.RadioButtons(self)
-        self.__hierarchy.set_labels(('Selected', 'Below'))
-        self.__main_layout.addRow(
-            widgets.FormLabel('Hierarchy'), self.__hierarchy
+        search_edit: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
+        main_layout.addRow(widgets.FormLabel("Search"), search_edit)
+        search_idx: int = main_layout.row_id()
+
+        replace_edit: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
+        main_layout.addRow(widgets.FormLabel("Replace"), replace_edit)
+        replace_idx: int = main_layout.row_id()
+
+        main_layout.addRow(widgets.HorizontalLine(parent))
+
+        # Mirror Options
+        transform_layout: QtWidgets.QGridLayout = QtWidgets.QGridLayout()
+        main_layout.addRow(widgets.FormLabel("Mirror"), transform_layout)
+
+        preset_mirror = QtWidgets.QComboBox(self)
+        preset_mirror.addItems(
+            [
+                "XY (Behavior)",
+                "YZ (Behavior)",
+                "XZ (Behavior)",
+                "XY (Orient)",
+                "YZ (Orient)",
+                "XZ (Orient)",
+                "Custom",
+            ]
         )
+        transform_layout.addWidget(preset_mirror, 0, 0, 1, 3)
 
-        self.__main_layout.addRow(
-            widgets.FrameWidget('Paste Options', False, False, self)
-        )
-
-        self.__method: widgets.RadioButtons = widgets.RadioButtons(self)
-        self.__method.set_labels(('X:X', '1:X', 'Search & Replace'))
-        self.__method.button_group().buttonClicked.connect(
-            self.set_valid_options
-        )
-        self.__main_layout.addRow(widgets.FormLabel('Method'), self.__method)
-
-        self.__search = QLineEdit(self)
-        self.__main_layout.addRow(widgets.FormLabel('Search'), self.__search)
-        self.__search_index = self.__main_layout.row_id()
-
-        self.__replace = QLineEdit(self)
-        self.__main_layout.addRow(widgets.FormLabel('Replace'), self.__replace)
-        self.__replace_index = self.__main_layout.row_id()
-
-        self.__main_layout.addRow(widgets.HorizontalLine(self))
-
-        transform_layout = QGridLayout(self)
-        self.__main_layout.addRow(widgets.FormLabel('Mirror'), transform_layout)
-
-        self.__preset_mirror = QComboBox(self)
-        self.__preset_mirror.addItem('XY(Behavior)')
-        self.__preset_mirror.addItem('YZ(Behavior)')
-        self.__preset_mirror.addItem('XZ(Behavior)')
-        self.__preset_mirror.addItem('XY(Orient)')
-        self.__preset_mirror.addItem('YZ(Orient)')
-        self.__preset_mirror.addItem('XZ(Orient)')
-        self.__preset_mirror.addItem('Custom')
-        self.__preset_mirror.setCurrentIndex(6)
-        self.__preset_mirror.currentIndexChanged.connect(self.set_mirror_preset)
-        transform_layout.addWidget(self.__preset_mirror, 0, 0, 1, 3)
-
-        self.__tx = QCheckBox('tx', self)
+        self.__tx = QtWidgets.QCheckBox("tx", self)
         transform_layout.addWidget(self.__tx, 1, 0)
 
-        self.__ty = QCheckBox('ty', self)
+        self.__ty = QtWidgets.QCheckBox("ty", self)
         transform_layout.addWidget(self.__ty, 1, 1)
 
-        self.__tz = QCheckBox('tz', self)
+        self.__tz = QtWidgets.QCheckBox("tz", self)
         transform_layout.addWidget(self.__tz, 1, 2)
 
-        self.__rx = QCheckBox('rx', self)
+        self.__rx = QtWidgets.QCheckBox("rx", self)
         transform_layout.addWidget(self.__rx, 2, 0)
 
-        self.__ry = QCheckBox('ry', self)
+        self.__ry = QtWidgets.QCheckBox("ry", self)
         transform_layout.addWidget(self.__ry, 2, 1)
 
-        self.__rz = QCheckBox('rz', self)
+        self.__rz = QtWidgets.QCheckBox("rz", self)
         transform_layout.addWidget(self.__rz, 2, 2)
 
-        self.__sx = QCheckBox('sx', self)
+        self.__sx = QtWidgets.QCheckBox("sx", self)
         transform_layout.addWidget(self.__sx, 3, 0)
 
-        self.__sy = QCheckBox('sy', self)
+        self.__sy = QtWidgets.QCheckBox("sy", self)
         transform_layout.addWidget(self.__sy, 3, 1)
 
-        self.__sz = QCheckBox('sz', self)
+        self.__sz = QtWidgets.QCheckBox("sz", self)
         transform_layout.addWidget(self.__sz, 3, 2)
 
-    # override
-    def load_settings(self) -> None:
-        '''Load ui settings from file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
-        self.__method.set_check_id(settings.method.value())
-        self.__hierarchy.set_check_id(settings.hierarchy.value())
-        self.__search.setText(settings.search.value())
-        self.__replace.setText(settings.replace.value())
-        self.set_mirror_preset(self.__preset_mirror.currentIndex())
-        self.set_valid_options()
-
-    # override
-    def save_settings(self) -> None:
-        '''Save ui settings to file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
-        settings.method.set_value(self.__method.check_id())
-        settings.hierarchy.set_value(self.__hierarchy.check_id())
-        settings.search.set_value(self.__search.text())
-        settings.replace.set_value(self.__replace.text())
-        settings.reverse_tx.set_value(self.__tx.isChecked())
-        settings.reverse_ty.set_value(self.__ty.isChecked())
-        settings.reverse_tz.set_value(self.__tz.isChecked())
-        settings.reverse_rx.set_value(self.__rx.isChecked())
-        settings.reverse_ry.set_value(self.__ry.isChecked())
-        settings.reverse_rz.set_value(self.__rz.isChecked())
-        settings.reverse_sx.set_value(self.__sx.isChecked())
-        settings.reverse_sy.set_value(self.__sy.isChecked())
-        settings.reverse_sz.set_value(self.__sz.isChecked())
-        settings.write()
-
-    # override
-    def reset_settings(self) -> None:
-        '''Reset ui settings.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
-
-    # override
-    def about(self) -> None:
-        '''Show a about dialog.[override]'''
-        widgets.AboutDialog.info(
-            self, __product__, __version__, __copyright__, __doc__
+        # Settings Binding
+        settings: Settings = self.tool_settings()
+        settings.window_geo.bind(
+            setter=self.restoreGeometry,
+            getter=self.saveGeometry,
+            encoder=utils.qt_to_ascii,
+            decoder=utils.ascii_to_qt,
+        )
+        settings.hierarchy.bind(
+            setter=hierarchy.setCurrentIndex,
+            getter=hierarchy.currentIndex,
+        )
+        settings.method.bind(
+            setter=method.setCurrentIndex,
+            getter=method.currentIndex,
+        )
+        settings.search.bind(
+            setter=search_edit.setText,
+            getter=search_edit.text,
+        )
+        settings.replace.bind(
+            setter=replace_edit.setText,
+            getter=replace_edit.text,
+        )
+        settings.reverse_tx.bind(
+            setter=self.__tx.setChecked,
+            getter=self.__tx.isChecked,
+        )
+        settings.reverse_ty.bind(
+            setter=self.__ty.setChecked,
+            getter=self.__ty.isChecked,
+        )
+        settings.reverse_tz.bind(
+            setter=self.__tz.setChecked,
+            getter=self.__tz.isChecked,
+        )
+        settings.reverse_rx.bind(
+            setter=self.__rx.setChecked,
+            getter=self.__rx.isChecked,
+        )
+        settings.reverse_ry.bind(
+            setter=self.__ry.setChecked,
+            getter=self.__ry.isChecked,
+        )
+        settings.reverse_rz.bind(
+            setter=self.__rz.setChecked,
+            getter=self.__rz.isChecked,
+        )
+        settings.reverse_sx.bind(
+            setter=self.__sx.setChecked,
+            getter=self.__sx.isChecked,
+        )
+        settings.reverse_sy.bind(
+            setter=self.__sy.setChecked,
+            getter=self.__sy.isChecked,
+        )
+        settings.reverse_sz.bind(
+            setter=self.__sz.setChecked,
+            getter=self.__sz.isChecked,
         )
 
-    @Slot()
-    def set_valid_options(self) -> None:
-        '''Synchronize with valid options.'''
-        enabled: bool = self.__method.check_id() == 2
-        self.__main_layout.set_row_enabled(self.__search_index, enabled)
-        self.__main_layout.set_row_enabled(self.__replace_index, enabled)
+        method.currentIndexChanged.connect(
+            lambda idx: main_layout.set_row_enabled(search_idx, idx == 2)
+        )
+        method.currentIndexChanged.connect(
+            lambda idx: main_layout.set_row_enabled(replace_idx, idx == 2)
+        )
+        preset_mirror.currentIndexChanged.connect(self._apply_mirror_preset)
 
-    @Slot(int)
-    def set_mirror_preset(self, index: int) -> None:
-        '''Set mirror presets.'''
-        if index == 0:  # XY(Behavior)
-            self.__tx.setChecked(True)
-            self.__ty.setChecked(True)
-            self.__tz.setChecked(False)
-            self.__rx.setChecked(False)
-            self.__ry.setChecked(False)
-            self.__rz.setChecked(False)
-            self.__sx.setChecked(False)
-            self.__sy.setChecked(False)
-            self.__sz.setChecked(False)
-        elif index == 1:  # YZ(Behavior)
-            self.__tx.setChecked(True)
-            self.__ty.setChecked(True)
-            self.__tz.setChecked(True)
-            self.__rx.setChecked(False)
-            self.__ry.setChecked(False)
-            self.__rz.setChecked(False)
-            self.__sx.setChecked(False)
-            self.__sy.setChecked(False)
-            self.__sz.setChecked(False)
-        elif index == 2:  # XZ(Behavior)
-            self.__tx.setChecked(True)
-            self.__ty.setChecked(False)
-            self.__tz.setChecked(True)
-            self.__rx.setChecked(False)
-            self.__ry.setChecked(False)
-            self.__rz.setChecked(False)
-            self.__sx.setChecked(False)
-            self.__sy.setChecked(False)
-            self.__sz.setChecked(False)
-        elif index == 3:  # XY(Orient)
-            self.__tx.setChecked(False)
-            self.__ty.setChecked(False)
-            self.__tz.setChecked(False)
-            self.__rx.setChecked(True)
-            self.__ry.setChecked(True)
-            self.__rz.setChecked(False)
-            self.__sx.setChecked(False)
-            self.__sy.setChecked(False)
-            self.__sz.setChecked(False)
-        elif index == 4:  # YZ(Orient)
-            self.__tx.setChecked(True)
-            self.__ty.setChecked(False)
-            self.__tz.setChecked(False)
-            self.__rx.setChecked(False)
-            self.__ry.setChecked(True)
-            self.__rz.setChecked(True)
-            self.__sx.setChecked(False)
-            self.__sy.setChecked(False)
-            self.__sz.setChecked(False)
-        elif index == 5:  # XZ(Orient)
-            self.__tx.setChecked(False)
-            self.__ty.setChecked(False)
-            self.__tz.setChecked(False)
-            self.__rx.setChecked(True)
-            self.__ry.setChecked(False)
-            self.__rz.setChecked(True)
-            self.__sx.setChecked(False)
-            self.__sy.setChecked(False)
-            self.__sz.setChecked(False)
-        else:  # Custom
-            settings: Settings = Settings.instance(__name__, True)
-            self.__tx.setChecked(settings.reverse_tx.value())
-            self.__ty.setChecked(settings.reverse_ty.value())
-            self.__tz.setChecked(settings.reverse_tz.value())
-            self.__rx.setChecked(settings.reverse_rx.value())
-            self.__ry.setChecked(settings.reverse_ry.value())
-            self.__rz.setChecked(settings.reverse_rz.value())
-            self.__sx.setChecked(settings.reverse_sx.value())
-            self.__sy.setChecked(settings.reverse_sy.value())
-            self.__sz.setChecked(settings.reverse_sz.value())
+        initial_method: int = method.currentIndex()
+        main_layout.set_row_enabled(search_idx, initial_method == 2)
+        main_layout.set_row_enabled(replace_idx, initial_method == 2)
+        preset_mirror.setCurrentIndex(6)
 
-    @widgets.undo
+    def _apply_mirror_preset(self, index: int) -> None:
+        """Applies predefined checkbox states based on the preset index.
+
+        Args:
+            index (int): The index of the selected preset.
+        """
+        if index >= 6:  # Custom
+            return
+
+        presets: dict[int, list[bool]] = {
+            0: [True, True, False, False, False, False],  # XY(Behavior)
+            1: [True, True, True, False, False, False],  # YZ(Behavior)
+            2: [True, False, True, False, False, False],  # XZ(Behavior)
+            3: [False, False, False, True, True, False],  # XY(Orient)
+            4: [True, False, False, False, True, True],  # YZ(Orient)
+            5: [False, False, False, True, False, True],  # XZ(Orient)
+        }
+        self.__tx.setChecked(presets[index][0])
+        self.__ty.setChecked(presets[index][1])
+        self.__tz.setChecked(presets[index][2])
+        self.__rx.setChecked(presets[index][3])
+        self.__ry.setChecked(presets[index][4])
+        self.__rz.setChecked(presets[index][5])
+        self.__sx.setChecked(False)
+        self.__sy.setChecked(False)
+        self.__sz.setChecked(False)
+
+    @dcc.undo
     def apply(self) -> None:
-        '''Apply'''
+        """Executes the tool logic and saves current settings."""
         self.save_settings()
-        main()
-
-
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
-def children_nodes(node: str) -> list[str]:
-    '''Return children nodes.'''
-    result: list[str] = [node]
-    children: list[str] = (
-        cmds.listRelatives(node, children=True, path=True) or []
-    )
-    if not children:
-        return result
-
-    for child in children:
-        result.extend(children_nodes(child))
-
-    return result
-
-
-def selected_attribute() -> list[str]:
-    '''Return selected attribute at channel box.'''
-
-    def __long_attr_name(nodes: list[str], attrs: list[str]) -> list[str]:
-        '''Return long attribute name.'''
-        if not attrs:
-            return []
-
-        for i, attr in enumerate(attrs):
-            attrs[i] = cmds.attributeName(f'{nodes[0]}.{attr}', long=True)
-
-        return attrs
-
-    channel_box: str = mel.eval('$gChannelBoxName=$gChannelBoxName;')
-    result: list[str] = []
-
-    result += __long_attr_name(
-        cmds.channelBox(channel_box, query=True, mainObjectList=True),
-        cmds.channelBox(channel_box, query=True, selectedMainAttributes=True),
-    )
-
-    result += __long_attr_name(
-        cmds.channelBox(channel_box, query=True, shapeObjectList=True),
-        cmds.channelBox(channel_box, query=True, selectedShapeAttributes=True),
-    )
-
-    result += __long_attr_name(
-        cmds.channelBox(channel_box, query=True, historyObjectList=True),
-        cmds.channelBox(
-            channel_box, query=True, selectedHistoryAttributes=True
-        ),
-    )
-
-    return result
+        main(self.tool_settings())
 
 
 def apply(
@@ -359,14 +292,23 @@ def apply(
     dst_nodes: list[str],
     mirror: list[list[bool]] | None = None,
 ) -> None:
-    '''Copy Animation'''
+    """Copies animation curves between nodes and applies mirroring if set.
+
+    Args:
+        src_nodes (list[str]): A list of source Maya nodes.
+        dst_nodes (list[str]): A list of destination Maya nodes.
+        mirror (list[list[bool]] | None, optional): A 3x3 matrix representing
+            mirror flags for translate, rotate, and scale. Defaults to None.
+    """
     if mirror is None:
         mirror = [[False, False, False] * 3]
 
-    selected_attr = selected_attribute()
+    selected_attr: list[str] = dcc.selection.get_selected_channel_box_plugs(
+        is_attribute_only=True
+    )
     for src, dst in zip(src_nodes, dst_nodes):
         connected_curves: list[str] = []
-        for curve_type in utility.ANIM_CURVE_TYPES:
+        for curve_type in dcc.animation.ANIM_CURVES_TYPE:
             connected_curves.extend(
                 cmds.listConnections(
                     src, plugs=True, connections=True, type=curve_type
@@ -380,19 +322,19 @@ def apply(
         for i in range(0, len(connected_curves), 2):
             src_plug: str = connected_curves[i + 1]
             dst_plug: str = connected_curves[i]
-            src_attr_name: str = '.'.join(src_plug.split('.')[1:])
-            dst_attr_name: str = '.'.join(dst_plug.split('.')[1:])
+            src_attr_name: str = ".".join(src_plug.split(".")[1:])
+            dst_attr_name: str = ".".join(dst_plug.split(".")[1:])
             if selected_attr and dst_attr_name not in selected_attr:
                 continue
 
-            new_src_node: str = cmds.duplicate(src_plug.split('.')[0])[0]
-            src_plug = f'{new_src_node}.{src_attr_name}'
-            dst_plug = f'{dst}.{dst_attr_name}'
+            new_src_node: str = cmds.duplicate(src_plug.split(".")[0])[0]
+            src_plug = f"{new_src_node}.{src_attr_name}"
+            dst_plug = f"{dst}.{dst_attr_name}"
             cmds.connectAttr(src_plug, dst_plug, force=True)
 
             # Mirror
             for i, channel in enumerate(MIRROR_CHANNELS):
-                for j, axis in enumerate(MIRROR_AXIS):
+                for j, axis in enumerate(MIRROR_AXES):
                     if not mirror[i][j]:
                         continue
 
@@ -411,27 +353,47 @@ def apply(
                     )
 
 
-def option(unique_id: str = '') -> None:
-    '''Show window.'''
+def option(unique_id: str = "") -> None:
+    """Shows the tool's main window.
+
+    Args:
+        unique_id (str, optional): A unique identifier for the window
+            instance. Defaults to "".
+    """
     window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()
 
 
-def main() -> None:
-    '''Copy Animation from specific options.'''
+def main(settings: Settings | None = None) -> None:
+    """Executes the copy animation process based on tool settings.
+
+    Args:
+        settings (Settings | None, optional): The tool settings instance to
+            use. If None, it initializes settings from the module.
+            Defaults to None.
+    """
     selection: list[str] = cmds.ls(selection=True)
-    settings: Settings = Settings.instance(__name__, True)
+    if not selection:
+        _logger.error("Select node(s) to copy animation.")
+        return
+
+    if settings is None:
+        settings = Settings.instance(__name__, True)
+        settings.read()
+
     src_nodes: list[str] = []
     dst_nodes: list[str] = []
 
     # Method = X:X
     if settings.method.value() == 0:
-        if not selection or len(selection) < 2:
-            _logger.error('Select more than two nodes to copy animation.')
+        if len(selection) < 2:
+            _logger.error("Select more than two nodes to copy animation.")
             return
 
         if len(selection) % 2 != 0:
-            _logger.error('Destination node does not match source node.')
+            _logger.error(
+                "The number of source and destination nodes does not match."
+            )
             return
 
         half_num: int = int(len(selection) / 2)
@@ -440,8 +402,8 @@ def main() -> None:
 
     # Method = 1:X
     elif settings.method.value() == 1:
-        if not selection or len(selection) < 2:
-            _logger.error('Select more than two nodes to copy animation.')
+        if len(selection) < 2:
+            _logger.error("Select more than two nodes to copy animation.")
             return
 
         src_nodes = [selection[0]] * len(selection[1:])
@@ -449,16 +411,12 @@ def main() -> None:
 
     # Method = Search % Replace
     else:
-        if not selection:
-            _logger.error('Select node(s) to copy animation.')
-            return
-
         for src_node in selection:
-            dst_node = src_node.replace(
+            dst_node: str = src_node.replace(
                 settings.search.value(), settings.replace.value()
             )
             if not cmds.objExists(dst_node):
-                _logger.warning('Does not exists %s', dst_node)
+                _logger.warning("Target node does not exist: %s", dst_node)
                 continue
 
             src_nodes.append(src_node)
@@ -468,10 +426,8 @@ def main() -> None:
         src_children_nodes: list[str] = []
         dst_children_nodes: list[str] = []
         for src, dst in zip(src_nodes, dst_nodes):
-            # temp:list[str] = cmds.listRelatives(src, children=True, allDescendents=True, path=True)or []
-            # temp.reverse()
-            src_children_nodes.extend(children_nodes(src))
-            dst_children_nodes.extend(children_nodes(dst))
+            src_children_nodes.extend(dcc.node.get_children([src]))
+            dst_children_nodes.extend(dcc.node.get_children([dst]))
 
         src_nodes = src_children_nodes
         dst_nodes = dst_children_nodes
@@ -495,4 +451,4 @@ def main() -> None:
     ]
 
     apply(src_nodes, dst_nodes, mirror)
-    _logger.info('Done.')
+    _logger.info("Done.")

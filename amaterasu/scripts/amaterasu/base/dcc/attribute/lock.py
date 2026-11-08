@@ -197,3 +197,22 @@ def unlock_and_show(
             Defaults to False.
     """
     __set_lock_and_hide(nodes, False, translate, rotate, scale, visibility)
+
+
+def lock_all_attributes(nodes: list[str]) -> None:
+    """Locks all settable attributes on the specified utility nodes.
+
+    This function iterates through all keyable and settable attributes of the given
+    nodes and applies a lock. It skips compound parent/child elements containing
+    brackets or dots in their names.
+
+    Args:
+        nodes (list[str]): A list of Maya node names whose attributes should be locked.
+    """
+    for node in nodes:
+        keyable_attrs: list[str] = cmds.listAttr(node, settable=True) or []
+        for attr in keyable_attrs:
+            if "." in attr or "[" in attr:
+                continue
+            if cmds.getAttr(f"{node}.{attr}", settable=True):
+                cmds.setAttr(f"{node}.{attr}", lock=True)

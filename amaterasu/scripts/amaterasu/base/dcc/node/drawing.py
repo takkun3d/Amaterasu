@@ -33,6 +33,41 @@ from __future__ import annotations
 from maya import cmds
 from amaterasu.base import utils
 
+INDEX_COLOR_NAMES: list[str] = [
+    "Default",
+    "Black",
+    "Dark Gray",
+    "Light Gray",
+    "Crimson",
+    "Navy Blue",
+    "Blue",
+    "Dark Green",
+    "Dark Purple",
+    "Magenta",
+    "Brown",
+    "Dark Brown",
+    "Rust",
+    "Red",
+    "Green",
+    "Bright Blue",
+    "White",
+    "Yellow",
+    "Light Blue",
+    "Light Green",
+    "Pink",
+    "Orange",
+    "Light Yellow",
+    "Solid Green",
+    "Light Brown",
+    "Mustard",
+    "Bright Yellow Green",
+    "Cyan",
+    "Bright Cyan",
+    "Pale Blue",
+    "Purple",
+    "Light Magenta",
+]
+
 
 def _apply_color_override(
     node: str,
