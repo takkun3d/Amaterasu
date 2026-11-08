@@ -30,9 +30,9 @@ warn_unused_ignores = false
 # module = "maya.cmds.*"
 # disable_error_code = ["arg-type", "assignment", "call-arg"]
 
-[tool.black]
-line-length = 80
-skip-string-normalization = true
+# [tool.black]
+# line-length = 80
+# skip-string-normalization = true
 
 [tool.ruff]
 line-length = 80
