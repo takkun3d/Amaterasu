@@ -27,17 +27,20 @@ on what matters: creating.
 """
 
 from __future__ import annotations
-from typing import Any
+
 import re
+from typing import Any
+
 from maya import cmds
 from maya.api import OpenMaya
 from maya.app.renderSetup.model import utils as rs_utils
 from maya.app.renderSetup.views import viewCmds
-from amaterasu.base.qt import QtCore, QtWidgets, QtGui
+
 from amaterasu.base import dcc, framework, utils, widgets
+from amaterasu.base.qt import QtCore, QtGui, QtWidgets
 
 __product__: str = "Renamer"
-__version__: str = "1.40"
+__version__: str = "1.50"
 _logger: utils.Logger = utils.get_logger(__product__)
 
 
@@ -65,7 +68,9 @@ class Settings(framework.ToolSettings):
     suffix: framework.Variant[str] = framework.Variant("")
     insert_str: framework.Variant[str] = framework.Variant("")
     insert_to: framework.Variant[int] = framework.Variant(0)
-    find_replace_rules: framework.Variant[str] = framework.Variant('[["", ""]]')
+    find_replace_rules: framework.Variant[str] = framework.Variant(
+        '[["", "", true]]'
+    )
 
 
 class PreviewDialog(QtWidgets.QDialog):
@@ -323,6 +328,7 @@ class FindReplaceRuleWidget(QtWidgets.QWidget):
         self,
         find_str: str = "",
         replace_str: str = "",
+        is_enabled: bool = True,
         parent: QtWidgets.QWidget | None = None,
         flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Widget,
     ) -> None:
@@ -342,6 +348,10 @@ class FindReplaceRuleWidget(QtWidgets.QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
 
+        self.__enabled: QtWidgets.QCheckBox = QtWidgets.QCheckBox(self)
+        self.__enabled.setChecked(is_enabled)
+        layout.addWidget(self.__enabled)
+
         self.__search: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
         self.__search.setPlaceholderText("Find")
         self.__search.setText(find_str)
@@ -360,13 +370,18 @@ class FindReplaceRuleWidget(QtWidgets.QWidget):
         button.clicked.connect(lambda: self.removed.emit(self))
         layout.addWidget(button)
 
-    def rule(self) -> tuple[str, str]:
+    def rule(self) -> tuple[str, str, bool]:
         """Gets the rule from this widget.
 
         Returns:
-            tuple[str, str]: A tuple containing the find and replace strings.
+            tuple[str, str, bool]: A tuple containing the find string,
+                replace string, and enabled state.
         """
-        return self.__search.text(), self.__replace.text()
+        return (
+            self.__search.text(),
+            self.__replace.text(),
+            self.__enabled.isChecked(),
+        )
 
 
 class FindAndReplace(QtWidgets.QWidget):
@@ -426,15 +441,19 @@ class FindAndReplace(QtWidgets.QWidget):
         btn_layout.addWidget(button)
 
     @QtCore.Slot()
-    def add_rule(self, find: str = "", replace: str = "") -> None:
+    def add_rule(
+        self, find: str = "", replace: str = "", is_enabled: bool = True
+    ) -> None:
         """Adds a new dynamic rule row.
 
         Args:
             find (str, optional): The initial find string. Defaults to "".
             replace (str, optional): The initial replace string. Defaults to "".
+            is_enabled (bool, optional): The initial enable replace.
+                Defaults to true.
         """
         rule_widget: FindReplaceRuleWidget = FindReplaceRuleWidget(
-            find, replace, self.rules_container
+            find, replace, is_enabled, self.rules_container
         )
         rule_widget.removed.connect(self.remove_rule)
         self.__rules_layout.addWidget(rule_widget)
@@ -451,23 +470,29 @@ class FindAndReplace(QtWidgets.QWidget):
         if self.__rules_layout.count() == 0:
             self.add_rule()
 
-    def rules(self) -> list[tuple[str, str]]:
+    def rules(self) -> list[tuple[str, str, bool]]:
         """Collects the find and replace data from all dynamic rows.
 
         Returns:
             list[tuple[str, str]]: A list of (find, replace) tuples.
         """
-        rules: list[tuple[str, str]] = []
+        rules: list[tuple[str, str, bool]] = []
         for i in range(self.__rules_layout.count()):
-            item: QtWidgets.QLayoutItem = self.__rules_layout.itemAt(i)
+            item: QtWidgets.QLayoutItem | None = self.__rules_layout.itemAt(i)
+            if not item:
+                continue
+
             if item and item.widget():
-                widget: QtWidgets.QWidget = item.widget()
+                widget: QtWidgets.QWidget | None = item.widget()
+                if not widget:
+                    continue
+
                 if isinstance(widget, FindReplaceRuleWidget):
                     rules.append(widget.rule())
 
         return rules
 
-    def set_rules(self, rules: list[list[str]]) -> None:
+    def set_rules(self, rules: list[list[Any]]) -> None:
         """Populates the dynamic rows from a list of rules.
 
         Args:
@@ -475,13 +500,21 @@ class FindAndReplace(QtWidgets.QWidget):
                 (e.g., [["find1", "replace1"], ...]).
         """
         while self.__rules_layout.count():
-            item: QtWidgets.QLayoutItem = self.__rules_layout.takeAt(0)
+            item: QtWidgets.QLayoutItem | None = self.__rules_layout.takeAt(0)
+            if not item:
+                continue
+
             if item and item.widget():
-                item.widget().deleteLater()
+                _widget: QtWidgets.QWidget | None = item.widget()
+                if _widget:
+                    _widget.deleteLater()
 
         for rule in rules:
-            if len(rule) == 2:
-                self.add_rule(rule[0], rule[1])
+            if len(rule) >= 3:
+                self.add_rule(rule[0], rule[1], rule[2])
+
+            elif len(rule) == 2:
+                self.add_rule(rule[0], rule[1], True)
 
         if self.__rules_layout.count() == 0:
             self.add_rule()
@@ -634,10 +667,11 @@ class MainWindow(framework.ToolWindow[Settings]):
                 the scene.
         """
         self.save_settings()
-        raw_rules: list[tuple[str, str]] = self.__find_and_replace.rules()
+        raw_rules: list[tuple[str, str, bool]] = self.__find_and_replace.rules()
         rules: list[tuple[str, str]] = []
-        for find, replace in raw_rules:
-            rules.append((find.replace("*", ".*"), replace))
+        for find, replace, is_enabled in raw_rules:
+            if is_enabled:
+                rules.append((find.replace("*", ".*"), replace))
 
         self.rename(rules, preview=preview)
 
