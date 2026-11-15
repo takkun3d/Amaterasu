@@ -634,10 +634,18 @@ def playblast(layer_name: str, option: PlayblastOption) -> None:
     msaa: bool = cmds.getAttr("hardwareRenderingGlobals.multiSampleEnable")
     start_frame: float = cmds.getAttr("defaultRenderGlobals.startFrame")
     end_frame: float = cmds.getAttr("defaultRenderGlobals.endFrame")
+    film_gate: bool = cmds.getAttr(f"{option.camera}.displayFilmGate")
+    res_gate: bool = cmds.getAttr(f"{option.camera}.displayResolution")
+    overscan: float = cmds.getAttr(f"{option.camera}.overscan")
+    pan_zoom: bool = cmds.getAttr(f"{option.camera}.panZoomEnabled")
 
     cmds.setAttr("hardwareRenderingGlobals.ssaoEnable", option.ssao)
     cmds.setAttr("hardwareRenderingGlobals.motionBlurEnable", option.mb)
     cmds.setAttr("hardwareRenderingGlobals.multiSampleEnable", option.msaa)
+    cmds.setAttr(f"{option.camera}.displayFilmGate", False)
+    cmds.setAttr(f"{option.camera}.displayResolution", False)
+    cmds.setAttr(f"{option.camera}.overscan", 1.0)
+    cmds.setAttr(f"{option.camera}.panZoomEnabled", False)
 
     cmds.setFocus(panel)
     cmds.playblast(
@@ -661,6 +669,10 @@ def playblast(layer_name: str, option: PlayblastOption) -> None:
     cmds.setAttr("hardwareRenderingGlobals.ssaoEnable", ssao)
     cmds.setAttr("hardwareRenderingGlobals.motionBlurEnable", mb)
     cmds.setAttr("hardwareRenderingGlobals.multiSampleEnable", msaa)
+    cmds.setAttr(f"{option.camera}.displayFilmGate", film_gate)
+    cmds.setAttr(f"{option.camera}.displayResolution", res_gate)
+    cmds.setAttr(f"{option.camera}.overscan", overscan)
+    cmds.setAttr(f"{option.camera}.panZoomEnabled", pan_zoom)
     cmds.deleteUI(window)
 
 
