@@ -25,15 +25,18 @@ documentation and social media.
 """
 
 from __future__ import annotations
-from typing import Any
-import pathlib
+
 import json
+import os
+import pathlib
+import re
 import urllib.request
 import webbrowser
-import os
-import re
-from amaterasu.base.qt import QtCore, QtGui, QtWidgets
+from typing import Any
+
 from amaterasu.base import dcc, framework, utils
+from amaterasu.base.qt import QtCore, QtGui, QtWidgets
+
 from . import env
 
 __product__: str = "Amaterasu Launcher"
@@ -157,7 +160,7 @@ class UpdateCheckerThread(QtCore.QThread):
                 Defaults to False.
         """
         if parent is None:
-            parent = parent = dcc.get_maya_window()
+            parent = dcc.get_maya_window()
 
         super().__init__(parent)
         self.__force_emit: bool = force_emit
@@ -208,10 +211,10 @@ class UpdateCheckerThread(QtCore.QThread):
             self.update_required.emit(release_data)
 
         except TimeoutError as e:
-            self.error_occurred.emit(f"Check failed: {str(e)}")
+            self.error_occurred.emit(f"Check failed: {e!r}")
 
         except urllib.error.URLError as e:
-            self.error_occurred.emit(f"Check failed: {str(e)}")
+            self.error_occurred.emit(f"Check failed: {e!r}")
 
 
 class DownloadThread(QtCore.QThread):
@@ -352,9 +355,10 @@ class Launcher(QtWidgets.QWidget):
 
         left_layout.addSpacing(10)
 
-        self.__info = QtWidgets.QTextEdit()
+        self.__info = QtWidgets.QTextBrowser()  # QtWidgets.QTextEdit()
         self.__info.setObjectName("InfoText")
         self.__info.setReadOnly(True)
+        self.__info.setOpenExternalLinks(True)
         left_layout.addWidget(self.__info)
 
         left_layout.addSpacing(10)
@@ -452,9 +456,18 @@ class Launcher(QtWidgets.QWidget):
         the download button is disabled.
         """
         tag_name: str = self.__release_data.get("tag_name", "Unknown")
-        digits: str = re.sub(r'\D', '', tag_name)
+        digits: str = re.sub(r"\D", "", tag_name)
         github_version: int = int(digits) if digits else 0
         body: str = self.__release_data.get("body", "No release notes.")
+
+        body = re.sub(r"!\[.*?\]\(.*?\)", "", body)
+        body = re.sub(r"<video.*?>.*?</video>", "", body, flags=re.DOTALL)
+        body = re.sub(r"<img.*?>", "", body)
+        body = re.sub(
+            r"https://github\.com/user-attachments/assets/[a-zA-Z0-9\-]+",
+            "",
+            body,
+        )
 
         self.__version.setText(f"LATEST VERSION: {github_version}")
         self.__info.setMarkdown(body)
