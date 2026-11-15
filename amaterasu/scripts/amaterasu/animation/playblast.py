@@ -20,16 +20,18 @@
 """Quick playblast from the rendering setup."""
 
 from __future__ import annotations
+
 import os
 from dataclasses import dataclass, field
+
 from maya import cmds, mel
-from maya.app.renderSetup.model import renderSetup
-from maya.app.renderSetup.model import renderLayer
-from amaterasu.base.qt import QtCore, QtWidgets
+from maya.app.renderSetup.model import renderLayer, renderSetup
+
 from amaterasu.base import dcc, framework, utils, widgets
+from amaterasu.base.qt import QtCore, QtWidgets
 
 __product__: str = "Playblast"
-__version__: str = "1.31"
+__version__: str = "1.32"
 _logger: utils.Logger = utils.get_logger(__product__)
 
 DEFAULT_FILE_NAME_PREFIX: str = "<Scene>/<RenderLayer>/<RenderLayer>"
