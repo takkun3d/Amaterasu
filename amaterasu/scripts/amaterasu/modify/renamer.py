@@ -40,7 +40,7 @@ from amaterasu.base import dcc, framework, utils, widgets
 from amaterasu.base.qt import QtCore, QtGui, QtWidgets
 
 __product__: str = "Renamer"
-__version__: str = "1.50"
+__version__: str = "1.51"
 _logger: utils.Logger = utils.get_logger(__product__)
 
 
@@ -59,6 +59,8 @@ class Settings(framework.ToolSettings):
             (0 for First, 1 for Last).
         find_replace_rules (framework.Variant[str]): JSON string representing
             multiple find/replace rules.
+        target_index (framework.Variant[int]): The index of the target
+            selection mode (0 for Object, 1 for Render Setup).
     """
 
     window_geo: framework.Variant[str] = framework.Variant("")
@@ -71,6 +73,7 @@ class Settings(framework.ToolSettings):
     find_replace_rules: framework.Variant[str] = framework.Variant(
         '[["", "", true]]'
     )
+    target_index: framework.Variant[int] = framework.Variant(0)
 
 
 class PreviewDialog(QtWidgets.QDialog):
@@ -130,7 +133,8 @@ class PreviewDialog(QtWidgets.QDialog):
 class StringAndNumber(QtWidgets.QWidget):
     """String and number option tab."""
 
-    applied = QtCore.Signal(bool)
+    applied = QtCore.Signal(bool, bool)
+    target_changed = QtCore.Signal(int)
 
     def __init__(
         self,
@@ -168,14 +172,29 @@ class StringAndNumber(QtWidgets.QWidget):
         form_layout.addRow(widgets.FormLabel("Suffix"), self.__suffix)
 
         btn_layout: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout()
+        btn_layout.setContentsMargins(0, 10, 0, 0)
         main_layout.addLayout(btn_layout)
 
-        button: QtWidgets.QPushButton = QtWidgets.QPushButton("Preview", self)
-        button.clicked.connect(lambda: self.applied.emit(True))
+        label: QtWidgets.QLabel = QtWidgets.QLabel("Target:", self)
+        label.setMaximumWidth(40)
+        btn_layout.addWidget(label, False)
+
+        self.__target: QtWidgets.QComboBox = QtWidgets.QComboBox(self)
+        self.__target.addItems(["Object", "Render Setup"])
+        self.__target.setMaximumHeight(29)
+        self.__target.currentIndexChanged.connect(self.target_changed.emit)
+        btn_layout.addWidget(self.__target)
+
+        button = QtWidgets.QPushButton("Preview", self)
+        button.clicked.connect(
+            lambda: self.applied.emit(True, self.__target.currentIndex() == 1)
+        )
         btn_layout.addWidget(button)
 
         button = QtWidgets.QPushButton("Apply", self)
-        button.clicked.connect(lambda: self.applied.emit(False))
+        button.clicked.connect(
+            lambda: self.applied.emit(False, self.__target.currentIndex() == 1)
+        )
         btn_layout.addWidget(button)
 
     def base_name(self) -> str:
@@ -242,11 +261,29 @@ class StringAndNumber(QtWidgets.QWidget):
         """
         self.__suffix.setText(value)
 
+    def target_index(self) -> int:
+        """Gets the current target combo box index.
+
+        Returns:
+            int: The current index (0 for Object, 1 for Render Setup).
+        """
+        return self.__target.currentIndex()
+
+    def set_target_index(self, value: int) -> None:
+        """Sets the target combo box index.
+
+        Args:
+            value (int): The index to set (0 for Object, 1 for Render Setup).
+        """
+        if self.__target.currentIndex() != value:
+            self.__target.setCurrentIndex(value)
+
 
 class InsertStringTo(QtWidgets.QWidget):
     """Insert string to fist/last option tab."""
 
-    applied = QtCore.Signal(bool)
+    applied = QtCore.Signal(bool, bool)
+    target_changed = QtCore.Signal(int)
 
     def __init__(
         self,
@@ -276,14 +313,29 @@ class InsertStringTo(QtWidgets.QWidget):
         form_layout.addRow(widgets.FormLabel("Insert to"), self.__insert_to)
 
         btn_layout: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout()
+        btn_layout.setContentsMargins(0, 10, 0, 0)
         main_layout.addLayout(btn_layout)
 
-        button: QtWidgets.QPushButton = QtWidgets.QPushButton("Preview", self)
-        button.clicked.connect(lambda: self.applied.emit(True))
+        label: QtWidgets.QLabel = QtWidgets.QLabel("Target:", self)
+        label.setMaximumWidth(40)
+        btn_layout.addWidget(label, False)
+
+        self.__target: QtWidgets.QComboBox = QtWidgets.QComboBox(self)
+        self.__target.addItems(["Object", "Render Setup"])
+        self.__target.setMaximumHeight(29)
+        self.__target.currentIndexChanged.connect(self.target_changed.emit)
+        btn_layout.addWidget(self.__target)
+
+        button = QtWidgets.QPushButton("Preview", self)
+        button.clicked.connect(
+            lambda: self.applied.emit(True, self.__target.currentIndex() == 1)
+        )
         btn_layout.addWidget(button)
 
         button = QtWidgets.QPushButton("Apply", self)
-        button.clicked.connect(lambda: self.applied.emit(False))
+        button.clicked.connect(
+            lambda: self.applied.emit(False, self.__target.currentIndex() == 1)
+        )
         btn_layout.addWidget(button)
 
     def insert(self) -> str:
@@ -318,6 +370,23 @@ class InsertStringTo(QtWidgets.QWidget):
         """
         self.__insert_to.setCurrentIndex(value)
 
+    def target_index(self) -> int:
+        """Gets the current target combo box index.
+
+        Returns:
+            int: The current index (0 for Object, 1 for Render Setup).
+        """
+        return self.__target.currentIndex()
+
+    def set_target_index(self, value: int) -> None:
+        """Sets the target combo box index.
+
+        Args:
+            value (int): The index to set (0 for Object, 1 for Render Setup).
+        """
+        if self.__target.currentIndex() != value:
+            self.__target.setCurrentIndex(value)
+
 
 class FindReplaceRuleWidget(QtWidgets.QWidget):
     """A single row widget for a find and replace rule."""
@@ -338,6 +407,8 @@ class FindReplaceRuleWidget(QtWidgets.QWidget):
             find_str (str, optional): The initial find string. Defaults to "".
             replace_str (str, optional): The initial replace string.
                 Defaults to "".
+            is_enabled (bool, optional): Whether the rule is initially enabled.
+                Defaults to True.
             parent (QtWidgets.QWidget | None, optional): The parent widget.
                 Defaults to None.
             flag (QtCore.Qt.WindowType, optional): The window flags.
@@ -375,7 +446,7 @@ class FindReplaceRuleWidget(QtWidgets.QWidget):
 
         Returns:
             tuple[str, str, bool]: A tuple containing the find string,
-                replace string, and enabled state.
+                replace string, and the enabled state.
         """
         return (
             self.__search.text(),
@@ -387,7 +458,8 @@ class FindReplaceRuleWidget(QtWidgets.QWidget):
 class FindAndReplace(QtWidgets.QWidget):
     """Find and replace option tab with dynamic rows."""
 
-    applied = QtCore.Signal(bool)
+    applied = QtCore.Signal(bool, bool)
+    target_changed = QtCore.Signal(int)
 
     def __init__(
         self,
@@ -404,7 +476,7 @@ class FindAndReplace(QtWidgets.QWidget):
         """
         super().__init__(parent, flag)
         main_layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(self)
-        main_layout.setContentsMargins(4, 10, 4, 4)
+        main_layout.setContentsMargins(0, 10, 0, 0)
 
         scroll_area = QtWidgets.QScrollArea(self)
         scroll_area.setWidgetResizable(True)
@@ -430,14 +502,29 @@ class FindAndReplace(QtWidgets.QWidget):
         ctrl_layout.addWidget(button)
 
         btn_layout: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout()
+        btn_layout.setContentsMargins(0, 10, 0, 0)
         main_layout.addLayout(btn_layout)
 
+        label: QtWidgets.QLabel = QtWidgets.QLabel("Target:", self)
+        label.setMaximumWidth(40)
+        btn_layout.addWidget(label, False)
+
+        self.__target: QtWidgets.QComboBox = QtWidgets.QComboBox(self)
+        self.__target.addItems(["Object", "Render Setup"])
+        self.__target.setMaximumHeight(29)
+        self.__target.currentIndexChanged.connect(self.target_changed.emit)
+        btn_layout.addWidget(self.__target)
+
         button = QtWidgets.QPushButton("Preview", self)
-        button.clicked.connect(lambda: self.applied.emit(True))
+        button.clicked.connect(
+            lambda: self.applied.emit(True, self.__target.currentIndex() == 1)
+        )
         btn_layout.addWidget(button)
 
         button = QtWidgets.QPushButton("Apply", self)
-        button.clicked.connect(lambda: self.applied.emit(False))
+        button.clicked.connect(
+            lambda: self.applied.emit(False, self.__target.currentIndex() == 1)
+        )
         btn_layout.addWidget(button)
 
     @QtCore.Slot()
@@ -474,7 +561,8 @@ class FindAndReplace(QtWidgets.QWidget):
         """Collects the find and replace data from all dynamic rows.
 
         Returns:
-            list[tuple[str, str]]: A list of (find, replace) tuples.
+            list[tuple[str, str, bool]]: A list of tuples containing the find
+                string, replace string, and enabled state.
         """
         rules: list[tuple[str, str, bool]] = []
         for i in range(self.__rules_layout.count()):
@@ -496,8 +584,8 @@ class FindAndReplace(QtWidgets.QWidget):
         """Populates the dynamic rows from a list of rules.
 
         Args:
-            rules (list[list[str]]): A list of rule pairs
-                (e.g., [["find1", "replace1"], ...]).
+            rules (list[list[Any]]): A list of rule lists
+                (e.g., [["find1", "replace1", True], ...]).
         """
         while self.__rules_layout.count():
             item: QtWidgets.QLayoutItem | None = self.__rules_layout.takeAt(0)
@@ -518,6 +606,23 @@ class FindAndReplace(QtWidgets.QWidget):
 
         if self.__rules_layout.count() == 0:
             self.add_rule()
+
+    def target_index(self) -> int:
+        """Gets the current target combo box index.
+
+        Returns:
+            int: The current index (0 for Object, 1 for Render Setup).
+        """
+        return self.__target.currentIndex()
+
+    def set_target_index(self, value: int) -> None:
+        """Sets the target combo box index.
+
+        Args:
+            value (int): The index to set (0 for Object, 1 for Render Setup).
+        """
+        if self.__target.currentIndex() != value:
+            self.__target.setCurrentIndex(value)
 
 
 class MainWindow(framework.ToolWindow[Settings]):
@@ -543,6 +648,8 @@ class MainWindow(framework.ToolWindow[Settings]):
         self.setWindowTitle(__product__)
         self.resize(400, 300)
         self.__tab: QtWidgets.QTabWidget
+        self.__string_and_number: StringAndNumber
+        self.__insert_string_to: InsertStringTo
         self.__find_and_replace: FindAndReplace
 
     def create_ui(self, parent: QtWidgets.QWidget) -> None:
@@ -558,17 +665,21 @@ class MainWindow(framework.ToolWindow[Settings]):
         self.__tab.setDocumentMode(True)
         main_layout.addWidget(self.__tab)
 
-        string_and_number: StringAndNumber = StringAndNumber(self)
-        string_and_number.applied.connect(self.string_and_number)
-        self.__tab.addTab(string_and_number, "String && Number")
+        self.__string_and_number = StringAndNumber(self)
+        self.__string_and_number.applied.connect(self.string_and_number)
+        self.__tab.addTab(self.__string_and_number, "String && Number")
 
-        insert_string_to: InsertStringTo = InsertStringTo(self)
-        insert_string_to.applied.connect(self.insert_string)
-        self.__tab.addTab(insert_string_to, "Insert String To")
+        self.__insert_string_to = InsertStringTo(self)
+        self.__insert_string_to.applied.connect(self.insert_string)
+        self.__tab.addTab(self.__insert_string_to, "Insert String To")
 
         self.__find_and_replace = FindAndReplace(self)
         self.__find_and_replace.applied.connect(self.find_replace)
         self.__tab.addTab(self.__find_and_replace, "Find && Replace")
+
+        self.__string_and_number.target_changed.connect(self.sync_targets)
+        self.__insert_string_to.target_changed.connect(self.sync_targets)
+        self.__find_and_replace.target_changed.connect(self.sync_targets)
 
         settings: Settings = self.tool_settings()
         settings.window_geo.bind(
@@ -578,40 +689,57 @@ class MainWindow(framework.ToolWindow[Settings]):
             decoder=utils.ascii_to_qt,
         )
         settings.base_name.bind(
-            setter=string_and_number.set_base_name,
-            getter=string_and_number.base_name,
+            setter=self.__string_and_number.set_base_name,
+            getter=self.__string_and_number.base_name,
         )
         settings.start_number.bind(
-            setter=string_and_number.set_start_number,
-            getter=string_and_number.start_number,
+            setter=self.__string_and_number.set_start_number,
+            getter=self.__string_and_number.start_number,
         )
         settings.padding.bind(
-            setter=string_and_number.set_padding,
-            getter=string_and_number.padding,
+            setter=self.__string_and_number.set_padding,
+            getter=self.__string_and_number.padding,
         )
         settings.suffix.bind(
-            setter=string_and_number.set_suffix,
-            getter=string_and_number.suffix,
+            setter=self.__string_and_number.set_suffix,
+            getter=self.__string_and_number.suffix,
         )
         settings.insert_str.bind(
-            setter=insert_string_to.set_insert,
-            getter=insert_string_to.insert,
+            setter=self.__insert_string_to.set_insert,
+            getter=self.__insert_string_to.insert,
         )
         settings.insert_to.bind(
-            setter=insert_string_to.set_insert_to,
-            getter=insert_string_to.insert_to,
+            setter=self.__insert_string_to.set_insert_to,
+            getter=self.__insert_string_to.insert_to,
         )
         settings.find_replace_rules.bind(
             setter=self.__find_and_replace.set_rules,
             getter=self.__find_and_replace.rules,
         )
+        settings.target_index.bind(
+            setter=self.sync_targets,
+            getter=self.__string_and_number.target_index,
+        )
 
-    def string_and_number(self, preview: bool) -> None:
+    @QtCore.Slot(int)
+    def sync_targets(self, index: int) -> None:
+        """Synchronizes the target combo box index across all tabs.
+
+        Args:
+            index (int): The target combo box index to sync (0 or 1).
+        """
+        self.__string_and_number.set_target_index(index)
+        self.__insert_string_to.set_target_index(index)
+        self.__find_and_replace.set_target_index(index)
+
+    def string_and_number(self, preview: bool, is_rs_only: bool) -> None:
         """Executes the string and number logic.
 
         Args:
             preview (bool): If True, runs in preview mode without modifying
                 the scene.
+            is_rs_only (bool): If True, applies renaming only to Render Setup
+                nodes instead of objects.
         """
         self.save_settings()
         settings: Settings = self.tool_settings()
@@ -638,14 +766,16 @@ class MainWindow(framework.ToolWindow[Settings]):
             _logger.error("Start has no legal characters.")
             return
 
-        self.rename([(find, replace)], number, preview)
+        self.rename([(find, replace)], number, preview, is_rs_only)
 
-    def insert_string(self, preview: bool) -> None:
+    def insert_string(self, preview: bool, is_rs_only: bool) -> None:
         """Executes the insert string logic.
 
         Args:
             preview (bool): If True, runs in preview mode without modifying
                 the scene.
+            is_rs_only (bool): If True, applies renaming only to Render Setup
+                nodes instead of objects.
         """
         self.save_settings()
         settings: Settings = self.tool_settings()
@@ -657,14 +787,16 @@ class MainWindow(framework.ToolWindow[Settings]):
         else:
             replace = f"@g<0>{insert_str}"
 
-        self.rename([(find, replace)], preview=preview)
+        self.rename([(find, replace)], preview=preview, is_rs_only=is_rs_only)
 
-    def find_replace(self, preview: bool) -> None:
+    def find_replace(self, preview: bool, is_rs_only: bool) -> None:
         """Executes the multiple find and replace logic.
 
         Args:
             preview (bool): If True, runs in preview mode without modifying
                 the scene.
+            is_rs_only (bool): If True, applies renaming only to Render Setup
+                nodes instead of objects.
         """
         self.save_settings()
         raw_rules: list[tuple[str, str, bool]] = self.__find_and_replace.rules()
@@ -673,7 +805,7 @@ class MainWindow(framework.ToolWindow[Settings]):
             if is_enabled:
                 rules.append((find.replace("*", ".*"), replace))
 
-        self.rename(rules, preview=preview)
+        self.rename(rules, preview=preview, is_rs_only=is_rs_only)
 
     @dcc.undo
     def rename(
@@ -681,6 +813,7 @@ class MainWindow(framework.ToolWindow[Settings]):
         rules: list[tuple[str, str]],
         number: int = 0,
         preview: bool = False,
+        is_rs_only: bool = False,
     ) -> None:
         """A wrapper for the core renaming logic to handle UI updates and
         undo grouping.
@@ -691,9 +824,13 @@ class MainWindow(framework.ToolWindow[Settings]):
                 Defaults to 0.
             preview (bool, optional): If True, opens the preview dialog
                 instead of applying directly. Defaults to False.
+            is_rs_only (bool, optional): If True, targets Render Setup selection
+                instead of the active viewport selection. Defaults to False.
         """
         if preview:
-            changes: list[tuple[str, str]] = rename(rules, number, preview=True)
+            changes: list[tuple[str, str]] = rename(
+                rules, number, preview=True, is_rs_only=is_rs_only
+            )
             if not changes:
                 _logger.warning("No nodes will be renamed.")
                 return
@@ -701,10 +838,10 @@ class MainWindow(framework.ToolWindow[Settings]):
             dialog: PreviewDialog = PreviewDialog(changes, self)
             result: int = dialog.exec_()
             if result == QtWidgets.QDialog.DialogCode.Accepted:
-                rename(rules, number, preview=False)
+                rename(rules, number, preview=False, is_rs_only=is_rs_only)
 
         else:
-            rename(rules, number, preview=False)
+            rename(rules, number, preview=False, is_rs_only=is_rs_only)
 
 
 def num_to_char(v: int, padding: int, is_lower: bool = False) -> str:
@@ -882,18 +1019,24 @@ def apply_rules(
 
 
 def rename(
-    rules: list[tuple[str, str]], number: int = 0, preview: bool = False
+    rules: list[tuple[str, str]],
+    number: int = 0,
+    preview: bool = False,
+    is_rs_only: bool = False,
 ) -> list[tuple[str, str]]:
-    """Core renaming logic handling sequential rules across selected objects.
+    """Core renaming logic handling sequential rules across selected nodes.
 
-    Iterates over currently selected nodes in Maya (including Render Setup layers)
-    and applies the renaming rules. It returns a list of the modifications made.
+    Iterates over currently selected nodes in Maya or Render Setup layers
+    based on the target mode, and applies the renaming rules. It returns
+    a list of the modifications made.
 
     Args:
         rules (list[tuple[str, str]]): A list of (find, replace) tuples.
         number (int, optional): The initial sequence number. Defaults to 0.
         preview (bool, optional): If True, performs calculations but
             avoids renaming nodes. Defaults to False.
+        is_rs_only (bool, optional): If True, targets Render Setup selection
+            instead of the global active selection. Defaults to False.
 
     Returns:
         list[tuple[str, str]]: A list of (old_name, new_name) tuples for
@@ -903,11 +1046,15 @@ def rename(
     has_error: bool = False
     changes: list[tuple[str, str]] = []
 
-    selection: OpenMaya.MSelectionList = (
-        OpenMaya.MGlobal.getActiveSelectionList(True)
-    )
-    rs_selection: list[str] = viewCmds.getSelection(False, False, False, False)
-    if not selection and not rs_selection:
+    rs_selection: list[str] = []
+    selection: OpenMaya.MSelectionList = OpenMaya.MSelectionList()
+
+    if is_rs_only:
+        rs_selection = viewCmds.getSelection(False, False, False, False)
+    else:
+        selection = OpenMaya.MGlobal.getActiveSelectionList(True)
+
+    if not selection.length() and not rs_selection:
         _logger.error("Select nodes or render layer to rename.")
         return changes
 
