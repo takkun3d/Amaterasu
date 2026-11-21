@@ -27,17 +27,20 @@ on what matters: creating.
 """
 
 from __future__ import annotations
-from typing import Any
+
 import re
+from typing import Any
+
 from maya import cmds
 from maya.api import OpenMaya
 from maya.app.renderSetup.model import utils as rs_utils
 from maya.app.renderSetup.views import viewCmds
-from amaterasu.base.qt import QtCore, QtWidgets, QtGui
+
 from amaterasu.base import dcc, framework, utils, widgets
+from amaterasu.base.qt import QtCore, QtGui, QtWidgets
 
 __product__: str = "Renamer"
-__version__: str = "1.40"
+__version__: str = "1.51"
 _logger: utils.Logger = utils.get_logger(__product__)
 
 
@@ -56,6 +59,8 @@ class Settings(framework.ToolSettings):
             (0 for First, 1 for Last).
         find_replace_rules (framework.Variant[str]): JSON string representing
             multiple find/replace rules.
+        target_index (framework.Variant[int]): The index of the target
+            selection mode (0 for Object, 1 for Render Setup).
     """
 
     window_geo: framework.Variant[str] = framework.Variant("")
@@ -65,7 +70,9 @@ class Settings(framework.ToolSettings):
     suffix: framework.Variant[str] = framework.Variant("")
     insert_str: framework.Variant[str] = framework.Variant("")
     insert_to: framework.Variant[int] = framework.Variant(0)
-    find_replace_rules: framework.Variant[str] = framework.Variant('[["", ""]]')
+    find_replace_rules: framework.Variant[str] = framework.Variant(
+        '[["", "", true]]'
+    )
 
 
 class PreviewDialog(QtWidgets.QDialog):
@@ -163,9 +170,10 @@ class StringAndNumber(QtWidgets.QWidget):
         form_layout.addRow(widgets.FormLabel("Suffix"), self.__suffix)
 
         btn_layout: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout()
+        btn_layout.setContentsMargins(0, 10, 0, 0)
         main_layout.addLayout(btn_layout)
 
-        button: QtWidgets.QPushButton = QtWidgets.QPushButton("Preview", self)
+        button = QtWidgets.QPushButton("Preview", self)
         button.clicked.connect(lambda: self.applied.emit(True))
         btn_layout.addWidget(button)
 
@@ -271,9 +279,10 @@ class InsertStringTo(QtWidgets.QWidget):
         form_layout.addRow(widgets.FormLabel("Insert to"), self.__insert_to)
 
         btn_layout: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout()
+        btn_layout.setContentsMargins(0, 10, 0, 0)
         main_layout.addLayout(btn_layout)
 
-        button: QtWidgets.QPushButton = QtWidgets.QPushButton("Preview", self)
+        button = QtWidgets.QPushButton("Preview", self)
         button.clicked.connect(lambda: self.applied.emit(True))
         btn_layout.addWidget(button)
 
@@ -323,6 +332,7 @@ class FindReplaceRuleWidget(QtWidgets.QWidget):
         self,
         find_str: str = "",
         replace_str: str = "",
+        is_enabled: bool = True,
         parent: QtWidgets.QWidget | None = None,
         flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Widget,
     ) -> None:
@@ -332,6 +342,8 @@ class FindReplaceRuleWidget(QtWidgets.QWidget):
             find_str (str, optional): The initial find string. Defaults to "".
             replace_str (str, optional): The initial replace string.
                 Defaults to "".
+            is_enabled (bool, optional): Whether the rule is initially enabled.
+                Defaults to True.
             parent (QtWidgets.QWidget | None, optional): The parent widget.
                 Defaults to None.
             flag (QtCore.Qt.WindowType, optional): The window flags.
@@ -341,6 +353,10 @@ class FindReplaceRuleWidget(QtWidgets.QWidget):
         layout: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
+
+        self.__enabled: QtWidgets.QCheckBox = QtWidgets.QCheckBox(self)
+        self.__enabled.setChecked(is_enabled)
+        layout.addWidget(self.__enabled)
 
         self.__search: QtWidgets.QLineEdit = QtWidgets.QLineEdit(self)
         self.__search.setPlaceholderText("Find")
@@ -360,13 +376,18 @@ class FindReplaceRuleWidget(QtWidgets.QWidget):
         button.clicked.connect(lambda: self.removed.emit(self))
         layout.addWidget(button)
 
-    def rule(self) -> tuple[str, str]:
+    def rule(self) -> tuple[str, str, bool]:
         """Gets the rule from this widget.
 
         Returns:
-            tuple[str, str]: A tuple containing the find and replace strings.
+            tuple[str, str, bool]: A tuple containing the find string,
+                replace string, and the enabled state.
         """
-        return self.__search.text(), self.__replace.text()
+        return (
+            self.__search.text(),
+            self.__replace.text(),
+            self.__enabled.isChecked(),
+        )
 
 
 class FindAndReplace(QtWidgets.QWidget):
@@ -389,7 +410,7 @@ class FindAndReplace(QtWidgets.QWidget):
         """
         super().__init__(parent, flag)
         main_layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(self)
-        main_layout.setContentsMargins(4, 10, 4, 4)
+        main_layout.setContentsMargins(0, 10, 0, 0)
 
         scroll_area = QtWidgets.QScrollArea(self)
         scroll_area.setWidgetResizable(True)
@@ -415,6 +436,7 @@ class FindAndReplace(QtWidgets.QWidget):
         ctrl_layout.addWidget(button)
 
         btn_layout: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout()
+        btn_layout.setContentsMargins(0, 10, 0, 0)
         main_layout.addLayout(btn_layout)
 
         button = QtWidgets.QPushButton("Preview", self)
@@ -426,15 +448,19 @@ class FindAndReplace(QtWidgets.QWidget):
         btn_layout.addWidget(button)
 
     @QtCore.Slot()
-    def add_rule(self, find: str = "", replace: str = "") -> None:
+    def add_rule(
+        self, find: str = "", replace: str = "", is_enabled: bool = True
+    ) -> None:
         """Adds a new dynamic rule row.
 
         Args:
             find (str, optional): The initial find string. Defaults to "".
             replace (str, optional): The initial replace string. Defaults to "".
+            is_enabled (bool, optional): The initial enable replace.
+                Defaults to true.
         """
         rule_widget: FindReplaceRuleWidget = FindReplaceRuleWidget(
-            find, replace, self.rules_container
+            find, replace, is_enabled, self.rules_container
         )
         rule_widget.removed.connect(self.remove_rule)
         self.__rules_layout.addWidget(rule_widget)
@@ -451,37 +477,52 @@ class FindAndReplace(QtWidgets.QWidget):
         if self.__rules_layout.count() == 0:
             self.add_rule()
 
-    def rules(self) -> list[tuple[str, str]]:
+    def rules(self) -> list[tuple[str, str, bool]]:
         """Collects the find and replace data from all dynamic rows.
 
         Returns:
-            list[tuple[str, str]]: A list of (find, replace) tuples.
+            list[tuple[str, str, bool]]: A list of tuples containing the find
+                string, replace string, and enabled state.
         """
-        rules: list[tuple[str, str]] = []
+        rules: list[tuple[str, str, bool]] = []
         for i in range(self.__rules_layout.count()):
-            item: QtWidgets.QLayoutItem = self.__rules_layout.itemAt(i)
+            item: QtWidgets.QLayoutItem | None = self.__rules_layout.itemAt(i)
+            if not item:
+                continue
+
             if item and item.widget():
-                widget: QtWidgets.QWidget = item.widget()
+                widget: QtWidgets.QWidget | None = item.widget()
+                if not widget:
+                    continue
+
                 if isinstance(widget, FindReplaceRuleWidget):
                     rules.append(widget.rule())
 
         return rules
 
-    def set_rules(self, rules: list[list[str]]) -> None:
+    def set_rules(self, rules: list[list[Any]]) -> None:
         """Populates the dynamic rows from a list of rules.
 
         Args:
-            rules (list[list[str]]): A list of rule pairs
-                (e.g., [["find1", "replace1"], ...]).
+            rules (list[list[Any]]): A list of rule lists
+                (e.g., [["find1", "replace1", True], ...]).
         """
         while self.__rules_layout.count():
-            item: QtWidgets.QLayoutItem = self.__rules_layout.takeAt(0)
+            item: QtWidgets.QLayoutItem | None = self.__rules_layout.takeAt(0)
+            if not item:
+                continue
+
             if item and item.widget():
-                item.widget().deleteLater()
+                _widget: QtWidgets.QWidget | None = item.widget()
+                if _widget:
+                    _widget.deleteLater()
 
         for rule in rules:
-            if len(rule) == 2:
-                self.add_rule(rule[0], rule[1])
+            if len(rule) >= 3:
+                self.add_rule(rule[0], rule[1], rule[2])
+
+            elif len(rule) == 2:
+                self.add_rule(rule[0], rule[1], True)
 
         if self.__rules_layout.count() == 0:
             self.add_rule()
@@ -510,6 +551,8 @@ class MainWindow(framework.ToolWindow[Settings]):
         self.setWindowTitle(__product__)
         self.resize(400, 300)
         self.__tab: QtWidgets.QTabWidget
+        self.__string_and_number: StringAndNumber
+        self.__insert_string_to: InsertStringTo
         self.__find_and_replace: FindAndReplace
 
     def create_ui(self, parent: QtWidgets.QWidget) -> None:
@@ -525,13 +568,13 @@ class MainWindow(framework.ToolWindow[Settings]):
         self.__tab.setDocumentMode(True)
         main_layout.addWidget(self.__tab)
 
-        string_and_number: StringAndNumber = StringAndNumber(self)
-        string_and_number.applied.connect(self.string_and_number)
-        self.__tab.addTab(string_and_number, "String && Number")
+        self.__string_and_number = StringAndNumber(self)
+        self.__string_and_number.applied.connect(self.string_and_number)
+        self.__tab.addTab(self.__string_and_number, "String && Number")
 
-        insert_string_to: InsertStringTo = InsertStringTo(self)
-        insert_string_to.applied.connect(self.insert_string)
-        self.__tab.addTab(insert_string_to, "Insert String To")
+        self.__insert_string_to = InsertStringTo(self)
+        self.__insert_string_to.applied.connect(self.insert_string)
+        self.__tab.addTab(self.__insert_string_to, "Insert String To")
 
         self.__find_and_replace = FindAndReplace(self)
         self.__find_and_replace.applied.connect(self.find_replace)
@@ -545,28 +588,28 @@ class MainWindow(framework.ToolWindow[Settings]):
             decoder=utils.ascii_to_qt,
         )
         settings.base_name.bind(
-            setter=string_and_number.set_base_name,
-            getter=string_and_number.base_name,
+            setter=self.__string_and_number.set_base_name,
+            getter=self.__string_and_number.base_name,
         )
         settings.start_number.bind(
-            setter=string_and_number.set_start_number,
-            getter=string_and_number.start_number,
+            setter=self.__string_and_number.set_start_number,
+            getter=self.__string_and_number.start_number,
         )
         settings.padding.bind(
-            setter=string_and_number.set_padding,
-            getter=string_and_number.padding,
+            setter=self.__string_and_number.set_padding,
+            getter=self.__string_and_number.padding,
         )
         settings.suffix.bind(
-            setter=string_and_number.set_suffix,
-            getter=string_and_number.suffix,
+            setter=self.__string_and_number.set_suffix,
+            getter=self.__string_and_number.suffix,
         )
         settings.insert_str.bind(
-            setter=insert_string_to.set_insert,
-            getter=insert_string_to.insert,
+            setter=self.__insert_string_to.set_insert,
+            getter=self.__insert_string_to.insert,
         )
         settings.insert_to.bind(
-            setter=insert_string_to.set_insert_to,
-            getter=insert_string_to.insert_to,
+            setter=self.__insert_string_to.set_insert_to,
+            getter=self.__insert_string_to.insert_to,
         )
         settings.find_replace_rules.bind(
             setter=self.__find_and_replace.set_rules,
@@ -634,10 +677,11 @@ class MainWindow(framework.ToolWindow[Settings]):
                 the scene.
         """
         self.save_settings()
-        raw_rules: list[tuple[str, str]] = self.__find_and_replace.rules()
+        raw_rules: list[tuple[str, str, bool]] = self.__find_and_replace.rules()
         rules: list[tuple[str, str]] = []
-        for find, replace in raw_rules:
-            rules.append((find.replace("*", ".*"), replace))
+        for find, replace, is_enabled in raw_rules:
+            if is_enabled:
+                rules.append((find.replace("*", ".*"), replace))
 
         self.rename(rules, preview=preview)
 
@@ -658,19 +702,55 @@ class MainWindow(framework.ToolWindow[Settings]):
             preview (bool, optional): If True, opens the preview dialog
                 instead of applying directly. Defaults to False.
         """
+        selection: OpenMaya.MSelectionList = (
+            OpenMaya.MGlobal.getActiveSelectionList(True)
+        )
+        rs_selection: list[str] = viewCmds.getSelection(
+            False, False, False, False
+        )
+        target_mode: str = "all"
+        if selection.length() > 0 and rs_selection:
+            msg: QtWidgets.QMessageBox = QtWidgets.QMessageBox(self)
+            msg.setWindowTitle("Target Selection")
+            msg.setText(
+                "Both Object and Render Setup are selected.\n"
+                "Which one would you like to rename?"
+            )
+            msg.setIcon(QtWidgets.QMessageBox.Icon.Question)
+
+            btn_obj: QtWidgets.QPushButton = msg.addButton(
+                "Object", QtWidgets.QMessageBox.ButtonRole.ActionRole
+            )
+            btn_rs: QtWidgets.QPushButton = msg.addButton(
+                "Render Setup", QtWidgets.QMessageBox.ButtonRole.ActionRole
+            )
+            msg.addButton("Cancel", QtWidgets.QMessageBox.ButtonRole.RejectRole)
+
+            msg.exec_()
+            clicked: QtWidgets.QAbstractButton = msg.clickedButton()
+            if clicked == btn_obj:
+                target_mode = "object"
+
+            elif clicked == btn_rs:
+                target_mode = "rs"
+
+            else:
+                return
+
         if preview:
-            changes: list[tuple[str, str]] = rename(rules, number, preview=True)
+            changes: list[tuple[str, str]] = rename(
+                rules, number, preview=True, target_mode=target_mode
+            )
             if not changes:
-                _logger.warning("No nodes will be renamed.")
                 return
 
             dialog: PreviewDialog = PreviewDialog(changes, self)
             result: int = dialog.exec_()
             if result == QtWidgets.QDialog.DialogCode.Accepted:
-                rename(rules, number, preview=False)
+                rename(rules, number, preview=False, target_mode=target_mode)
 
         else:
-            rename(rules, number, preview=False)
+            rename(rules, number, preview=False, target_mode=target_mode)
 
 
 def num_to_char(v: int, padding: int, is_lower: bool = False) -> str:
@@ -848,18 +928,24 @@ def apply_rules(
 
 
 def rename(
-    rules: list[tuple[str, str]], number: int = 0, preview: bool = False
+    rules: list[tuple[str, str]],
+    number: int = 0,
+    preview: bool = False,
+    target_mode: str = "all",
 ) -> list[tuple[str, str]]:
-    """Core renaming logic handling sequential rules across selected objects.
+    """Core renaming logic handling sequential rules across selected nodes.
 
-    Iterates over currently selected nodes in Maya (including Render Setup layers)
-    and applies the renaming rules. It returns a list of the modifications made.
+    Iterates over currently selected nodes in Maya or Render Setup layers
+    based on the target mode, and applies the renaming rules. It returns
+    a list of the modifications made.
 
     Args:
         rules (list[tuple[str, str]]): A list of (find, replace) tuples.
         number (int, optional): The initial sequence number. Defaults to 0.
         preview (bool, optional): If True, performs calculations but
             avoids renaming nodes. Defaults to False.
+        target_mode (str, optional): The target selection mode for renaming.
+            Accepts "all", "object", or "rs". Defaults to "all".
 
     Returns:
         list[tuple[str, str]]: A list of (old_name, new_name) tuples for
@@ -869,11 +955,16 @@ def rename(
     has_error: bool = False
     changes: list[tuple[str, str]] = []
 
-    selection: OpenMaya.MSelectionList = (
-        OpenMaya.MGlobal.getActiveSelectionList(True)
-    )
-    rs_selection: list[str] = viewCmds.getSelection(False, False, False, False)
-    if not selection and not rs_selection:
+    rs_selection: list[str] = []
+    selection: OpenMaya.MSelectionList = OpenMaya.MSelectionList()
+
+    if target_mode in ("all", "rs"):
+        rs_selection = viewCmds.getSelection(False, False, False, False)
+
+    if target_mode in ("all", "object"):
+        selection = OpenMaya.MGlobal.getActiveSelectionList(True)
+
+    if not selection.length() and not rs_selection:
         _logger.error("Select nodes or render layer to rename.")
         return changes
 
@@ -925,6 +1016,9 @@ def rename(
 
     if not has_error and not preview and changes:
         _logger.info("Done")
+
+    elif not changes:
+        _logger.warning("No nodes will be renamed.")
 
     return changes
 
