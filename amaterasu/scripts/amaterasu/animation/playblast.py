@@ -20,16 +20,18 @@
 """Quick playblast from the rendering setup."""
 
 from __future__ import annotations
+
 import os
 from dataclasses import dataclass, field
+
 from maya import cmds, mel
-from maya.app.renderSetup.model import renderSetup
-from maya.app.renderSetup.model import renderLayer
-from amaterasu.base.qt import QtCore, QtWidgets
+from maya.app.renderSetup.model import renderLayer, renderSetup
+
 from amaterasu.base import dcc, framework, utils, widgets
+from amaterasu.base.qt import QtCore, QtWidgets
 
 __product__: str = "Playblast"
-__version__: str = "1.31"
+__version__: str = "1.32"
 _logger: utils.Logger = utils.get_logger(__product__)
 
 DEFAULT_FILE_NAME_PREFIX: str = "<Scene>/<RenderLayer>/<RenderLayer>"
@@ -634,10 +636,18 @@ def playblast(layer_name: str, option: PlayblastOption) -> None:
     msaa: bool = cmds.getAttr("hardwareRenderingGlobals.multiSampleEnable")
     start_frame: float = cmds.getAttr("defaultRenderGlobals.startFrame")
     end_frame: float = cmds.getAttr("defaultRenderGlobals.endFrame")
+    film_gate: bool = cmds.getAttr(f"{option.camera}.displayFilmGate")
+    res_gate: bool = cmds.getAttr(f"{option.camera}.displayResolution")
+    overscan: float = cmds.getAttr(f"{option.camera}.overscan")
+    pan_zoom: bool = cmds.getAttr(f"{option.camera}.panZoomEnabled")
 
     cmds.setAttr("hardwareRenderingGlobals.ssaoEnable", option.ssao)
     cmds.setAttr("hardwareRenderingGlobals.motionBlurEnable", option.mb)
     cmds.setAttr("hardwareRenderingGlobals.multiSampleEnable", option.msaa)
+    cmds.setAttr(f"{option.camera}.displayFilmGate", False)
+    cmds.setAttr(f"{option.camera}.displayResolution", False)
+    cmds.setAttr(f"{option.camera}.overscan", 1.0)
+    cmds.setAttr(f"{option.camera}.panZoomEnabled", False)
 
     cmds.setFocus(panel)
     cmds.playblast(
@@ -661,6 +671,10 @@ def playblast(layer_name: str, option: PlayblastOption) -> None:
     cmds.setAttr("hardwareRenderingGlobals.ssaoEnable", ssao)
     cmds.setAttr("hardwareRenderingGlobals.motionBlurEnable", mb)
     cmds.setAttr("hardwareRenderingGlobals.multiSampleEnable", msaa)
+    cmds.setAttr(f"{option.camera}.displayFilmGate", film_gate)
+    cmds.setAttr(f"{option.camera}.displayResolution", res_gate)
+    cmds.setAttr(f"{option.camera}.overscan", overscan)
+    cmds.setAttr(f"{option.camera}.panZoomEnabled", pan_zoom)
     cmds.deleteUI(window)
 
 
