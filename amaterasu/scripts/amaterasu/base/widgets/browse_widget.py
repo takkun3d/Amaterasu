@@ -24,6 +24,7 @@ capturing selected Maya nodes, or triggering custom input dialogs.
 """
 
 from __future__ import annotations
+
 from amaterasu.base.qt import QtCore, QtWidgets
 from amaterasu.base.widgets.icon_button import IconButton
 
@@ -105,3 +106,19 @@ class BrowseWidget(QtWidgets.QWidget):
             value (bool): True to make the line edit read-only, False otherwise.
         """
         self.__line_edit.setReadOnly(value)
+
+    def placeholder_text(self) -> str:
+        """Gets the current placeholder text of the line edit.
+
+        Returns:
+            str: The text currently displayed in the line edit.
+        """
+        return self.__line_edit.placeholderText()
+
+    def set_placeholder_text(self, text: str) -> None:
+        """Set placeholder text to QLineEdit.
+
+        Args:
+            text (str): The placeholder text to display in the line edit.
+        """
+        self.__line_edit.setPlaceholderText(text)

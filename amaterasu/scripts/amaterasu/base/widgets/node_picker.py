@@ -20,7 +20,9 @@
 """Custom Node Picker widget based on BrowseWidget."""
 
 from __future__ import annotations
+
 from maya import cmds
+
 from amaterasu.base.qt import QtCore, QtWidgets
 from amaterasu.base.widgets.browse_widget import BrowseWidget
 
