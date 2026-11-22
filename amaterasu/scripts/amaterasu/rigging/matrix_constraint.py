@@ -1,362 +1,352 @@
-# ==============================================================================
+# Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.
 #
-# Matrix Constraint
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# ==============================================================================
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+"""Constrains the specified node using matrix calculations."""
+
 from __future__ import annotations
-from typing import TYPE_CHECKING
-
-try:
-    from PySide2.QtCore import Qt, Slot
-    from PySide2.QtWidgets import (
-        QWidget,
-        QComboBox,
-        QCheckBox,
-        QPushButton,
-        QVBoxLayout,
-    )
-
-except ImportError:
-    if not TYPE_CHECKING:
-        from PySide6.QtCore import Qt, Slot
-        from PySide6.QtWidgets import (
-            QWidget,
-            QComboBox,
-            QCheckBox,
-            QPushButton,
-            QVBoxLayout,
-        )
 
 from maya import cmds
-from ..lib import logger, parser, widgets
-from amaterasu.base import dcc
 
-# ==============================================================================
-#
-# Variables
-#
-# ==============================================================================
-__product__: str = 'Matrix Constraint'
-__version__: str = '1.30'
-__doc__ = 'Constrains the specified node using matrix calculations.'
-__copyright__ = (
-    'Copyright (c) 2014-2026 takkun (takkun3d). Released under the MIT License.'
-)
-_logger: logger.Logger = logger.get_logger(__product__)
+from amaterasu.base import dcc, framework, utils, widgets
+from amaterasu.base.qt import QtCore, QtWidgets
 
-PLUGIN_NAME: str = 'quatNodes.mll'
+__product__: str = "Matrix Constraint"
+__version__: str = "1.40"
+_logger: utils.Logger = utils.get_logger(__product__)
+
+PLUGIN_NAME: str = "quatNodes.mll"
 
 
-# ==============================================================================
-#
-# Classes
-#
-# ==============================================================================
-class Settings(parser.ToolSettings):
-    '''Settings for tool.'''
+class Settings(framework.ToolSettings):
+    """Settings for the Matrix Constraint tool.
 
-    window_geo: parser.Variant[str] = parser.Variant('')
-    space: parser.Variant[int] = parser.Variant(1)  # 0:World 1:Local
-    follows_parent: parser.Variant[bool] = parser.Variant(True)
+    Attributes:
+        window_geo (framework.Variant[str]): The saved window geometry.
+        space (framework.Variant[int]): The calculation space
+            (0: World, 1: Local).
+        follows_parent (framework.Variant[bool]): Whether local space
+            calculations follow the parent transform.
+    """
+
+    window_geo: framework.Variant[str] = framework.Variant("")
+    space: framework.Variant[int] = framework.Variant(1)  # 0:World 1:Local
+    follows_parent: framework.Variant[bool] = framework.Variant(True)
 
 
-class MainWindow(widgets.ToolWidget):
-    '''Tool main window'''
+class MainWindow(framework.ToolWindow[Settings]):
+    """Main window for the Matrix Constraint tool."""
 
     def __init__(
         self,
-        parent: QWidget | None = None,
-        flag: Qt.WindowFlags = Qt.WindowFlags(),
-        unique_id: str = '',
+        parent: QtWidgets.QWidget | None = None,
+        flag: QtCore.Qt.WindowType = QtCore.Qt.WindowType.Window,
+        unique_id: str = "",
     ) -> None:
-        '''Initialize widget.'''
+        """Initializes the main window.
+
+        Args:
+            parent (QtWidgets.QWidget | None, optional): The parent widget.
+                Defaults to None.
+            flag (QtCore.Qt.WindowType, optional): The Qt window flags.
+                Defaults to Window.
+            unique_id (str, optional): A unique identifier for restoring
+                window states. Defaults to "".
+        """
         super().__init__(parent, flag, unique_id)
         self.setWindowTitle(__product__)
         self.resize(400, 200)
 
-        option_widget: QWidget = self.option_widget()
-        main_layout: QVBoxLayout = QVBoxLayout(option_widget)
+        self.__form_layout: widgets.FormLayout
+        self.__space: QtWidgets.QComboBox
+        self.__sources: widgets.NodePicker
+        self.__target: widgets.NodePicker
+        self.__follows_parent_idx: int
+
+    def create_ui(self, parent: QtWidgets.QWidget) -> None:
+        """Creates the tool-specific user interface elements.
+
+        Args:
+            parent (QtWidgets.QWidget): The parent widget for UI containment.
+        """
+        main_layout: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout(parent)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.__form_layout: widgets.FormLayout = widgets.FormLayout(self)
+        self.__form_layout = widgets.FormLayout(parent)
         main_layout.addLayout(self.__form_layout)
 
-        self.__space: QComboBox = QComboBox(self)
-        self.__space.addItem('World')
-        self.__space.addItem('Local')
+        self.__space = QtWidgets.QComboBox(parent)
+        self.__space.addItem("World")
+        self.__space.addItem("Local")
         self.__space.currentIndexChanged.connect(self.set_valid_options)
-        self.__form_layout.addRow(widgets.FormLabel('Space'), self.__space)
+        self.__form_layout.addRow(widgets.FormLabel("Space"), self.__space)
 
-        self.__form_layout.addRow(widgets.HorizontalLine(self))
+        self.__form_layout.addRow(widgets.HorizontalLine(parent))
 
-        self.__sources: widgets.NodePicker = widgets.NodePicker(-1, self)
-        self.__sources.set_placeholder_text(
-            '*Select in order: Parent -> Child.'
-        )
-        self.__form_layout.addRow(widgets.FormLabel('Sources'), self.__sources)
+        self.__sources = widgets.NodePicker(parent, multi_select=True)
+        self.__sources.set_placeholder_text("Select in order: Parent -> Child.")
+        self.__form_layout.addRow(widgets.FormLabel("Sources"), self.__sources)
 
-        self.__target: widgets.NodePicker = widgets.NodePicker(1, self)
-        self.__form_layout.addRow(widgets.FormLabel('Target'), self.__target)
+        self.__target = widgets.NodePicker(parent, multi_select=False)
+        self.__form_layout.addRow(widgets.FormLabel("Target"), self.__target)
 
-        self.__form_layout.addRow(widgets.HorizontalLine(self))
+        self.__form_layout.addRow(widgets.HorizontalLine(parent))
 
-        self.__follows_parent: QCheckBox = QCheckBox('Follows Parent', self)
-        self.__form_layout.addRow('', self.__follows_parent)
-        self.__follows_parent_idx: int = self.__form_layout.row_id()
+        follows_parent = QtWidgets.QCheckBox("Follows Parent", parent)
+        self.__form_layout.addRow("", follows_parent)
+        self.__follows_parent_idx = self.__form_layout.row_id()
 
-        button: QPushButton = QPushButton('Build', self)
+        button: QtWidgets.QPushButton = QtWidgets.QPushButton("Build", parent)
         button.clicked.connect(self.apply)
         main_layout.addStretch(True)
         main_layout.addWidget(button)
 
-    # override
-    def load_settings(self) -> None:
-        '''Load ui settings from file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        self.restoreGeometry(widgets.to_qt(settings.window_geo.value()))
-        self.__space.setCurrentIndex(settings.space.value())
-        self.__follows_parent.setChecked(settings.follows_parent.value())
+        settings: Settings = self.tool_settings()
+        settings.window_geo.bind(
+            setter=self.restoreGeometry,
+            getter=self.saveGeometry,
+            encoder=utils.qt_to_ascii,
+            decoder=utils.ascii_to_qt,
+        )
+        settings.space.bind(
+            setter=self.__space.setCurrentIndex,
+            getter=self.__space.currentIndex,
+        )
+        settings.follows_parent.bind(
+            setter=follows_parent.setChecked,
+            getter=follows_parent.isChecked,
+        )
         self.set_valid_options()
 
-    # override
-    def save_settings(self) -> None:
-        '''Save ui settings to file.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.window_geo.set_value(widgets.to_ascii(self.saveGeometry()))
-        settings.space.set_value(self.__space.currentIndex())
-        settings.follows_parent.set_value(self.__follows_parent.isChecked())
-        settings.write()
-
-    # override
-    def reset_settings(self) -> None:
-        '''Reset ui settings.[override]'''
-        settings: Settings = Settings.instance(__name__, True)
-        settings.reset()
-        self.load_settings()
-
-    # override
-    def about(self) -> None:
-        '''Show a about dialog.[override]'''
-        widgets.AboutDialog.info(
-            self, __product__, __version__, __copyright__, __doc__
-        )
-
-    @Slot()
+    @QtCore.Slot()
     def set_valid_options(self) -> None:
-        '''Synchronize with valid options.'''
+        """Synchronizes UI option states based on the selected space."""
         self.__form_layout.set_row_enabled(
-            self.__follows_parent_idx, (self.__space.currentIndex() == 1)
+            self.__follows_parent_idx, self.__space.currentIndex() == 1
         )
 
-    @widgets.undo
+    @dcc.undo
     def apply(self) -> None:
-        '''Apply'''
+        """Validates inputs and builds the matrix constraint."""
         self.save_settings()
 
-        settings: Settings = Settings.instance(__name__, True)
         sources: list[str] = self.__sources.text_as_list()
-        if not sources:
-            _logger.error('Source node is required to apply Matrix Constraint.')
-            return
-
         target: str = self.__target.text()
-        if not target:
-            _logger.error('Target node is required to apply Matrix Constraint.')
+        if not sources or not target:
+            _logger.error(
+                "Sources and Target nodes are required to apply Matrix Constraint."
+            )
             return
 
+        settings: Settings = self.tool_settings()
         apply(
             sources,
             target,
             settings.space.value(),
             settings.follows_parent.value(),
         )
-        _logger.info('Done.')
+        _logger.info("Done.")
 
 
-# ==============================================================================
-#
-# Functions
-#
-# ==============================================================================
+# TODO: Consider moving to amaterasu.base (e.g., dcc.rig or dcc.node).
+def extract_base_name(node: str) -> str:
+    """Extracts the short base name from a DAG path or namespaced node.
+
+    Args:
+        node (str): The full or partial node name.
+
+    Returns:
+        str: The extracted base name prefix.
+    """
+    short_name: str = node.split("|")[-1].split(":")[-1]
+    return short_name.split("_")[0]
+
+
+# TODO: Consider moving to amaterasu.base (e.g., dcc.rig).
+def cancel_joint_orient(prefix: str, target: str, decompose_mtx: str) -> str:
+    """Creates quaternion nodes to cancel out joint orientation.
+
+    Args:
+        prefix (str): The naming prefix for created nodes.
+        target (str): The target joint node name.
+        decompose_mtx (str): The decomposeMatrix node driving the target.
+
+    Returns:
+        str: The output rotate plug name after canceling joint orient.
+    """
+    joint_orient_quat: str = cmds.createNode(
+        "eulerToQuat", name=f"{prefix}_etq"
+    )
+    cmds.connectAttr(
+        f"{target}.jointOrient", f"{joint_orient_quat}.inputRotate"
+    )
+
+    invert_joint_orient_quat: str = cmds.createNode(
+        "quatInvert", name=f"{prefix}_qi"
+    )
+    cmds.connectAttr(
+        f"{joint_orient_quat}.outputQuat",
+        f"{invert_joint_orient_quat}.inputQuat",
+    )
+
+    remove_orient_prod: str = cmds.createNode("quatProd", name=f"{prefix}_qp")
+    cmds.connectAttr(
+        f"{decompose_mtx}.outputQuat",
+        f"{remove_orient_prod}.input1Quat",
+    )
+    cmds.connectAttr(
+        f"{invert_joint_orient_quat}.outputQuat",
+        f"{remove_orient_prod}.input2Quat",
+    )
+
+    joint_orient_euler: str = cmds.createNode(
+        "quatToEuler", name=f"{prefix}_qte"
+    )
+    cmds.connectAttr(
+        f"{remove_orient_prod}.outputQuat",
+        f"{joint_orient_euler}.inputQuat",
+    )
+    cmds.connectAttr(
+        f"{target}.rotateOrder",
+        f"{joint_orient_euler}.inputRotateOrder",
+    )
+    return f"{joint_orient_euler}.outputRotate"
+
+
+# TODO: Consider moving to amaterasu.base (e.g., dcc.rig).
+def connect_mult_matrix(
+    base_name: str,
+    source_plugs: list[str],
+    target_plug: str,
+) -> str:
+    """Creates a multMatrix node and connects the specified matrix plugs.
+
+    Args:
+        base_name (str): The naming prefix for the multMatrix node.
+        source_plugs (list[str]): Ordered list of source matrix plugs.
+        target_plug (str): The destination plug to connect the matrix sum to.
+
+    Returns:
+        str: The name of the created multMatrix node.
+    """
+    mult_matrix: str = cmds.createNode(
+        "multMatrix", name=f"{base_name}_multMtx"
+    )
+    for i, plug in enumerate(source_plugs):
+        cmds.connectAttr(plug, f"{mult_matrix}.matrixIn[{i}]")
+
+    cmds.connectAttr(f"{mult_matrix}.matrixSum", target_plug)
+    return mult_matrix
+
+
 def apply(
     sources: list[str],
     target: str,
     space: int = 1,
     follows_parent: bool = True,
 ) -> None:
-    '''Do it'''
+    """Builds a matrix constraint setup between the specified nodes.
 
-    if not cmds.pluginInfo(PLUGIN_NAME, query=True, loaded=True):
-        cmds.loadPlugin(PLUGIN_NAME)
+    Args:
+        sources (list[str]): Source transform nodes ordered from parent to
+            child.
+        target (str): The constrained target node name.
+        space (int, optional): Calculation space (0: World, 1: Local).
+            Defaults to 1.
+        follows_parent (bool, optional): Whether local space calculations
+            follow the parent transform. Defaults to True.
+    """
 
-    base_name: str = sources[-1].split('|')[-1].split(':')[-1]
-    base_name = base_name.split('_')[0]
+    dcc.plugin.load(PLUGIN_NAME)
 
-    target_base_name: str = target.split('|')[-1].split(':')[-1]
-    target_base_name = target_base_name.split('_')[0]
+    base_name: str = extract_base_name(sources[-1])
+    target_base_name: str = extract_base_name(target)
+    prefix: str = f"{base_name}{target_base_name}"
 
-    # Target Space
     target_space: str = cmds.createNode(
-        'transform',
-        name=f'{base_name}{target_base_name}Space_null',
+        "transform",
+        name=f"{prefix}Space_null",
         parent=target,
     )
-    cmds.setAttr(f'{target_space}.visibility', False)
-    cmds.setAttr(f'{target_space}.hiddenInOutliner', True)
+    cmds.setAttr(f"{target_space}.visibility", False)
+    cmds.setAttr(f"{target_space}.hiddenInOutliner", True)
     target_space = cmds.parent(target_space, sources[-1])[0]
+    dcc.attribute.lock_and_hide([target_space], True, True, True, True)
 
-    for attr in ['translate', 'rotate', 'scale', 'visibility']:
-        cmds.setAttr(
-            f'{target_space}.{attr}',
-            lock=True,
-            keyable=False,
-            channelBox=False,
-        )
-
-    # Mult Matrix
-    mult_matrix: str = cmds.createNode(
-        'multMatrix', name=f'{base_name}{target_base_name}_multMtx'
-    )
-
-    if space == 0:
-        # Calc Matrix
-        cmds.connectAttr(
-            f'{target_space}.worldMatrix[0]', f'{mult_matrix}.matrixIn[0]'
-        )
-        cmds.connectAttr(
-            f'{target}.parentInverseMatrix[0]',
-            f'{mult_matrix}.matrixIn[1]',
-        )
-
-    else:
-        cmds.connectAttr(f'{target_space}.matrix', f'{mult_matrix}.matrixIn[0]')
-
-        # Reverse sources.
-        sources = list(reversed(sources))
-
-        # Calc Matrix
-        i: int = 0
-        for i, node in enumerate(sources, 1):
-            cmds.connectAttr(f'{node}.matrix', f'{mult_matrix}.matrixIn[{i}]')
-
-        if follows_parent:
-            cmds.connectAttr(
-                f'{sources[-1]}.parentMatrix[0]',
-                f'{mult_matrix}.matrixIn[{i+1}]',
-            )
-            cmds.connectAttr(
-                f'{target}.parentInverseMatrix[0]',
-                f'{mult_matrix}.matrixIn[{i+2}]',
-            )
-
-    # Decompose Matrix
     decompose_mtx: str = cmds.createNode(
-        'decomposeMatrix',
-        name=f'{base_name}{target_base_name}_decomposeMtx',
+        "decomposeMatrix",
+        name=f"{prefix}_decomposeMtx",
     )
-    cmds.connectAttr(f'{mult_matrix}.matrixSum', f'{decompose_mtx}.inputMatrix')
+    cmds.connectAttr(
+        f"{target}.rotateOrder", f"{decompose_mtx}.inputRotateOrder"
+    )
 
-    # Cancels out joint orient.
-    if cmds.objectType(target) == 'joint':
-        # Euler to Quat
-        joint_orient_quat: str = cmds.createNode(
-            'eulerToQuat', name=f'{base_name}{target_base_name}_etq'
-        )
-        cmds.connectAttr(
-            f'{target}.jointOrient', f'{joint_orient_quat}.inputRotate'
-        )
+    # World
+    if space == 0:
+        matrix_plugs: list[str] = [
+            f"{target_space}.worldMatrix[0]",
+            f"{target}.parentInverseMatrix[0]",
+        ]
 
-        # Invert
-        invert_joint_orient_quat: str = cmds.createNode(
-            'quatInvert', name=f'{base_name}{target_base_name}_qi'
-        )
-        cmds.connectAttr(
-            f'{joint_orient_quat}.outputQuat',
-            f'{invert_joint_orient_quat}.inputQuat',
-        )
-
-        # Remove joint orient
-        remove_orient_prod: str = cmds.createNode(
-            'quatProd', name=f'{base_name}{target_base_name}_qp'
-        )
-        cmds.connectAttr(
-            f'{decompose_mtx}.outputQuat',
-            f'{remove_orient_prod}.input1Quat',
-        )
-        cmds.connectAttr(
-            f'{invert_joint_orient_quat}.outputQuat',
-            f'{remove_orient_prod}.input2Quat',
-        )
-
-        # Quat to Euler
-        joint_orient_euler: str = cmds.createNode(
-            'quatToEuler', name=f'{base_name}{target_base_name}_qte'
-        )
-        cmds.connectAttr(
-            f'{remove_orient_prod}.outputQuat',
-            f'{joint_orient_euler}.inputQuat',
-        )
-        cmds.connectAttr(
-            f'{target}.rotateOrder',
-            f'{joint_orient_euler}.inputRotateOrder',
-        )
-
-        # Target
-        cmds.connectAttr(
-            f'{decompose_mtx}.outputTranslate',
-            f'{target}.translate',
-            force=True,
-        )
-        cmds.connectAttr(
-            f'{joint_orient_euler}.outputRotate',
-            f'{target}.rotate',
-            force=True,
-        )
-        cmds.connectAttr(
-            f'{decompose_mtx}.outputScale',
-            f'{target}.scale',
-            force=True,
-        )
-        cmds.connectAttr(
-            f'{decompose_mtx}.outputShear',
-            f'{target}.shear',
-            force=True,
-        )
-
-    # Transform
+    # Local
     else:
-        # Target
-        cmds.connectAttr(
-            f'{decompose_mtx}.outputTranslate',
-            f'{target}.translate',
-            force=True,
-        )
-        cmds.connectAttr(
-            f'{decompose_mtx}.outputRotate',
-            f'{target}.rotate',
-            force=True,
-        )
-        cmds.connectAttr(
-            f'{decompose_mtx}.outputScale',
-            f'{target}.scale',
-            force=True,
-        )
-        cmds.connectAttr(
-            f'{decompose_mtx}.outputShear',
-            f'{target}.shear',
-            force=True,
-        )
+        sources = list(reversed(sources))
+        matrix_plugs = [f"{target_space}.matrix"] + [
+            f"{node}.matrix" for node in sources
+        ]
+        if follows_parent:
+            matrix_plugs.extend(
+                [
+                    f"{sources[-1]}.parentMatrix[0]",
+                    f"{target}.parentInverseMatrix[0]",
+                ]
+            )
 
-    # Update Outliner
-    for panel in cmds.getPanel(type='outlinerPanel'):
+    connect_mult_matrix(prefix, matrix_plugs, f"{decompose_mtx}.inputMatrix")
+
+    rotate_plug: str = f"{decompose_mtx}.outputRotate"
+    if cmds.objectType(target) == "joint":
+        rotate_plug = cancel_joint_orient(prefix, target, decompose_mtx)
+
+    cmds.connectAttr(
+        f"{decompose_mtx}.outputTranslate", f"{target}.translate", force=True
+    )
+    cmds.connectAttr(rotate_plug, f"{target}.rotate", force=True)
+    cmds.connectAttr(
+        f"{decompose_mtx}.outputScale", f"{target}.scale", force=True
+    )
+    cmds.connectAttr(
+        f"{decompose_mtx}.outputShear", f"{target}.shear", force=True
+    )
+
+    # TODO: Consider moving outliner refresh to amaterasu.base (e.g., dcc.ui).
+    for panel in cmds.getPanel(type="outlinerPanel") or []:
         cmds.outlinerEditor(panel, edit=True, refresh=True)
 
-    # Clean up
-    # history_visibility.main([target, *sources], 0)
     dcc.node.hide_history([target, *sources])
 
 
-def main(unique_id: str = '') -> None:
-    '''Show window.'''
+def main(unique_id: str = "") -> None:
+    """Initializes and displays the main application window.
+
+    Args:
+        unique_id (str, optional): A unique identifier for restoring
+            window states. Defaults to "".
+    """
     window: MainWindow = MainWindow(unique_id=unique_id)
     window.show()
