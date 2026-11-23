@@ -285,6 +285,9 @@ def apply(
     cmds.connectAttr(f"{soft_mod_ctrl}.rotate", f"{soft_mod_handle}.rotate")
     cmds.connectAttr(f"{soft_mod_ctrl}.scale", f"{soft_mod_handle}.scale")
     cmds.connectAttr(f"{soft_mod_ctrl}.shear", f"{soft_mod_handle}.shear")
+    cmds.connectAttr(
+        f"{soft_mod_ctrl}.rotateOrder", f"{soft_mod_handle}.rotateOrder"
+    )
 
     dcc.attribute.add_separator(soft_mod_ctrl, "softMod", channelBox=True)
 
